@@ -50,15 +50,17 @@ const Avd_Dec: React.FC = () => {
         throw new Error(`Status ${response.status}: ${text}`);
       }
       const result: MarketBreadthData = await response.json();
-      const latestSlot = result.chartData?.[result.chartData.length - 1]?.time;
+      const latestSlot = result.chartData && result.chartData.length > 0 
+        ? result.chartData[result.chartData.length - 1].time 
+        : null;
       if (latestSlot && latestSlot !== lastSlotRef.current) {
         setData(result);
         setLoading(false);
-        lastSlotRef.current = latestSlot ?? null;
+        lastSlotRef.current = latestSlot;
       } else if (!data) {
         setData(result);
         setLoading(false);
-        lastSlotRef.current = latestSlot ?? null;
+        lastSlotRef.current = latestSlot;
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -71,7 +73,6 @@ const Avd_Dec: React.FC = () => {
     fetchMarketBreadth();
     const interval = setInterval(fetchMarketBreadth, 5000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -112,13 +113,19 @@ const Avd_Dec: React.FC = () => {
       </div>
       <div style={{ minHeight: 220, width: "100%", position: "relative" }}>
         <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={data ? data.chartData : []} margin={{ right: 20, left: -20 }}>
+          <AreaChart 
+            data={data ? data.chartData : []} 
+            margin={{ right: 20, left: -20 }}
+          >
             <XAxis
               dataKey="time"
               stroke="#9CA3AF"
               tick={{ fill: "#9CA3AF", fontSize: 7 }}
             />
-            <YAxis stroke="#9CA3AF" tick={{ fill: "#9CA3AF", fontSize: 10 }} />
+            <YAxis 
+              stroke="#9CA3AF" 
+              tick={{ fill: "#9CA3AF", fontSize: 10 }} 
+            />
             <Tooltip
               contentStyle={{
                 backgroundColor: "#1F2937",
