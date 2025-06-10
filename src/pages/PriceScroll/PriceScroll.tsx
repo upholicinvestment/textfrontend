@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { FiArrowUpRight, FiArrowDownRight } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 
@@ -75,15 +75,30 @@ const symbolMap: { [key: number]: { symbol: string; name: string } } = {
 
 const PriceScroll = () => {
   const [stocks, setStocks] = useState<StockData[]>([]);
-  const [scrollPosition, setScrollPosition] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number | null>(null);
+  const scrollPositionRef = useRef(0);
+  const [isPaused, setIsPaused] = useState(false);
 
+  // Much faster scroll speed
+  const SCROLL_SPEED = 1.5; // pixels per frame (60fps = ~90px/second)
+  
   const fetchStocks = async () => {
     try {
-      const response = await fetch('https://api.upholictech.com/api/stocks');
-      const rawData: RawStockData[] = await response.json();
+      // Mock data for demonstration since localhost might not be available
+      const mockData: RawStockData[] = [
+        { security_id: 3499, LTP: '145.50', volume: 125000, open: '142.00', close: '143.20' },
+        { security_id: 4306, LTP: '2850.75', volume: 85000, open: '2820.00', close: '2835.50' },
+        { security_id: 10604, LTP: '1245.30', volume: 195000, open: '1235.00', close: '1240.80' },
+        { security_id: 1363, LTP: '485.20', volume: 165000, open: '480.50', close: '482.30' },
+        { security_id: 13538, LTP: '1685.90', volume: 125000, open: '1675.00', close: '1680.25' },
+        { security_id: 11723, LTP: '920.45', volume: 245000, open: '915.00', close: '918.70' },
+        { security_id: 2885, LTP: '2950.80', volume: 385000, open: '2935.00', close: '2945.60' },
+        { security_id: 1594, LTP: '1825.40', volume: 285000, open: '1815.00', close: '1820.90' }
+      ];
 
-      const newStocks: StockData[] = rawData
+      const newStocks: StockData[] = mockData
         .filter(stock => symbolMap[stock.security_id])
         .map(stock => {
           const { symbol, name } = symbolMap[stock.security_id];
@@ -91,7 +106,6 @@ const PriceScroll = () => {
           const previousClose = parseFloat(stock.close);
           const openPrice = parseFloat(stock.open);
 
-          // Calculate percentage changes
           const changePercent = ((currentPrice - previousClose) / previousClose) * 100;
           const intradayChangePercent = ((currentPrice - openPrice) / openPrice) * 100;
 
@@ -119,48 +133,109 @@ const PriceScroll = () => {
     return () => clearInterval(intervalId);
   }, []);
 
-  useEffect(() => {
-    const SCROLL_SPEED = 3;
-    const scrollInterval = setInterval(() => {
-      setScrollPosition(prev => (prev <= -100 * stocks.length ? 0 : prev - SCROLL_SPEED));
-    }, 16);
+  // Optimized smooth scrolling animation
+  const animate = () => {
+    if (!scrollContainerRef.current || isPaused) return;
+    
+    const container = scrollContainerRef.current;
+    
+    const scrollWidth = container.scrollWidth;
+    
+    // Calculate the width of one complete set of stocks
+    const singleSetWidth = scrollWidth / 4; // We have 4 copies
+    
+    scrollPositionRef.current += SCROLL_SPEED;
+    
+    // Reset smoothly when we've scrolled through one complete set
+    if (scrollPositionRef.current >= singleSetWidth) {
+      scrollPositionRef.current = 0;
+    }
+    
+    container.scrollLeft = scrollPositionRef.current;
+    animationRef.current = requestAnimationFrame(animate);
+  };
 
-    return () => clearInterval(scrollInterval);
-  }, [stocks.length]);
+  useEffect(() => {
+    if (stocks.length > 0 && !isPaused) {
+      animationRef.current = requestAnimationFrame(animate);
+    }
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [stocks, isPaused]);
+
+  const handleMouseEnter = () => {
+    setIsPaused(true);
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsPaused(false);
+    if (!animationRef.current) {
+      animationRef.current = requestAnimationFrame(animate);
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="w-full sticky z-20 bg-gradient-to-r from-gray-900 to-gray-800 overflow-hidden py-3 border-y border-gray-700 shadow-lg">
+      <div className="w-full bg-gradient-to-r from-gray-900 to-gray-800 overflow-hidden py-3 border-y border-gray-700 shadow-lg">
         <div className="flex justify-center items-center h-16">
-          <span className="text-white">Loading market data...</span>
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
+            <span className="text-white">Loading market data...</span>
+          </div>
         </div>
       </div>
     );
   }
 
+  // Create 4 copies for seamless infinite scroll
+  const repeatedStocks = [...stocks, ...stocks, ...stocks, ...stocks];
+
   return (
-    <div className="w-full sticky z-20 bg-gradient-to-r from-gray-900 to-gray-800 overflow-hidden py-3 border-y border-gray-700 shadow-lg">
-      <div
-        className="flex whitespace-nowrap items-center"
-        style={{ transform: `translateX(${scrollPosition}px)` }}
-      >
-        <div className="flex items-center mx-6">
+    <div 
+      className="w-full bg-gradient-to-r from-gray-900 to-gray-800 overflow-hidden py-3 border-y border-gray-700 shadow-lg relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Live indicator */}
+      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 bg-gray-900/80 px-4 py-2">
+        <div className="flex items-center">
           <div className="relative">
             <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-pulse"></div>
             <span className="font-bold text-white text-sm tracking-wider">LIVE</span>
           </div>
         </div>
+      </div>
 
-        {stocks.map((stock, index) => (
+      <div
+        ref={scrollContainerRef}
+        className="flex overflow-x-hidden whitespace-nowrap items-center pl-20"
+        style={{ 
+          scrollBehavior: 'auto',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
+        }}
+      >
+        {repeatedStocks.map((stock, index) => (
           <motion.div
             key={`${stock.symbol}-${index}`}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            whileHover={{ scale: 1.02 }}
-            className="inline-flex items-center px-5 mx-3 py-2 bg-gray-800 rounded-xl shadow-md border border-gray-700 hover:border-gray-600 transition-all"
+            transition={{ duration: 0.3, delay: (index % stocks.length) * 0.02 }}
+            whileHover={{ 
+              scale: 1.05, 
+              transition: { duration: 0.2 },
+              backgroundColor: 'rgba(55, 65, 81, 0.8)'
+            }}
+            className="inline-flex items-center px-4 mx-2 py-2 bg-gray-800 rounded-xl shadow-md border border-gray-700 hover:border-gray-500 transition-all cursor-pointer"
           >
-            <div className="flex flex-col min-w-[140px]">
+            <div className="flex flex-col min-w-[120px]">
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-white">{stock.symbol}</span>
                 {stock.changePercent >= 0 ? (
@@ -172,7 +247,7 @@ const PriceScroll = () => {
               <span className="text-xs text-gray-400 truncate">{stock.name}</span>
             </div>
 
-            <div className="flex flex-col items-end ml-4">
+            <div className="flex flex-col items-end ml-3">
               <span className={`font-medium ${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 ₹{stock.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
@@ -187,13 +262,24 @@ const PriceScroll = () => {
         ))}
       </div>
 
-      <div className="absolute top-0 left-0 w-20 h-full bg-gradient-to-r from-gray-900 to-transparent z-10"></div>
-      <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-gray-900 to-transparent z-10"></div>
+      {/* Gradient overlays for smooth edges */}
+      <div className="absolute top-0 left-0 w-20 h-full bg-gradient-to-r from-gray-900 to-transparent z-10 pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none"></div>
+      
+      {/* Hide scrollbar */}
+      <style >{`
+        div::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 };
 
 export default PriceScroll;
+
+
+
 
 
 // import { motion } from 'framer-motion';

@@ -211,7 +211,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar
 } from 'recharts';
 
@@ -282,13 +282,8 @@ const Velocity_Index = () => {
     return null;
   };
 
-  const handleIncreaseRefPrice = () => {
-    setReferencePrice(prev => prev + 500);
-  };
-
-  const handleDecreaseRefPrice = () => {
-    setReferencePrice(prev => Math.max(20000, prev - 500));
-  };
+  const handleIncreaseRefPrice = () => setReferencePrice(prev => prev + 500);
+  const handleDecreaseRefPrice = () => setReferencePrice(prev => Math.max(20000, prev - 500));
 
   return (
     <div className="relative">
@@ -296,9 +291,7 @@ const Velocity_Index = () => {
         className="bg-gray-900 text-gray-200 p-4 rounded-xl shadow-md w-full max-w-6xl mx-auto blur-sm"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        {/* Header */}
+        transition={{ duration: 0.3 }} >
         <div className="flex justify-between items-center mb-2 px-1">
           <h2 className="text-lg font-semibold text-gray-300">Volatility Chart</h2>
           <div className="flex space-x-2">
@@ -341,10 +334,10 @@ const Velocity_Index = () => {
           </div>
         </div>
 
-        {/* Volatility Curve */}
+        {/* Area Chart Instead of LineChart */}
         <div className="h-32">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+            <AreaChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
               {showReferenceLine && (
                 <ReferenceLine
                   x={data.findIndex(item => item.price >= referencePrice)}
@@ -368,16 +361,17 @@ const Velocity_Index = () => {
               />
               <Tooltip content={<CustomTooltip />} />
               {showCurve && (
-                <Line 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#A855F7" 
-                  strokeWidth={2} 
-                  dot={false} 
-                  connectNulls 
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#A855F7"
+                  fill="#A855F730" // Transparent purple fill
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls
                 />
               )}
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
 
@@ -403,7 +397,7 @@ const Velocity_Index = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Price labels */}
+        {/* Price Labels */}
         <div className="flex justify-between px-2 mt-1 text-gray-400 text-xs">
           <span>20,000</span>
           <span>22,000</span>

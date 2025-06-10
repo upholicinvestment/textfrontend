@@ -4,3 +4,40 @@
     /* padding: 2rem; */
     text-align: center;
 }
+
+
+/* Add to App.css */
+.candle-enter {
+  opacity: 0;
+}
+
+.candle-enter-active {
+  opacity: 1;
+  transition: opacity 300ms ease-out;
+}
+
+/* Wick animation */
+@keyframes wick-grow {
+  from { height: 0; }
+  to { height: var(--final-height); }
+}
+
+.candle-wick {
+  animation: wick-grow 0.3s ease-out forwards;
+}
+
+/* Body animation */
+@keyframes body-grow {
+  from { 
+    height: 0;
+    opacity: 0;
+  }
+  to { 
+    height: var(--final-height);
+    opacity: 1;
+  }
+}
+
+.candle-body {
+  animation: body-grow 0.4s ease-out forwards;
+}
