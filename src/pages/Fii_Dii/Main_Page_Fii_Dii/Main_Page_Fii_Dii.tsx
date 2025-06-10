@@ -10,24 +10,21 @@ import NiftyChart from '../Analysis/Analysis';
 const Main_Page_Fii_Dii = () => {
   const [activeTab, setActiveTab] = useState('Summary');
 
-
   const tabs = [
     { id: 'history', label: 'Analysis' },
     { id: 'summary', label: 'Summary' },
-    { id: 'fno', label: 'Futures and Options' },
-    { id: 'cash', label: 'Cash Market' },
+    { id: 'fno', label: 'F&O' }, // Shortened for mobile
+    { id: 'cash', label: 'Cash' }, // Shortened for mobile
   ];
 
-
-  // Add dark mode toggle button in your header
   const HistoryContent = () => (
-    <div className="sensibull-tab-content">
+    <div className="mt-4 sm:mt-6">
       <NiftyChart />
     </div>
   );
 
   const SummaryContent = () => (
-    <div className="sensibull-tab-content">
+    <div className="mt-4 sm:mt-6">
       <Summary />
     </div>
   );
@@ -52,17 +49,17 @@ const Main_Page_Fii_Dii = () => {
     };
 
     return (
-      <div className="sensibull-tab-content">
-        <h3>Futures & Options Data</h3>
-        <div style={{ marginBottom: '20px' }}>
-          <label htmlFor="participant-select" style={{ marginRight: '10px' }}>
+      <div className="mt-4 sm:mt-6">
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">Futures & Options Data</h3>
+        <div className="mb-4 sm:mb-6">
+          <label htmlFor="participant-select" className="mr-2 text-gray-700 text-sm sm:text-base">
             Select Participant:
           </label>
           <select
             id="participant-select"
             value={activeParticipant}
             onChange={(e) => setActiveParticipant(e.target.value)}
-            className="sensibull-dropdown"
+            className="px-2 py-1 sm:px-3 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             {participantTabs.map((tab) => (
               <option key={tab} value={tab}>
@@ -77,9 +74,9 @@ const Main_Page_Fii_Dii = () => {
   };
 
   const CashContent = () => (
-    <div className="sensibull-tab-content">
-      <h3>Cash Market Data</h3>
-      <p>Equity market trading information</p>
+    <div className="mt-4 sm:mt-6">
+      <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Cash Market Data</h3>
+      <p className="text-gray-600 text-sm sm:text-base mb-3 sm:mb-4">Equity market trading information</p>
       <FII_DII_Data />
     </div>
   );
@@ -88,9 +85,9 @@ const Main_Page_Fii_Dii = () => {
     switch (activeTab) {
       case 'Summary':
         return <SummaryContent />;
-      case 'Futures and Options':
+      case 'F&O':
         return <FNOContent />;
-      case 'Cash Market':
+      case 'Cash':
         return <CashContent />;
       case 'Analysis':
         return <HistoryContent />;
@@ -100,14 +97,17 @@ const Main_Page_Fii_Dii = () => {
   };
 
   return (
-    <div className={`sensibull-container`}>
-      <div className="sensibull-header-ui">
-        <div className="sensibull-tabs-container">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
+      {/* Responsive tabs container */}
+      <div className="mb-4 sm:mb-6">
+        <div className="inline-flex flex-wrap gap-1 bg-white rounded-lg shadow-sm p-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              className={`sensibull-tab-item ${
-                activeTab === tab.label ? 'sensibull-tab-active' : ''
+              className={`px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base rounded-md transition-colors duration-200 whitespace-nowrap ${
+                activeTab === tab.label
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'text-gray-600 hover:bg-gray-100'
               }`}
               onClick={() => setActiveTab(tab.label)}
             >
@@ -115,10 +115,12 @@ const Main_Page_Fii_Dii = () => {
             </button>
           ))}
         </div>
-        {/* Add dark mode toggle button */}
       </div>
 
-      <div className="sensibull-content-area">{renderTabContent()}</div>
+      {/* Main content area - full width */}
+      <div className="w-full">
+        {renderTabContent()}
+      </div>
     </div>
   );
 };

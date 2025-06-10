@@ -48,7 +48,7 @@ const Pro_Index_Opt: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("https://api.upholictech.com/api/Pro_Index_Opt/data")
+      .get<FIIData[]>("http://localhost:8000/api/Pro_Index_Opt/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
@@ -171,7 +171,7 @@ const Pro_Index_Opt: React.FC = () => {
               orientation="right" 
               tick={{ fontSize: 12, fill: "#6c757d" }}
               label={{ 
-                value: "Pro Activity (₹ Cr)", 
+                value: "Pro Activity", 
                 angle: -90, 
                 position: "insideRight",
                 fontSize: 12,
@@ -189,7 +189,7 @@ const Pro_Index_Opt: React.FC = () => {
               }}
               formatter={(value, name) => {
                 if (name === "Pro Call Change" || name === "Pro Put Change") {
-                  return [value.toLocaleString() + " Cr", name];
+                  return [value.toLocaleString(), name];
                 }
                 return [value, name];
               }}
@@ -241,12 +241,6 @@ const Pro_Index_Opt: React.FC = () => {
         </ResponsiveContainer>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>
-        <a className='header-button' href="/fii_dii" style={buttonStyle}>FII/DII Data</a>
-        <a className='header-button' href="/pro_oi_index_fut" style={buttonStyle}>Pro Futures OI</a>
-        <a className='header-button' href="/pro_oi_index_opt" style={buttonStyle}>Pro Options OI</a>
-      </div>
-
       <ProIndexFutChart/>
       <ProOIIndexFutChart/>
       <ProOIIndexOptChart/>
@@ -254,17 +248,5 @@ const Pro_Index_Opt: React.FC = () => {
   );
 };
 
-const buttonStyle = {
-  padding: "8px 16px",
-  borderRadius: "20px",
-  backgroundColor: "#495057",
-  color: "white",
-  border: "none",
-  cursor: "pointer",
-  fontWeight: "500",
-  textDecoration: "none",
-  transition: "all 0.2s ease",
-  boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-};
 
 export default Pro_Index_Opt;

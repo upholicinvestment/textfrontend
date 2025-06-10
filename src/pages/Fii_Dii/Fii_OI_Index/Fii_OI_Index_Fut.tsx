@@ -42,7 +42,7 @@ const Fii_OI_Index_Fut: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("https://api.upholictech.com/api/OIFII_Index_Fut/data")
+      .get<FIIData[]>("http://localhost:8000/api/OIFII_Index_Fut/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
@@ -183,7 +183,7 @@ const Fii_OI_Index_Fut: React.FC = () => {
               }}
               formatter={(value, name) => {
                 if (name === "FII Futures OI") {
-                  return [value.toLocaleString() + " Cr", name];
+                  return [value.toLocaleString(), name];
                 }
                 return [value, name];
               }}

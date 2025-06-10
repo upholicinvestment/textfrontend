@@ -49,7 +49,7 @@ const Dii_Index_Fut: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("https://api.upholictech.com/api/DII_Index_Fut/data")
+      .get<FIIData[]>("http://localhost:8000/api/DII_Index_Fut/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
@@ -118,21 +118,21 @@ const Dii_Index_Fut: React.FC = () => {
             <YAxis
               yAxisId="right"
               orientation="right"
-              label={{ value: "DII Buy/Sell (₹ Cr)", angle: -90, position: "insideRight" }}
+              label={{ value: "DII Buy/Sell", angle: -90, position: "insideRight" }}
             />
             <Tooltip 
               formatter={(value, name) => {
                 if (name === "NIFTY") {
                   return [value, "NIFTY Value"];
                 }
-                return [value, "DII Index Futures (₹ Cr)"];
+                return [value, "DII Index Futures"];
               }}
             />
             <Legend />
             <Bar
               yAxisId="right"
               dataKey="callChange"
-              name="DII Index Futures (₹ Cr)"
+              name="DII Index Futures"
             >
               {filteredData.map((entry, index) => (
                 <Cell 

@@ -51,7 +51,7 @@ const Client_OI_Index_Opt: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("https://api.upholictech.com/api/OIClient_Index_Opt/data")
+      .get<FIIData[]>("http://localhost:8000/api/OIClient_Index_Opt/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);

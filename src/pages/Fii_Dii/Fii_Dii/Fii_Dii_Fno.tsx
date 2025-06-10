@@ -48,7 +48,7 @@ const Fii_Dii_Fno: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("https://api.upholictech.com/api/data")
+      .get<FIIData[]>("http://localhost:8000/api/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
@@ -171,7 +171,7 @@ const Fii_Dii_Fno: React.FC = () => {
               orientation="right" 
               tick={{ fontSize: 12, fill: "#6c757d" }}
               label={{ 
-                value: "FII Activity (₹ Cr)", 
+                value: "FII Activity", 
                 angle: -90, 
                 position: "insideRight",
                 fontSize: 12,
@@ -189,7 +189,7 @@ const Fii_Dii_Fno: React.FC = () => {
               }}
               formatter={(value, name) => {
                 if (name === "FII Call Change" || name === "FII Put Change") {
-                  return [value.toLocaleString() + " Cr", name];
+                  return [value.toLocaleString(), name];
                 }
                 return [value, name];
               }}
@@ -241,12 +241,6 @@ const Fii_Dii_Fno: React.FC = () => {
         </ResponsiveContainer>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>
-        <a className='header-button' href="/fii_dii" style={buttonStyle}>FII/DII Data</a>
-        <a className='header-button' href="/fii_index_fut" style={buttonStyle}>FII Futures</a>
-        <a className='header-button' href="/fii_oi_index_opt" style={buttonStyle}>FII Options OI</a>
-      </div>
-
       <FIIIndexFutChart/>
       <FIIOIIndexFutChart/>
       <FIIOIIndexOptChart/>
@@ -254,17 +248,6 @@ const Fii_Dii_Fno: React.FC = () => {
   );
 };
 
-const buttonStyle = {
-  padding: "8px 16px",
-  borderRadius: "20px",
-  backgroundColor: "#495057",
-  color: "white",
-  border: "none",
-  cursor: "pointer",
-  fontWeight: "500",
-  textDecoration: "none",
-  transition: "all 0.2s ease",
-  boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-};
+
 
 export default Fii_Dii_Fno;

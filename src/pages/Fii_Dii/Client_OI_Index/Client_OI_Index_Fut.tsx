@@ -43,7 +43,7 @@ const Client_OI_Index_Fut: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("https://api.upholictech.com/api/OIClient_Index_Fut/data")
+      .get<FIIData[]>("http://localhost:8000/api/OIClient_Index_Fut/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
@@ -134,7 +134,7 @@ const Client_OI_Index_Fut: React.FC = () => {
             <Tooltip 
               formatter={(value, name) => {
                 if (name === "NIFTY") return [value, "NIFTY Value"];
-                if (name === "Client Futures OI") return [`₹ ${value.toLocaleString()} Cr`, name];
+                if (name === "Client Futures OI") return [` ${value.toLocaleString()}`, name];
                 return [value, name];
               }}
               labelFormatter={(label) => `Date: ${label}`}

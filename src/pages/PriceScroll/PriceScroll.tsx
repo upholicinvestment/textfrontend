@@ -69,7 +69,7 @@ const symbolMap: { [key: number]: { symbol: string; name: string } } = {
    236: { symbol: 'ASIANPAINT', name: 'Asian Paints' },
    3456: { symbol: 'TATAMOTORS', name: 'Tata Motors' }, };
 
-const API_URL = 'https://api.upholictech.com/api/stocks';
+const API_URL = 'http://localhost:8000/api/stocks';
 const CARD_WIDTH = 320;
 const BASE_SCROLL_SPEED = 50; // px/sec
 const SCROLL_ACCELERATION = 2;

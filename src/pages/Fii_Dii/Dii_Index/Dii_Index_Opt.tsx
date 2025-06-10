@@ -45,7 +45,7 @@ const Dii_Index_Opt: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("https://api.upholictech.com/api/DII_Index_Opt/data")
+      .get<FIIData[]>("http://localhost:8000/api/DII_Index_Opt/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
@@ -126,7 +126,7 @@ const Dii_Index_Opt: React.FC = () => {
               yAxisId="right"  
               orientation="right" 
               label={{ 
-                value: "DII Buy/Sell (₹ Cr)", 
+                value: "DII Buy/Sell", 
                 angle: -90, 
                 position: "insideRight",
                 style: { fill: '#388e3c' }
@@ -136,8 +136,8 @@ const Dii_Index_Opt: React.FC = () => {
             <Tooltip 
               formatter={(value, name) => {
                 if (name === "NIFTY") return [value, "NIFTY Value"];
-                if (name === "DII Call Change") return [`₹ ${value.toLocaleString()} Cr`, name];
-                if (name === "DII Put Change") return [`₹ ${value.toLocaleString()} Cr`, name];
+                if (name === "DII Call Change") return [` ${value.toLocaleString()}`, name];
+                if (name === "DII Put Change") return [` ${value.toLocaleString()}`, name];
                 return [value, name];
               }}
               labelFormatter={(label) => `Date: ${label}`}

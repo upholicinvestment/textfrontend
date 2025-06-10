@@ -36,18 +36,15 @@ const allSeries = [
 const monthOrder = ['01','02','03','04','05','06','07','08','09','10','11','12'];
 
 function extractMonths(data: NetOIData[]) {
-  // Use only month number (MM)
   const months = new Set<string>();
   data.forEach(d => {
     const [, month] = d.date.split('-');
     months.add(month);
   });
-  // Return months present in data, sorted Jan–Dec
   return monthOrder.filter(m => months.has(m));
 }
 
 function monthLabel(month: string) {
-  // '01' => 'Jan'
   return dayjs('2024-' + month + '-01').format('MMM');
 }
 
@@ -57,6 +54,7 @@ export default function NetOIChart() {
   const [selectedSeries, setSelectedSeries] = useState<string[]>(allSeries.map(series => series.key));
   const [months, setMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [showControls, setShowControls] = useState(false);
 
   useEffect(() => {
     fetch('http://localhost:8000/api/net-oi')
@@ -66,7 +64,6 @@ export default function NetOIChart() {
         setLoading(false);
         const ms = extractMonths(json);
         setMonths(ms);
-        // Default: latest month present in the data
         if (json.length) {
           const latestMonth = json[json.length - 1].date.split('-')[1];
           setSelectedMonth(latestMonth);
@@ -86,7 +83,6 @@ export default function NetOIChart() {
     );
   };
 
-  // Filter data for selected month (any year)
   const filteredData = data.filter(d => {
     if (!selectedMonth) return true;
     const [, month] = d.date.split('-');
@@ -98,130 +94,120 @@ export default function NetOIChart() {
   }
 
   return (
-    <div className="graph-container" style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
-      {/* Chart */}
-      <div className="chart-wrapper" style={{ flex: 1, backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1)', padding: '20px' }}>
-        {/* Months Button Group */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          {months.map(month => (
-            <button
-              key={month}
-              onClick={() => setSelectedMonth(month)}
-              style={{
-                padding: '7px 18px',
-                borderRadius: '5px',
-                border: month === selectedMonth ? '2px solid #4e73df' : '1px solid #e3e6f0',
-                background: month === selectedMonth ? '#4e73df' : '#fff',
-                color: month === selectedMonth ? '#fff' : '#4e73df',
-                fontWeight: month === selectedMonth ? 700 : 500,
-                cursor: 'pointer',
-                fontSize: '15px',
-                transition: 'all 0.16s'
-              }}
-            >
-              {monthLabel(month)}
-            </button>
-          ))}
-        </div>
-        <ResponsiveContainer width="100%" height={500}>
-          <ComposedChart data={filteredData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e3e6f0" />
-            <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#5a5c69' }} />
-            <YAxis yAxisId="left" orientation="left" tick={{ fontSize: 12, fill: '#5a5c69' }} />
-            <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fontSize: 12, fill: '#5a5c69' }} />
-            <Tooltip contentStyle={{
-              backgroundColor: '#fff',
-              border: '1px solid #e3e6f0',
-              borderRadius: '0.35rem',
-              boxShadow: '0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15)'
-            }} />
-            <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '14px' }} />
-            {allSeries.map(series => (
-              selectedSeries.includes(series.key) && (
-                <Area
-                  key={series.key}
-                  yAxisId={series.axis}
-                  type="monotone"
-                  dataKey={series.key}
-                  fill='none'
-                  stroke={series.color}
-                  strokeWidth={2}
-                  activeDot={{ r: 6 }}
-                  name={series.label}
-                  dot={false}
-                />
-              )
-            ))}
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-      {/* Checkboxes */}
-      <div className="controls-wrapper" style={{
-        minWidth: '220px',
-        backgroundColor: '#fff',
-        borderRadius: '8px',
-        boxShadow: '0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1)',
-        padding: '20px'
-      }}>
-        <h3 style={{
-          marginBottom: '15px',
-          color: '#5a5c69',
-          fontSize: '16px'
-        }}>Toggle Series</h3>
+    <div className="p-4 max-w-7xl mx-auto">
+      {/* Mobile toggle button - only shows on small screens */}
+      <button 
+        onClick={() => setShowControls(!showControls)}
+        className="lg:hidden mb-4 w-full py-2 px-4 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 transition-colors"
+      >
+        {showControls ? 'Hide Controls' : 'Show Controls'}
+      </button>
 
-        <label className="select-all" style={{
-          display: 'block',
-          marginBottom: '15px',
-          paddingBottom: '15px',
-          borderBottom: '1px solid #e3e6f0'
-        }}>
-          <input
-            type="checkbox"
-            checked={selectedSeries.length === allSeries.length}
-            onChange={() => {
-              if (selectedSeries.length === allSeries.length) {
-                setSelectedSeries([]);
-              } else {
-                setSelectedSeries(allSeries.map(series => series.key));
-              }
-            }}
-          />
-          <span style={{
-            fontWeight: 'bold',
-            marginLeft: '8px',
-            color: '#4e73df'
-          }}>Select All</span>
-        </label>
-        {allSeries.map(series => (
-          <label
-            key={series.key}
-            className="series-toggle"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginBottom: '10px',
-              cursor: 'pointer'
-            }}
-          >
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Chart - always visible */}
+        <div className="flex-1 bg-white rounded-lg shadow-sm p-4 lg:p-6">
+          {/* Months Button Group */}
+          <div className="flex flex-wrap gap-2 mb-6 overflow-x-auto pb-2">
+            {months.map(month => (
+              <button
+                key={month}
+                onClick={() => setSelectedMonth(month)}
+                className={`px-3 py-1 text-sm sm:px-4 sm:py-2 sm:text-base rounded-md transition-colors ${
+                  month === selectedMonth
+                    ? 'bg-blue-600 text-white font-semibold'
+                    : 'bg-white text-blue-600 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                {monthLabel(month)}
+              </button>
+            ))}
+          </div>
+          
+          <div className="w-full h-[300px] sm:h-[400px] md:h-[500px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={filteredData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e3e6f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis yAxisId="left" orientation="left" />
+                <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #e3e6f0',
+                    borderRadius: '0.35rem',
+                    boxShadow: '0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15)'
+                  }} 
+                />
+                <Legend 
+                  wrapperStyle={{ 
+                    paddingTop: '10px',
+                    fontSize: '12px',
+                    display: 'flex',
+                    flexWrap: 'wrap'
+                  }} 
+                />
+                {allSeries.map(series => (
+                  selectedSeries.includes(series.key) && (
+                    <Area
+                      key={series.key}
+                      yAxisId={series.axis}
+                      type="monotone"
+                      dataKey={series.key}
+                      fill='none'
+                      stroke={series.color}
+                      strokeWidth={2}
+                      activeDot={{ r: 4 }}
+                      name={series.label}
+                      dot={false}
+                    />
+                  )
+                ))}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Controls - hidden on mobile unless toggled */}
+        <div className={`${showControls ? 'block' : 'hidden'} lg:block w-full lg:w-64 bg-white rounded-lg shadow-sm p-4 lg:p-6`}>
+          <h3 className="text-lg font-medium text-gray-700 mb-4">Toggle Series</h3>
+
+          <label className="flex items-center mb-4 pb-4 border-b border-gray-200">
             <input
               type="checkbox"
-              checked={selectedSeries.includes(series.key)}
-              onChange={() => handleCheckboxChange(series.key)}
-              style={{ marginRight: '8px' }}
+              checked={selectedSeries.length === allSeries.length}
+              onChange={() => {
+                if (selectedSeries.length === allSeries.length) {
+                  setSelectedSeries([]);
+                } else {
+                  setSelectedSeries(allSeries.map(series => series.key));
+                }
+              }}
+              className="mr-2"
             />
-            <div style={{
-              width: '12px',
-              height: '12px',
-              backgroundColor: series.color,
-              marginRight: '8px',
-              borderRadius: '3px'
-            }}></div>
-            <span style={{
-              color: '#5a5c69',
-              fontSize: '14px'
-            }}>{series.label}</span>
+            <span className="font-semibold text-blue-600">Select All</span>
           </label>
-        ))}
+          
+          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+            {allSeries.map(series => (
+              <label
+                key={series.key}
+                className="flex items-center"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedSeries.includes(series.key)}
+                  onChange={() => handleCheckboxChange(series.key)}
+                  className="mr-2"
+                />
+                <div 
+                  className="w-3 h-3 mr-2 rounded-sm"
+                  style={{ backgroundColor: series.color }}
+                ></div>
+                <span className="text-sm text-gray-700 truncate">{series.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
