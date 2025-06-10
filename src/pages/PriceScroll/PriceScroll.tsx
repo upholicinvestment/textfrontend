@@ -1,6 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { FiArrowUpRight, FiArrowDownRight } from 'react-icons/fi';
-import { motion } from 'framer-motion';
 
 interface RawStockData {
   security_id: number;
@@ -8,8 +7,6 @@ interface RawStockData {
   volume: number;
   open: string;
   close: string;
-  high?: string;
-  low?: string;
 }
 
 interface StockData {
@@ -22,261 +19,274 @@ interface StockData {
 }
 
 const symbolMap: { [key: number]: { symbol: string; name: string } } = {
-  3499: { symbol: 'TATASTEEL', name: 'Tata Steel' },
-  4306: { symbol: 'SHRIRAMFIN', name: 'Shriram Finance' },
-  10604: { symbol: 'BHARTIARTL', name: 'Bharti Airtel' },
-  1363: { symbol: 'HINDALCO', name: 'Hindalco Industries' },
-  13538: { symbol: 'TECHM', name: 'Tech Mahindra' },
-  11723: { symbol: 'JSWSTEEL', name: 'JSW Steel' },
-  5097: { symbol: 'ETERNAL', name: 'Eternal' },
-  25: { symbol: 'ADANIENT', name: 'Adani Enterprises' },
-  2475: { symbol: 'ONGC', name: 'Oil & Natural Gas Corporation' },
-  1594: { symbol: 'INFY', name: 'Infosys' },
-  2031: { symbol: 'M&M', name: 'Mahindra & Mahindra' },
-  16669: { symbol: 'BAJAJ-AUTO', name: 'Bajaj Auto' },
-  1964: { symbol: 'TRENT', name: 'Trent' },
-  11483: { symbol: 'LT', name: 'Larsen & Toubro' },
-  1232: { symbol: 'GRASIM', name: 'Grasim Industries' },
-  7229: { symbol: 'HCLTECH', name: 'HCL Technologies' },
-  2885: { symbol: 'RELIANCE', name: 'Reliance Industries' },
-  16675: { symbol: 'BAJAJFINSV', name: 'Bajaj Finserv' },
-  11536: { symbol: 'TCS', name: 'Tata Consultancy Services' },
-  10999: { symbol: 'MARUTI', name: 'Maruti Suzuki' },
-  18143: { symbol: 'JIOFIN', name: 'Jio Financial Services' },
-  3432: { symbol: 'TATACONSUM', name: 'Tata Consumer Products' },
-  3506: { symbol: 'TITAN', name: 'Titan' },
-  467: { symbol: 'HDFCLIFE', name: 'HDFC Life Insurance' },
-  910: { symbol: 'EICHERMOT', name: 'Eicher Motors' },
-  3787: { symbol: 'WIPRO', name: 'Wipro' },
-  15083: { symbol: 'ADANIPORTS', name: 'Adani Ports & SEZ' },
-  21808: { symbol: 'SBILIFE', name: 'SBI Life Insurance' },
-  1660: { symbol: 'ITC', name: 'ITC' },
-  3045: { symbol: 'SBIN', name: 'State Bank of India' },
-  157: { symbol: 'APOLLOHOSP', name: 'Apollo Hospitals' },
-  881: { symbol: 'DRREDDY', name: 'Dr Reddys Laboratories' },
-  4963: { symbol: 'ICICIBANK', name: 'ICICI Bank' },
-  383: { symbol: 'BEL', name: 'Bharat Electronics' },
-  317: { symbol: 'BAJFINANCE', name: 'Bajaj Finance' },
-  11532: { symbol: 'ULTRACEMCO', name: 'UltraTech Cement' },
-  11630: { symbol: 'NTPC', name: 'NTPC' },
-  3351: { symbol: 'SUNPHARMA', name: 'Sun Pharmaceutical' },
-  14977: { symbol: 'POWERGRID', name: 'Power Grid Corporation of India' },
-  1922: { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank' },
-  5258: { symbol: 'INDUSINDBK', name: 'Indusind Bank' },
-  5900: { symbol: 'AXISBANK', name: 'Axis Bank' },
-  17963: { symbol: 'NESTLEIND', name: 'Nestle' },
-  1394: { symbol: 'HINDUNILVR', name: 'Hindustan Unilever' },
-  1333: { symbol: 'HDFCBANK', name: 'HDFC Bank' },
-  1348: { symbol: 'HEROMOTOCO', name: 'Hero Motocorp' },
-  694: { symbol: 'CIPLA', name: 'Cipla' },
-  236: { symbol: 'ASIANPAINT', name: 'Asian Paints' },
-  3456: { symbol: 'TATAMOTORS', name: 'Tata Motors' },
-};
+   3499: { symbol: 'TATASTEEL', name: 'Tata Steel' },
+   4306: { symbol: 'SHRIRAMFIN', name: 'Shriram Finance' },
+   10604: { symbol: 'BHARTIARTL', name: 'Bharti Airtel' },
+   1363: { symbol: 'HINDALCO', name: 'Hindalco Industries' },
+   13538: { symbol: 'TECHM', name: 'Tech Mahindra' },
+   11723: { symbol: 'JSWSTEEL', name: 'JSW Steel' },
+   5097: { symbol: 'ETERNAL', name: 'Eternal' },
+   25: { symbol: 'ADANIENT', name: 'Adani Enterprises' },
+   2475: { symbol: 'ONGC', name: 'Oil & Natural Gas Corporation' },
+   1594: { symbol: 'INFY', name: 'Infosys' },
+   2031: { symbol: 'M&M', name: 'Mahindra & Mahindra' },
+   16669: { symbol: 'BAJAJ-AUTO', name: 'Bajaj Auto' },
+   1964: { symbol: 'TRENT', name: 'Trent' },
+   11483: { symbol: 'LT', name: 'Larsen & Toubro' },
+   1232: { symbol: 'GRASIM', name: 'Grasim Industries' },
+   7229: { symbol: 'HCLTECH', name: 'HCL Technologies' },
+   2885: { symbol: 'RELIANCE', name: 'Reliance Industries' },
+   16675: { symbol: 'BAJAJFINSV', name: 'Bajaj Finserv' },
+   11536: { symbol: 'TCS', name: 'Tata Consultancy Services' },
+   10999: { symbol: 'MARUTI', name: 'Maruti Suzuki' },
+   18143: { symbol: 'JIOFIN', name: 'Jio Financial Services' },
+   3432: { symbol: 'TATACONSUM', name: 'Tata Consumer Products' },
+   3506: { symbol: 'TITAN', name: 'Titan' },
+   467: { symbol: 'HDFCLIFE', name: 'HDFC Life Insurance' },
+   910: { symbol: 'EICHERMOT', name: 'Eicher Motors' },
+   3787: { symbol: 'WIPRO', name: 'Wipro' },
+   15083: { symbol: 'ADANIPORTS', name: 'Adani Ports & SEZ' },
+   21808: { symbol: 'SBILIFE', name: 'SBI Life Insurance' },
+   1660: { symbol: 'ITC', name: 'ITC' },
+   3045: { symbol: 'SBIN', name: 'State Bank of India' },
+   157: { symbol: 'APOLLOHOSP', name: 'Apollo Hospitals' },
+   881: { symbol: 'DRREDDY', name: 'Dr Reddys Laboratories' },
+   4963: { symbol: 'ICICIBANK', name: 'ICICI Bank' },
+   383: { symbol: 'BEL', name: 'Bharat Electronics' },
+   317: { symbol: 'BAJFINANCE', name: 'Bajaj Finance' },
+   11532: { symbol: 'ULTRACEMCO', name: 'UltraTech Cement' },
+   11630: { symbol: 'NTPC', name: 'NTPC' },
+   3351: { symbol: 'SUNPHARMA', name: 'Sun Pharmaceutical' },
+   14977: { symbol: 'POWERGRID', name: 'Power Grid Corporation of India' },
+   1922: { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank' },
+   5258: { symbol: 'INDUSINDBK', name: 'Indusind Bank' },
+   5900: { symbol: 'AXISBANK', name: 'Axis Bank' },
+   17963: { symbol: 'NESTLEIND', name: 'Nestle' },
+   1394: { symbol: 'HINDUNILVR', name: 'Hindustan Unilever' },
+   1333: { symbol: 'HDFCBANK', name: 'HDFC Bank' },
+   1348: { symbol: 'HEROMOTOCO', name: 'Hero Motocorp' },
+   694: { symbol: 'CIPLA', name: 'Cipla' },
+   236: { symbol: 'ASIANPAINT', name: 'Asian Paints' },
+   3456: { symbol: 'TATAMOTORS', name: 'Tata Motors' }, };
+
+const API_URL = 'https://api.upholictech.com/api/stocks';
+const CARD_WIDTH = 320;
+const BASE_SCROLL_SPEED = 50; // px/sec
+const SCROLL_ACCELERATION = 2;
+const MAX_SPEED = 150;
 
 const PriceScroll = () => {
-  const [stocks, setStocks] = useState<StockData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number | null>(null);
-  const scrollPositionRef = useRef(0);
-  const [isPaused, setIsPaused] = useState(false);
+   const [stocks, setStocks] = useState<StockData[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
+   const [isPaused, setIsPaused] = useState(false);
+   const scrollAreaRef = useRef<HTMLDivElement>(null);
+   const animationRef = useRef<number | null>(null);
+   const scrollPositionRef = useRef(0);
+   const currentSpeedRef = useRef(BASE_SCROLL_SPEED);
+   const lastTimestampRef = useRef(0);
+   const rafActiveRef = useRef(false);
 
-  // Much faster scroll speed
-  const SCROLL_SPEED = 1.5; // pixels per frame (60fps = ~90px/second)
-  
-  const fetchStocks = async () => {
-    try {
-      // Mock data for demonstration since localhost might not be available
-      const mockData: RawStockData[] = [
-        { security_id: 3499, LTP: '145.50', volume: 125000, open: '142.00', close: '143.20' },
-        { security_id: 4306, LTP: '2850.75', volume: 85000, open: '2820.00', close: '2835.50' },
-        { security_id: 10604, LTP: '1245.30', volume: 195000, open: '1235.00', close: '1240.80' },
-        { security_id: 1363, LTP: '485.20', volume: 165000, open: '480.50', close: '482.30' },
-        { security_id: 13538, LTP: '1685.90', volume: 125000, open: '1675.00', close: '1680.25' },
-        { security_id: 11723, LTP: '920.45', volume: 245000, open: '915.00', close: '918.70' },
-        { security_id: 2885, LTP: '2950.80', volume: 385000, open: '2935.00', close: '2945.60' },
-        { security_id: 1594, LTP: '1825.40', volume: 285000, open: '1815.00', close: '1820.90' }
-      ];
+   // Get only latest tick per security_id
+   const fetchStocks = useCallback(async () => {
+     try {
+       const response = await fetch(API_URL);
+       const rawData: RawStockData[] = await response.json();
+       const latestById: { [key: number]: RawStockData } = {};
+       rawData.forEach(stock => {
+         latestById[stock.security_id] = stock;
+       });
 
-      const newStocks: StockData[] = mockData
-        .filter(stock => symbolMap[stock.security_id])
-        .map(stock => {
-          const { symbol, name } = symbolMap[stock.security_id];
-          const currentPrice = parseFloat(stock.LTP);
-          const previousClose = parseFloat(stock.close);
-          const openPrice = parseFloat(stock.open);
+       const newStocks: StockData[] = Object.values(latestById)
+         .filter(stock => symbolMap[stock.security_id])
+         .map(stock => {
+           const { symbol, name } = symbolMap[stock.security_id];
+           const currentPrice = parseFloat(stock.LTP);
+           const previousClose = parseFloat(stock.close);
+           const openPrice = parseFloat(stock.open);
+           const changePercent = ((currentPrice - previousClose) /
+previousClose) * 100;
+           const intradayChangePercent = ((currentPrice - openPrice) /
+openPrice) * 100;
+           return {
+             symbol,
+             name,
+             price: currentPrice,
+             changePercent,
+             intradayChangePercent,
+             volume: stock.volume,
+           };
+         });
+       setStocks(newStocks);
+       setIsLoading(false);
+     } catch (error) {
+       console.error('Error fetching stocks:', error);
+       setIsLoading(false);
+     }
+   }, []);
 
-          const changePercent = ((currentPrice - previousClose) / previousClose) * 100;
-          const intradayChangePercent = ((currentPrice - openPrice) / openPrice) * 100;
+   useEffect(() => {
+     fetchStocks();
+     const intervalId = setInterval(fetchStocks, 5000);
+     return () => clearInterval(intervalId);
+   }, [fetchStocks]);
 
-          return {
-            symbol,
-            name,
-            price: currentPrice,
-            changePercent,
-            intradayChangePercent,
-            volume: stock.volume
-          };
-        });
+   const animate = useCallback((timestamp: number) => {
+     if (!lastTimestampRef.current) lastTimestampRef.current = timestamp;
+     const deltaTime = (timestamp - lastTimestampRef.current) / 1000; // seconds
+     lastTimestampRef.current = timestamp;
 
-      setStocks(newStocks);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error fetching stocks:', error);
-      setIsLoading(false);
-    }
-  };
+     if (!rafActiveRef.current) return;
 
-  useEffect(() => {
-    fetchStocks();
-    const intervalId = setInterval(fetchStocks, 5000);
-    return () => clearInterval(intervalId);
-  }, []);
+     // Easing
+     if (isPaused) {
+       currentSpeedRef.current = Math.max(0, currentSpeedRef.current - SCROLL_ACCELERATION * deltaTime * 60);
+     } else {
+       currentSpeedRef.current = Math.min(MAX_SPEED, currentSpeedRef.current + SCROLL_ACCELERATION * deltaTime * 60);
+     }
 
-  // Optimized smooth scrolling animation
-  const animate = () => {
-    if (!scrollContainerRef.current || isPaused) return;
-    
-    const container = scrollContainerRef.current;
-    
-    const scrollWidth = container.scrollWidth;
-    
-    // Calculate the width of one complete set of stocks
-    const singleSetWidth = scrollWidth / 4; // We have 4 copies
-    
-    scrollPositionRef.current += SCROLL_SPEED;
-    
-    // Reset smoothly when we've scrolled through one complete set
-    if (scrollPositionRef.current >= singleSetWidth) {
-      scrollPositionRef.current = 0;
-    }
-    
-    container.scrollLeft = scrollPositionRef.current;
-    animationRef.current = requestAnimationFrame(animate);
-  };
+     if (currentSpeedRef.current <= 0) {
+       animationRef.current = requestAnimationFrame(animate);
+       return;
+     }
 
-  useEffect(() => {
-    if (stocks.length > 0 && !isPaused) {
-      animationRef.current = requestAnimationFrame(animate);
-    }
-    
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [stocks, isPaused]);
+     const scrollDistance = currentSpeedRef.current * deltaTime;
+     scrollPositionRef.current += scrollDistance;
 
-  const handleMouseEnter = () => {
-    setIsPaused(true);
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-    }
-  };
+     // Calculate the total width of all unique stock cards
+     const scrollLimit = stocks.length * CARD_WIDTH;
 
-  const handleMouseLeave = () => {
-    setIsPaused(false);
-    if (!animationRef.current) {
-      animationRef.current = requestAnimationFrame(animate);
-    }
-  };
+     // When we've scrolled the full width, reset position to 0 seamlessly
+     if (scrollPositionRef.current >= scrollLimit) {
+       scrollPositionRef.current = scrollPositionRef.current % scrollLimit;
+     }
 
-  if (isLoading) {
-    return (
-      <div className="w-full bg-gradient-to-r from-gray-900 to-gray-800 overflow-hidden py-3 border-y border-gray-700 shadow-lg">
-        <div className="flex justify-center items-center h-16">
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
-            <span className="text-white">Loading market data...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+     if (scrollAreaRef.current) {
+       scrollAreaRef.current.style.transform = `translateX(-${scrollPositionRef.current}px)`;
+     }
 
-  // Create 4 copies for seamless infinite scroll
-  const repeatedStocks = [...stocks, ...stocks, ...stocks, ...stocks];
+     animationRef.current = requestAnimationFrame(animate);
+   }, [stocks.length, isPaused]);
 
-  return (
-    <div 
-      className="w-full bg-gradient-to-r from-gray-900 to-gray-800 overflow-hidden py-3 border-y border-gray-700 shadow-lg relative"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {/* Live indicator */}
-      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 bg-gray-900/80 px-4 py-2">
-        <div className="flex items-center">
-          <div className="relative">
-            <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="font-bold text-white text-sm tracking-wider">LIVE</span>
-          </div>
-        </div>
-      </div>
+   useEffect(() => {
+     if (!stocks.length) return;
+     rafActiveRef.current = true;
+     animationRef.current = requestAnimationFrame(animate);
+     return () => {
+       rafActiveRef.current = false;
+       if (animationRef.current) cancelAnimationFrame(animationRef.current);
+     };
+   }, [animate, stocks.length]);
 
-      <div
-        ref={scrollContainerRef}
-        className="flex overflow-x-hidden whitespace-nowrap items-center pl-20"
-        style={{ 
-          scrollBehavior: 'auto',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none'
-        }}
-      >
-        {repeatedStocks.map((stock, index) => (
-          <motion.div
-            key={`${stock.symbol}-${index}`}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: (index % stocks.length) * 0.02 }}
-            whileHover={{ 
-              scale: 1.05, 
-              transition: { duration: 0.2 },
-              backgroundColor: 'rgba(55, 65, 81, 0.8)'
-            }}
-            className="inline-flex items-center px-4 mx-2 py-2 bg-gray-800 rounded-xl shadow-md border border-gray-700 hover:border-gray-500 transition-all cursor-pointer"
-          >
-            <div className="flex flex-col min-w-[120px]">
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-white">{stock.symbol}</span>
-                {stock.changePercent >= 0 ? (
-                  <FiArrowUpRight className="text-green-400 text-sm" />
-                ) : (
-                  <FiArrowDownRight className="text-red-400 text-sm" />
-                )}
-              </div>
-              <span className="text-xs text-gray-400 truncate">{stock.name}</span>
-            </div>
+   const handleMouseEnter = () => setIsPaused(true);
+   const handleMouseLeave = () => setIsPaused(false);
 
-            <div className="flex flex-col items-end ml-3">
-              <span className={`font-medium ${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                ₹{stock.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </span>
-              <div className="flex items-center">
-                <span className={`text-xs font-medium ${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%
-                </span>
-                <span className="text-xs text-gray-400 ml-2">• Vol: {stock.volume.toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+   // Repeat only as much as needed to cover at least two screenfuls (even with 1 or 2 stocks)
+   const visibleCards = Math.ceil(window.innerWidth / CARD_WIDTH) + 1;
+   const loopTimes = Math.max(2, Math.ceil(visibleCards / Math.max(1, stocks.length)));
+   const repeatedStocks = Array(loopTimes).fill(stocks).flat();
 
-      {/* Gradient overlays for smooth edges */}
-      <div className="absolute top-0 left-0 w-20 h-full bg-gradient-to-r from-gray-900 to-transparent z-10 pointer-events-none"></div>
-      <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none"></div>
-      
-      {/* Hide scrollbar */}
-      <style >{`
-        div::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
-    </div>
-  );
+   if (isLoading) {
+     return (
+       <div className="w-full bg-gradient-to-r from-gray-900 to-gray-800 overflow-hidden py-3 border-y border-gray-700 shadow-lg">
+         <div className="flex justify-center items-center h-16">
+           <div className="flex items-center space-x-2">
+             <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
+             <span className="text-white">Loading market data...</span>
+           </div>
+         </div>
+       </div>
+     );
+   }
+
+   if (!stocks.length) {
+     return (
+       <div className="w-full bg-gradient-to-r from-gray-900 to-gray-800 overflow-hidden py-3 border-y border-gray-700 shadow-lg">
+         <div className="flex justify-center items-center h-16">
+           <span className="text-white">No stocks to display.</span>
+         </div>
+       </div>
+     );
+   }
+
+   return (
+     <div
+       className="w-full bg-gradient-to-r from-gray-900 to-gray-800 overflow-hidden py-3 border-y border-gray-700 shadow-lg relative select-none"
+       onMouseEnter={handleMouseEnter}
+       onMouseLeave={handleMouseLeave}
+       style={{ minHeight: 84 }}
+     >
+       {/* Live indicator */}
+       <div className="absolute left-4 top-1/2 transform
+-translate-y-1/2 z-20 bg-gray-900/80 px-4 py-2 rounded-lg shadow">
+         <div className="flex items-center">
+           <div className="relative">
+             <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-pulse"></div>
+             <span className="font-bold text-white text-sm tracking-wider">LIVE</span>
+           </div>
+         </div>
+       </div>
+
+       {/* The animated scroll area (only one transform!) */}
+       <div
+         className="flex items-center whitespace-nowrap will-change-transform"
+         ref={scrollAreaRef}
+         style={{ transform: 'translateX(0)' }}
+       >
+         {repeatedStocks.map((stock, idx) => (
+           <div
+             key={`${stock.symbol}-${idx}`}
+             className="inline-flex items-center mx-2 px-6 py-3
+bg-gray-800 rounded-2xl shadow-md border border-gray-700
+hover:border-gray-400 transition-all cursor-pointer"
+             style={{
+               width: CARD_WIDTH,
+               minWidth: CARD_WIDTH,
+               maxWidth: CARD_WIDTH,
+               flexShrink: 0,
+               backfaceVisibility: 'hidden',
+             }}
+           >
+             <div className="flex flex-col min-w-[140px]">
+               <div className="flex items-center space-x-2">
+                 <span className="font-bold text-white truncate" 
+style={{ maxWidth: '120px' }}>{stock.symbol}</span>
+                 {stock.changePercent >= 0 ? (
+                   <FiArrowUpRight className="text-green-400 text-lg flex-shrink-0" />
+                 ) : (
+                   <FiArrowDownRight className="text-red-400 text-lg flex-shrink-0" />
+                 )}
+               </div>
+               <span className="text-xs text-gray-400 truncate" style={{
+maxWidth: '160px' }}>{stock.name}</span>
+             </div>
+             <div className="flex flex-col items-end ml-4">
+               <span className={`font-medium text-lg ${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                 ₹{stock.price.toLocaleString('en-IN', {
+minimumFractionDigits: 2 })}
+               </span>
+               <div className="flex items-center">
+                 <span className={`text-xs font-medium ${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                   {stock.changePercent >= 0 ? '+' : ''}
+                   {stock.changePercent.toFixed(2)}%
+                 </span>
+                 <span className="text-xs text-gray-400 ml-2">• Vol: 
+{(stock.volume / 1000).toFixed(1)}K</span>
+               </div>
+             </div>
+           </div>
+         ))}
+       </div>
+
+       {/* Gradient overlays */}
+       <div className="absolute top-0 left-0 w-32 h-full bg-gradient-to-r from-gray-900 via-gray-900/90 to-transparent z-10 pointer-events-none"></div>
+       <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-gray-900 via-gray-900/90 to-transparent z-10 pointer-events-none"></div>
+     </div>
+   );
 };
 
 export default PriceScroll;
+
+
 
 
 

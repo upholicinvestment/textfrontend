@@ -50,7 +50,7 @@ const Avd_Dec: React.FC = () => {
         throw new Error(`Status ${response.status}: ${text}`);
       }
       const result: MarketBreadthData = await response.json();
-      const latestSlot = result.chartData?.at(-1)?.time;
+      const latestSlot = result.chartData?.[result.chartData.length - 1]?.time;
       if (latestSlot && latestSlot !== lastSlotRef.current) {
         setData(result);
         setLoading(false);
@@ -71,7 +71,7 @@ const Avd_Dec: React.FC = () => {
     fetchMarketBreadth();
     const interval = setInterval(fetchMarketBreadth, 5000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -85,7 +85,6 @@ const Avd_Dec: React.FC = () => {
     </motion.div>
   );
 
-  // Always render the wrapper, numbers, and chart
   return (
     <Wrapper>
       <h2 className="text-2xl font-bold text-center text-white mb-4">
@@ -188,7 +187,6 @@ const Avd_Dec: React.FC = () => {
 };
 
 export default Avd_Dec;
-
 
 
 
