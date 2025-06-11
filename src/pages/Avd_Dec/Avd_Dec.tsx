@@ -39,7 +39,7 @@ const Avd_Dec: React.FC = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const response = await fetch("http://localhost:8000/api/advdec", {
+      const response = await fetch("https://www.upholictech.com/api/advdec", {
         signal: controller.signal,
       });
 
@@ -50,7 +50,7 @@ const Avd_Dec: React.FC = () => {
         throw new Error(`Status ${response.status}: ${text}`);
       }
       const result: MarketBreadthData = await response.json();
-      const latestSlot = result.chartData?.at(-1)?.time;
+      const latestSlot = result.chartData?.[result.chartData.length - 1]?.time;
       if (latestSlot && latestSlot !== lastSlotRef.current) {
         setData(result);
         setLoading(false);
@@ -85,7 +85,6 @@ const Avd_Dec: React.FC = () => {
     </motion.div>
   );
 
-  // Always render the wrapper, numbers, and chart
   return (
     <Wrapper>
       <h2 className="text-2xl font-bold text-center text-white mb-4">
