@@ -39,7 +39,7 @@ const Avd_Dec: React.FC = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const response = await fetch("http://localhost:8000/api/advdec", {
+      const response = await fetch("https://www.upholictech.com/api/advdec", {
         signal: controller.signal,
       });
 

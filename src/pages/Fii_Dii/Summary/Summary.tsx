@@ -31,7 +31,7 @@ const Summary = () => {
 
   // Fetch available dates from DB
   useEffect(() => {
-    fetch('http://localhost:8000/available-dates')
+    fetch('https://www.upholictech.com/available-dates')
       .then((res) => res.json())
       .then((data) => {
         setAvailableDates(data);
@@ -45,7 +45,7 @@ const Summary = () => {
   // Fetch summary for selected date
   useEffect(() => {
     if (!selectedDate) return;
-    fetch(`http://localhost:8000/summary?date=${selectedDate}`)
+    fetch(`https://www.upholictech.com/summary?date=${selectedDate}`)
       .then((res) => res.json())
       .then((result) => {
         setParticipants(result.data || []);

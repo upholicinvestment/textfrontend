@@ -48,7 +48,7 @@ const Fii_Dii_Fno: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("http://localhost:8000/api/data")
+      .get<FIIData[]>("https://www.upholictech.com/api/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);

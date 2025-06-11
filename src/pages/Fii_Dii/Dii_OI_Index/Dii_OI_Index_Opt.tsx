@@ -51,7 +51,7 @@ const Dii_OI_Index_Opt: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("http://localhost:8000/api/OIDII_Index_Opt/data")
+      .get<FIIData[]>("https://www.upholictech.com/api/OIDII_Index_Opt/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);

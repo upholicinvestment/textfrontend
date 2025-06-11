@@ -41,7 +41,7 @@ const Fii_Index_Fut: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("http://localhost:8000/api/FII_Index_Fut/data")
+      .get<FIIData[]>("https://www.upholictech.com/api/FII_Index_Fut/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
