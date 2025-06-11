@@ -36,36 +36,59 @@ const Avd_Dec: React.FC = () => {
   const fetchMarketBreadth = async () => {
     try {
       setError(null);
+      setLoading(true);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const response = await fetch("https://www.upholictech.com/api/advdec", {
         signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+        },
+        mode: 'cors'
       });
 
       clearTimeout(timeoutId);
 
-      if (!response.ok) {
+      // Check if response is HTML instead of JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        throw new Error(`Status ${response.status}: ${text}`);
+        if (text.startsWith('<!DOCTYPE html>')) {
+          throw new Error('Server returned HTML page instead of JSON. Check API endpoint.');
+        }
+        throw new Error(`Unexpected content type: ${contentType}`);
       }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
+      }
+
       const result: MarketBreadthData = await response.json();
-      const latestSlot = result.chartData && result.chartData.length > 0 
+      
+      // Validate response structure
+      if (!result || !result.current || !result.chartData) {
+        throw new Error('Invalid API response structure');
+      }
+
+      const latestSlot = result.chartData.length > 0 
         ? result.chartData[result.chartData.length - 1].time 
         : null;
+
       if (latestSlot && latestSlot !== lastSlotRef.current) {
         setData(result);
-        setLoading(false);
         lastSlotRef.current = latestSlot;
       } else if (!data) {
         setData(result);
-        setLoading(false);
         lastSlotRef.current = latestSlot;
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
+      const msg = err instanceof Error ? err.message : "Unknown error occurred";
       setError(msg);
-      console.error("Fetch error:", err);
+      console.error("API fetch error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,6 +109,11 @@ const Avd_Dec: React.FC = () => {
     </motion.div>
   );
 
+  // Format numbers with commas
+  const formatNumber = (num: number | undefined) => {
+    return num !== undefined ? num.toLocaleString() : "--";
+  };
+
   return (
     <Wrapper>
       <h2 className="text-2xl font-bold text-center text-white mb-4">
@@ -95,26 +123,26 @@ const Avd_Dec: React.FC = () => {
         <div>
           <span className="text-gray-400">Advances: </span>
           <span className="text-green-400 font-semibold">
-            {data ? data.current.advances : "--"}
+            {formatNumber(data?.current.advances)}
           </span>
         </div>
         <div>
           <span className="text-gray-400">Declines: </span>
           <span className="text-red-400 font-semibold">
-            {data ? data.current.declines : "--"}
+            {formatNumber(data?.current.declines)}
           </span>
         </div>
         <div>
           <span className="text-gray-400">Total: </span>
           <span className="text-blue-300 font-semibold">
-            {data ? data.current.total : "--"}
+            {formatNumber(data?.current.total)}
           </span>
         </div>
       </div>
       <div style={{ minHeight: 220, width: "100%", position: "relative" }}>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart 
-            data={data ? data.chartData : []} 
+            data={data?.chartData || []} 
             margin={{ right: 20, left: -20 }}
           >
             <XAxis
@@ -135,7 +163,7 @@ const Avd_Dec: React.FC = () => {
               }}
               itemStyle={{ color: "#F3F4F6" }}
               formatter={(value: number, name: string) => [
-                value,
+                value.toLocaleString(),
                 name === "advances" ? "Advances" : "Declines",
               ]}
               labelFormatter={(label) => `Time: ${label}`}
@@ -178,14 +206,23 @@ const Avd_Dec: React.FC = () => {
             </defs>
           </AreaChart>
         </ResponsiveContainer>
+
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-60 text-white text-lg z-10">
-            Loading market breadth data...
+            <div className="animate-pulse">Loading market data...</div>
           </div>
         )}
+
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-60 text-red-400 text-lg z-10">
-            Error: {error}
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-60 text-red-400 text-lg z-10 p-4">
+            <div className="text-center mb-2">⚠️ Error loading data</div>
+            <div className="text-sm mb-4 text-center max-w-md">{error}</div>
+            <button
+              onClick={fetchMarketBreadth}
+              className="mt-2 px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 text-white text-sm"
+            >
+              Retry
+            </button>
           </div>
         )}
       </div>
@@ -194,7 +231,6 @@ const Avd_Dec: React.FC = () => {
 };
 
 export default Avd_Dec;
-
 
 
 
