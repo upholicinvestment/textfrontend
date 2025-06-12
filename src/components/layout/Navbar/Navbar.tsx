@@ -75,7 +75,7 @@ const Navbar = () => {
       name: "FIIs/DIIs Data", 
       icon: "📈", 
       color: "bg-cyan-500",
-      path: "/fiis-diis-data" 
+      path: "/main-fii-dii" 
     },
   ];
 
