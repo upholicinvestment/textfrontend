@@ -392,15 +392,15 @@ export default function OIChartTabs() {
           // Pass interval as query param to backend for ATM data
           const intervalMinutes = intervalToMinutes(timeInterval);
           const res = await fetch(
-            `https://www.upholictech.com/api/nifty/atm-strikes-timeline?interval=${intervalMinutes}`
+            `https://api.upholictech.com/api/nifty/atm-strikes-timeline?interval=${intervalMinutes}`
           );
           const json = await res.json();
           setATMData(json.atmStrikes || []);
         } else {
           let endpoint =
             tab === 'NEAR5'
-              ? 'https://www.upholictech.com/api/nifty/near5'
-              : 'https://www.upholictech.com/api/nifty/overall';
+              ? 'https://api.upholictech.com/api/nifty/near5'
+              : 'https://api.upholictech.com/api/nifty/overall';
           const res = await fetch(endpoint);
           const json = await res.json();
           setTimeData(json.near5 || json.overall || []);

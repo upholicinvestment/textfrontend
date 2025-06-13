@@ -6,6 +6,7 @@ import DIIChart from '../../Fii_Dii/Dii_Index/Dii_Index_Opt';
 import ProChart from '../../Fii_Dii/Pro_Index/Pro_Index_Opt';
 import ClientChart from '../../Fii_Dii/Client_Index/Client_Index_Opt';
 import NiftyChart from '../Analysis/Analysis';
+import Navbar from '../../../components/layout/Navbar/Navbar';
 
 const Main_Page_Fii_Dii = () => {
   const [activeTab, setActiveTab] = useState('Summary');
@@ -13,8 +14,8 @@ const Main_Page_Fii_Dii = () => {
   const tabs = [
     { id: 'history', label: 'Analysis' },
     { id: 'summary', label: 'Summary' },
-    { id: 'fno', label: 'F&O' }, // Shortened for mobile
-    { id: 'cash', label: 'Cash' }, // Shortened for mobile
+    { id: 'fno', label: 'F&O' },
+    { id: 'cash', label: 'Cash' },
   ];
 
   const HistoryContent = () => (
@@ -59,7 +60,7 @@ const Main_Page_Fii_Dii = () => {
             id="participant-select"
             value={activeParticipant}
             onChange={(e) => setActiveParticipant(e.target.value)}
-            className="px-2 py-1 sm:px-3 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-2 py-1 sm:px-3 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           >
             {participantTabs.map((tab) => (
               <option key={tab} value={tab}>
@@ -97,29 +98,38 @@ const Main_Page_Fii_Dii = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
-      {/* Responsive tabs container */}
-      <div className="mb-4 sm:mb-6">
-        <div className="inline-flex flex-wrap gap-1 bg-white rounded-lg shadow-sm p-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base rounded-md transition-colors duration-200 whitespace-nowrap ${
-                activeTab === tab.label
-                  ? 'bg-blue-600 text-white font-medium'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-              onClick={() => setActiveTab(tab.label)}
-            >
-              {tab.label}
-            </button>
-          ))}
+    <div className="min-h-screen bg-gray-50">
+      {/* Navbar at the top with no margin above */}
+      <Navbar />
+      
+      {/* Spacer div below navbar only */}
+      <div className="h-6 sm:h-8"></div>
+      
+      {/* Main content container */}
+      <div className="px-4 sm:px-6 pb-6 mt-[70px]">
+        {/* Tabs navigation */}
+        <div className="mb-4 sm:mb-6">
+          <div className="inline-flex flex-wrap gap-1 bg-white rounded-lg shadow-sm p-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                className={`px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base rounded-md transition-colors duration-200 whitespace-nowrap ${
+                  activeTab === tab.label
+                    ? 'bg-indigo-600 text-white font-medium'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+                onClick={() => setActiveTab(tab.label)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Main content area - full width */}
-      <div className="w-full">
-        {renderTabContent()}
+        {/* Tab content area */}
+        <div className="w-full">
+          {renderTabContent()}
+        </div>
       </div>
     </div>
   );

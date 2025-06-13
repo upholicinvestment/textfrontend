@@ -10,6 +10,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Cell,
+  ReferenceLine
 } from "recharts";
 
 interface FIIData {
@@ -25,131 +27,259 @@ interface ChartData {
   putChange: number;
   niftyValue: number;
   month: string;
+  day: string;
+  weekday: string;
 }
 
 const monthNames = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
 ];
 
+const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const Dii_OI_Index_Opt: React.FC = () => {
   const [data, setData] = useState<ChartData[]>([]);
   const [filteredData, setFilteredData] = useState<ChartData[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [months, setMonths] = useState<string[]>([]);
+  const [niftyRange, setNiftyRange] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    axios
-      .get<FIIData[]>("https://www.upholictech.com/api/OIDII_Index_Opt/data")
-      .then((response) => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const response = await axios.get<FIIData[]>("https://api.upholictech.com/api/OIDII_Index_Opt/data");
+        
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
-          const month = monthNames[dateObj.getMonth()];
           return {
             date: item.Date,
             callChange: item.DII_Call_OI,
             putChange: item.DII_Put_OI,
             niftyValue: item.NIFTY_Value,
-            month: month,
+            month: monthNames[dateObj.getMonth()],
+            day: dateObj.getDate().toString(),
+            weekday: weekdayNames[dateObj.getDay()]
           };
         });
-        const uniqueMonths = Array.from(
-          new Set(formattedData.map((d) => d.month))
-        );
 
+        const uniqueMonths = Array.from(new Set(formattedData.map(d => d.month)));
+        const niftyValues = formattedData.map(d => d.niftyValue);
+        
         setData(formattedData);
         setMonths(uniqueMonths);
         setSelectedMonth(uniqueMonths[0] || "");
-      })
-      .catch((error) => console.error("Error fetching data:", error));
+        setNiftyRange({
+          min: Math.min(...niftyValues) * 0.995,
+          max: Math.max(...niftyValues) * 1.005
+        });
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        setError("Failed to load data. Please try again later.");
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   useEffect(() => {
-    if (selectedMonth) {
-      const filtered = data.filter((item) => item.month === selectedMonth);
-      setFilteredData(filtered);
-    }
+    const filtered = selectedMonth ? data.filter(item => item.month === selectedMonth) : [];
+    setFilteredData(filtered);
   }, [selectedMonth, data]);
 
-  return (
-    <div style={{ width: "100%", height: "500px", justifyContent: "center", paddingBottom: '100px' }}>
-      <br />
-      <div style={{ marginBottom: "10px", textAlign: "center" }}>
-        <h4>DII OI in Index Options</h4>
-        {months.map((month) => (
-          <button
-            key={month}
-            onClick={() => setSelectedMonth(month)}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "8px",
-              backgroundColor: selectedMonth === month ? "#007bff" : "#e0e0e0",
-              color: selectedMonth === month ? "white" : "black",
-              border: "none",
-              cursor: "pointer",
-              margin: '3px'
-            }}
-          >
-            {month}
-          </button>
-        ))}
+  const formatTooltipValue = (value: number, name: string) => {
+    if (name.includes("DII")) {
+      return [`₹${value.toLocaleString("en-IN")} Cr`, name];
+    }
+    return [value.toLocaleString("en-IN"), name];
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px] space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+        <p className="text-gray-600">Loading DII Options data...</p>
       </div>
-      
-      <div style={{ height: "100%", width: '1200px', margin: '0 auto' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart 
-            data={filteredData} 
-            margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis 
-              yAxisId="left" 
-              domain={['dataMin - 100', 'dataMax + 100']} 
-              label={{ value: "NIFTY Value", angle: -90, position: "insideLeft" }} 
-            />
-            <YAxis 
-              yAxisId="right"  
-              orientation="right" 
-              label={{ value: "DII Buy/Sell", angle: -90, position: "insideRight" }} 
-            />
-            <Tooltip />
-            <Legend />
-            <Bar 
-              yAxisId="right" 
-              dataKey="callChange" 
-              fill="#4CAF50" 
-              name="DII Call OI" 
-            />
-            <Bar 
-              yAxisId="right" 
-              dataKey="putChange" 
-              fill="#F44336" 
-              name="DII Put OI" 
-            />
-            <Area 
-              yAxisId="left" 
-              type="monotone" 
-              dataKey="niftyValue" 
-              fill="#9C27B0" 
-              stroke="#7B1FA2" 
-              strokeWidth={2} 
-              fillOpacity={0.3} 
-              name="NIFTY" 
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px] p-6 bg-red-50 rounded-lg">
+        <div className="text-red-600 font-medium text-lg mb-2">Error Loading Data</div>
+        <p className="text-gray-700 text-center mb-4">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full max-w-6xl mx-auto p-4">
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-indigo-700 to-blue-600 p-6 text-white">
+          <h1 className="text-2xl font-bold mb-2">DII Open Interest in Index Options</h1>
+          <p className="text-blue-100">
+            Domestic Institutional Investors' Call vs Put Open Interest vs NIFTY 50
+          </p>
+        </div>
+
+        {/* Month Selector */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex flex-wrap gap-2 justify-center">
+            {months.map(month => (
+              <button
+                key={month}
+                onClick={() => setSelectedMonth(month)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  selectedMonth === month 
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {month}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Chart Container */}
+        <div className="p-4 md:p-6">
+          <div className="h-[500px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart 
+                data={filteredData} 
+                margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
+                <XAxis 
+                  dataKey="day" 
+                  tick={{ fontSize: 12, fill: "#6b7280" }}
+                  tickMargin={10}
+                  tickFormatter={(day, index) => `${day} ${filteredData[index]?.weekday}`}
+                />
+                <YAxis 
+                  yAxisId="left" 
+                  domain={[niftyRange.min, niftyRange.max]}
+                  tick={{ fontSize: 12, fill: "#6b7280" }}
+                  tickFormatter={(value) => value.toLocaleString("en-IN")}
+                  label={{ 
+                    value: "NIFTY Value", 
+                    angle: -90, 
+                    position: "insideLeft",
+                    fontSize: 12,
+                    fill: "#374151",
+                    offset: -10
+                  }} 
+                />
+                <YAxis 
+                  yAxisId="right" 
+                  orientation="right" 
+                  tick={{ fontSize: 12, fill: "#6b7280" }}
+                  tickFormatter={(value) => `₹${Math.abs(value).toLocaleString("en-IN")} Cr`}
+                  label={{ 
+                    value: "DII Open Interest", 
+                    angle: -90, 
+                    position: "insideRight",
+                    fontSize: 12,
+                    fill: "#374151",
+                    offset: -10
+                  }} 
+                />
+                <ReferenceLine yAxisId="right" y={0} stroke="#374151" strokeDasharray="3 3" />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: "rgba(255,255,255,0.98)",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                    fontSize: "12px"
+                  }}
+                  labelFormatter={(value) => (
+                    <div className="font-semibold text-gray-700">
+                      {formatDate(value)}
+                    </div>
+                  )}
+                  formatter={formatTooltipValue}
+                />
+                <Legend 
+                  wrapperStyle={{
+                    paddingTop: "20px",
+                    fontSize: "12px"
+                  }}
+                />
+                <Bar 
+                  yAxisId="right" 
+                  dataKey="callChange" 
+                  name="DII Call OI"
+                  barSize={20}
+                  radius={[4, 4, 0, 0]}
+                >
+                  {filteredData.map((entry, index) => (
+                    <Cell 
+                      key={`call-${index}`} 
+                      fill={entry.callChange < 0 ? "#ef4444" : "#10b981"} 
+                    />
+                  ))}
+                </Bar>
+                <Bar 
+                  yAxisId="right" 
+                  dataKey="putChange" 
+                  name="DII Put OI"
+                  barSize={20}
+                  radius={[4, 4, 0, 0]}
+                >
+                  {filteredData.map((entry, index) => (
+                    <Cell 
+                      key={`put-${index}`} 
+                      fill={entry.putChange < 0 ? "#ef4444" : "#3b82f6"} 
+                    />
+                  ))}
+                </Bar>
+                <Area 
+                  yAxisId="left" 
+                  type="monotone" 
+                  dataKey="niftyValue" 
+                  fill="#6366f1" 
+                  stroke="#4f46e5" 
+                  name="NIFTY 50" 
+                  fillOpacity={0.1}
+                  strokeWidth={2}
+                  activeDot={{ r: 6, fill: "#4f46e5", strokeWidth: 0 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-gray-50 px-6 py-3 text-center text-sm text-gray-500 border-t border-gray-200">
+          <p>
+            Data source: Local API | 
+            <span className="text-green-600 mx-2">Green: Call OI</span> | 
+            <span className="text-blue-500 mx-2">Blue: Put OI</span> | 
+            <span className="text-red-500">Red: Negative OI</span>
+          </p>
+        </div>
       </div>
     </div>
   );
