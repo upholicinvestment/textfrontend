@@ -113,10 +113,10 @@ const Client_OI_Index_Fut: React.FC = () => {
                   dataKey="date"
                   tick={{ fontSize: 12, fill: "#6b7280" }}
                   tickMargin={10}
-                  tickFormatter={(value) => {
-                    const date = new Date(value);
-                    return `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
-                  }}
+                  // tickFormatter={(value) => {
+                  //   const date = new Date(value);
+                  //   return `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
+                  // }}
                 />
                 <YAxis
                   yAxisId="left"
@@ -136,7 +136,7 @@ const Client_OI_Index_Fut: React.FC = () => {
                   orientation="right"
                   tick={{ fontSize: 12, fill: "#10b981" }}
                   label={{
-                    value: "Client OI (₹ Cr)",
+                    value: "Client OI",
                     angle: -90,
                     position: "insideRight",
                     style: { fill: "#10b981", fontWeight: 700 },
@@ -157,10 +157,10 @@ const Client_OI_Index_Fut: React.FC = () => {
                     if (name === "Client Futures OI") return [`${value.toLocaleString()}`, name];
                     return [value, name];
                   }}
-                  labelFormatter={(label) => {
-                    const date = new Date(label);
-                    return `${date.getDate()} ${monthNames[date.getMonth()]}`;
-                  }}
+                  // labelFormatter={(label) => {
+                  //   const date = new Date(label);
+                  //   return `${date.getDate()} ${monthNames[date.getMonth()]}`;
+                  // }}
                 />
                 <Legend
                   wrapperStyle={{

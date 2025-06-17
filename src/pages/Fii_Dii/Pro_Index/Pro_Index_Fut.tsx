@@ -102,7 +102,7 @@ const Pro_Index_Fut: React.FC = () => {
 
   const formatTooltipValue = (value: number, name: string) => {
     if (name === "Pro Index Futures") {
-      return [`₹${value.toLocaleString("en-IN")} Cr`, name];
+      return [`₹${value.toLocaleString("en-IN")}`, name];
     }
     return [value.toLocaleString("en-IN"), name];
   };
@@ -180,10 +180,10 @@ const Pro_Index_Fut: React.FC = () => {
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
                 <XAxis 
-                  dataKey="day" 
+                  dataKey="date" 
                   tick={{ fontSize: 12, fill: "#6b7280" }}
                   tickMargin={10}
-                  tickFormatter={(day, index) => `${day} ${filteredData[index]?.weekday}`}
+                  // tickFormatter={(day, index) => `${day} ${filteredData[index]?.weekday}`}
                 />
                 <YAxis 
                   yAxisId="left" 
@@ -203,7 +203,7 @@ const Pro_Index_Fut: React.FC = () => {
                   yAxisId="right" 
                   orientation="right" 
                   tick={{ fontSize: 12, fill: "#6b7280" }}
-                  tickFormatter={(value) => `₹${Math.abs(value).toLocaleString("en-IN")} Cr`}
+                  tickFormatter={(value) => `₹${Math.abs(value).toLocaleString("en-IN")}`}
                   label={{ 
                     value: "Professional Activity", 
                     angle: -90, 

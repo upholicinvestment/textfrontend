@@ -114,10 +114,10 @@ const Client_OI_Index_Opt: React.FC = () => {
                 <XAxis
                   dataKey="date"
                   tick={{ fontSize: 12, fill: "#6b7280" }}
-                  tickFormatter={(value) => {
-                    const date = new Date(value);
-                    return `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
-                  }}
+                  // tickFormatter={(value) => {
+                  //   const date = new Date(value);
+                  //   return `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
+                  // }}
                   tickMargin={10}
                 />
                 <YAxis
@@ -159,10 +159,10 @@ const Client_OI_Index_Opt: React.FC = () => {
                     if (name === "NIFTY") return [value, name];
                     return [(Number(value) / 100000).toFixed(2) + "L", name];
                   }}
-                  labelFormatter={(label) => {
-                    const date = new Date(label);
-                    return `${date.getDate()} ${monthNames[date.getMonth()]}`;
-                  }}
+                  // labelFormatter={(label) => {
+                  //   const date = new Date(label);
+                  //   return `${date.getDate()} ${monthNames[date.getMonth()]}`;
+                  // }}
                 />
                 <Legend
                   wrapperStyle={{ paddingTop: "20px", fontSize: "14px" }}

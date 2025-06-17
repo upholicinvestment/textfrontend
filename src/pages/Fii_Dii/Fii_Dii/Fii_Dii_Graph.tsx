@@ -249,7 +249,7 @@ const Fii_Dii_Graph: React.FC = () => {
                   tick={{ fontSize: 12, fill: "#6b7280" }}
                   tickFormatter={(value) => Math.round(value).toLocaleString("en-IN")}
                   label={{
-                    value: "Investment (₹ Cr)",
+                    value: "Investment",
                     angle: -90,
                     position: "insideLeft",
                     fontSize: 12,
