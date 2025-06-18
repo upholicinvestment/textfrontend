@@ -42,6 +42,7 @@ const Avd_Dec: React.FC = () => {
       const response = await fetch("https://api.upholictech.com/api/advdec", {
         signal: controller.signal,
       });
+      console.log(response);
 
       clearTimeout(timeoutId);
 

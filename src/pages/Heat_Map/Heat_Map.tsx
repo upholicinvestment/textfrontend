@@ -294,6 +294,7 @@ const Heat_Map: React.FC = () => {
         if (!response.ok) {
           throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
+        console.log(response);
 
         const stocks: StockData[] = await response.json();
         if (!Array.isArray(stocks)) {

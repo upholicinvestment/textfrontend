@@ -394,6 +394,7 @@ export default function OIChartTabs() {
           const res = await fetch(
             `https://api.upholictech.com/api/nifty/atm-strikes-timeline?interval=${intervalMinutes}`
           );
+          console.log(res);
           const json = await res.json();
           setATMData(json.atmStrikes || []);
         } else {

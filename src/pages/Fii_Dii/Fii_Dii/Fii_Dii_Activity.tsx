@@ -11,7 +11,7 @@ function Fii_Dii_Activity() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('https://api.upholictech.com/api/fii-dii-data');
+        const response = await axios.get('http://localhost:8000/api/fii-dii-data');
         // setData(response.data);
         console.log(response.data);
       } catch (error) {
