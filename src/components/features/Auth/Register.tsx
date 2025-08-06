@@ -33,7 +33,6 @@ const brokerFieldMap: Record<string, string[]> = {
     "ANGEL_CLIENT_CODE",
     "ANGEL_PASSWORD",
     "ANGEL_TOTP_SECRET",
-    "CONTRACT_FILE",
   ],
   zerodha: ["ZERODHA_API_KEY", "ZERODHA_API_SECRET", "ZERODHA_ACCESS_TOKEN"],
   upstox: [
@@ -43,6 +42,10 @@ const brokerFieldMap: Record<string, string[]> = {
     "UPSTOX_ACCESS_TOKEN",
   ],
   dhan: ["DHAN_BASE_URL", "DHAN_ACCESS_TOKEN"],
+  hdfc: ["HDFC_BASE_URL", "HDFC_API_KEY"],
+  paytm: ["PAYTM_BASE_URL", "PAYTM_CLIENT_ID", "PAYTM_SECRET_KEY"],
+  kotak: ["KOTAK_API_KEY", "KOTAK_API_SECRET"],
+  icici: ["ICICI_API_KEY", "ICICI_API_SECRET"],
 };
 
 const OTP_COOLDOWN_DURATION = 60; // 60 seconds cooldown
@@ -197,6 +200,22 @@ const Register = () => {
     e.preventDefault();
     setError("");
     setSuccessMessage("");
+
+    console.log("🚀 Register Payload:", {
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      password: formData.password,
+      phone,
+      ...(initialProductId && { initialProductId }),
+      ...(initialVariantId && { initialVariantId }),
+      ...(selectedProduct?.key === "algo_simulator" &&
+        initialVariantId && {
+          brokerConfig: {
+            brokerName,
+            ...brokerConfig,
+          },
+        }),
+    });
 
     if (!formData.name || !formData.email || !formData.password || !phone) {
       setError("Please fill in all fields");
