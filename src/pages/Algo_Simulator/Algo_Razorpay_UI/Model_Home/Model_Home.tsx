@@ -5,7 +5,6 @@ import {
   FiCpu,
   FiBarChart2,
   FiTrendingUp,
-  FiX,
   FiChevronRight,
 } from "react-icons/fi";
 import "./Model_Home.css";

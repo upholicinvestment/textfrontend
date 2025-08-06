@@ -16,7 +16,6 @@ export default function Orb({
   forceHoverState = false,
 }: OrbProps) {
   const ctnDom = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number>(0);
   const starsRef = useRef<HTMLDivElement[]>([]);
   const nebulaRef = useRef<HTMLDivElement | null>(null);
   const particlesRef = useRef<HTMLDivElement[]>([]);
