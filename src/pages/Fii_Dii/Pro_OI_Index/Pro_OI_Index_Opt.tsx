@@ -51,7 +51,7 @@ const Pro_OI_Index_Opt: React.FC = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get<FIIData[]>("http://localhost:8000/api/OIPro_Index_Opt/data");
+        const response = await axios.get<FIIData[]>("https://api.upholictech.com/api/OIPro_Index_Opt/data");
         const formattedData: ChartData[] = response.data.map((item) => {
           const dateObj = new Date(item.Date);
           return {

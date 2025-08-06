@@ -55,7 +55,7 @@ const Avd_Dec: React.FC = () => {
 
       try {
         // console.log("Starting fetch request");
-        const response = await fetch("http://localhost:8000/api/advdec", {
+        const response = await fetch("https://api.upholictech.com/api/advdec", {
           signal,
           cache: 'no-cache'
         });

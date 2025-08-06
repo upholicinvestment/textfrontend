@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api', // Your backend URL
+  baseURL: 'https://api.upholictech.com/api', // Your backend URL
   withCredentials: true
 });
 

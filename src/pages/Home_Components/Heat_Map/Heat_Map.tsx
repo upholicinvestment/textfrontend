@@ -42,7 +42,7 @@ const Heat_Map: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch("http://localhost:8000/api/heatmap");
+      const response = await fetch("https://api.upholictech.com/api/heatmap");
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`);
       }

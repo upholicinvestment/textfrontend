@@ -55,7 +55,7 @@ const Fii_Dii_Fno: React.FC = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get<FIIData[]>("http://localhost:8000/api/data");
+        const response = await axios.get<FIIData[]>("https://api.upholictech.com/api/data");
         
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);

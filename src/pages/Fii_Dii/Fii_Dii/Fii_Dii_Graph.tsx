@@ -76,7 +76,7 @@ const Fii_Dii_Graph: React.FC = () => {
     const fetchData = async () => {
       try {
         const response = await axios.get<InvestmentData[]>(
-          "http://localhost:8000/api/fii-dii-data"
+          "https://api.upholictech.com/api/fii-dii-data"
         );
         setData(response.data);
         setFilteredData(response.data);
@@ -189,39 +189,51 @@ const Fii_Dii_Graph: React.FC = () => {
 
         {/* Year/Month Selector */}
         <div className="p-4 border-b border-gray-100">
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className="flex flex-wrap gap-4 items-center justify-center">
             {/* Year Selector */}
-            <select
-              value={selectedYear}
-              onChange={(e) => {
-                setSelectedYear(e.target.value === "All" ? "All" : Number(e.target.value));
-                setSelectedMonth("All");
-              }}
-              className="px-3 py-2 rounded-md border border-gray-200 shadow-sm text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-              style={{ minWidth: 110 }}
-            >
-              <option value="All">All Years</option>
-              {uniqueYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-
-            {/* Month Selector */}
-            {selectedYear !== "All" && (
+            <div className="flex items-center gap-2">
+              <label htmlFor="year-select" className="text-sm font-medium text-gray-700">
+                Year:
+              </label>
               <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
+                id="year-select"
+                value={selectedYear}
+                onChange={(e) => {
+                  setSelectedYear(e.target.value === "All" ? "All" : Number(e.target.value));
+                  setSelectedMonth("All");
+                }}
                 className="px-3 py-2 rounded-md border border-gray-200 shadow-sm text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                 style={{ minWidth: 110 }}
               >
-                {uniqueMonths.map((month) => (
-                  <option key={month} value={month}>
-                    {month}
+                <option value="All">All Years</option>
+                {uniqueYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Month Selector */}
+            {selectedYear !== "All" && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="month-select" className="text-sm font-medium text-gray-700">
+                  Month:
+                </label>
+                <select
+                  id="month-select"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="px-3 py-2 rounded-md border border-gray-200 shadow-sm text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                  style={{ minWidth: 110 }}
+                >
+                  {uniqueMonths.map((month) => (
+                    <option key={month} value={month}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
         </div>
@@ -249,7 +261,7 @@ const Fii_Dii_Graph: React.FC = () => {
                   tick={{ fontSize: 12, fill: "#6b7280" }}
                   tickFormatter={(value) => Math.round(value).toLocaleString("en-IN")}
                   label={{
-                    value: "Investment",
+                    value: "Investment (₹ Cr)",
                     angle: -90,
                     position: "insideLeft",
                     fontSize: 12,
@@ -288,7 +300,6 @@ const Fii_Dii_Graph: React.FC = () => {
                   activeDot={{ r: 6, fill: "#6366f1", strokeWidth: 0 }}
                   name="FII Investment"
                   legendType="none"
-
                 />
                 <Area
                   type="monotone"
@@ -305,12 +316,9 @@ const Fii_Dii_Graph: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </div>
-        {/* Footer removed */}
       </div>
     </div>
   );
 };
 
 export default Fii_Dii_Graph;
-
-
