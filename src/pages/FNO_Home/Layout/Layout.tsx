@@ -1,6 +1,6 @@
 import Navbar from "../../../components/layout/Navbar/Navbar"
 import PriceScroll from "../../PriceScroll/PriceScroll"
-import FNO_stock from "../FNO_Stock/FNO_stock"
+import Fno_Khazana from "../Fno_Khazana/Fno_Khazana"
 
 const Layout = () => {
     return (
@@ -13,7 +13,7 @@ const Layout = () => {
 
             {/* Adjusted pt-40 to a smaller value that fits your needs */}
             <div className="pt-[147px]">  {/* or use pt-[72px] if you need precise control */}
-                <FNO_stock/>
+              <Fno_Khazana/>
             </div>
         </>
     )

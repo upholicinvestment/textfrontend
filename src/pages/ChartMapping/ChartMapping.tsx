@@ -1,10 +1,10 @@
 
-import Avd_Dec from "../Avd_Dec/Avd_Dec";
-import Call_Put from "../Call_Put/Call_Put";
-import Chart_Overflow from "../Chart_Overflow/Chart_Overflow";
-import Gex_Level from "../Gex_Level/Gex_Level";
-import Heat_Map from "../Heat_Map/Heat_Map";
-import Velocity_Index from "../Velocity_Index/Velocity_Index";
+import Avd_Dec from "../Home_Components/Avd_Dec/Avd_Dec";
+import Call_Put from "../Home_Components/Call_Put/Call_Put";
+import Chart_Overflow from "../Home_Components/Chart_Overflow/Chart_Overflow";
+import Gex_Level from "../Home_Components/Gex_Level/Gex_Level";
+import Heat_Map from "../Home_Components/Heat_Map/Heat_Map";
+import Velocity_Index from "../Home_Components/Velocity_Index/Velocity_Index";
 
 const ChartMapping = () => {
     return (

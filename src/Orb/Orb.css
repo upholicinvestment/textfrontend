@@ -1,0 +1,306 @@
+/* Enhanced Cosmic UI with Depth and Motion */
+.orb-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: 
+    radial-gradient(
+      ellipse at center, 
+      hsl(calc(var(--hue, 260) - 20), 60%, 6%) 0%, 
+      hsl(calc(var(--hue, 260) - 10), 70%, 8%) 40%, 
+      hsl(var(--hue, 260), 80%, 10%) 100%
+    );
+  z-index: 0;
+}
+
+/* Multi-layered nebula background */
+.nebula {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(
+      circle at 20% 30%, 
+      hsla(calc(var(--hue, 260) + 30, 80%, 60%, 0.08) 0%, 
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 80% 70%, 
+      hsla(calc(var(--hue, 260) - 30, 80%, 60%, 0.08) 0%, 
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 50% 20%, 
+      hsla(var(--hue, 260), 90%, 70%, 0.05) 0%, 
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 50% 80%, 
+      hsla(calc(var(--hue, 260) + 60, 90%, 70%, 0.05) 0%, 
+      transparent 50%
+    ))));
+  animation: 
+    nebula-pulse 40s infinite alternate ease-in-out,
+    nebula-drift 180s infinite linear;
+  z-index: 1;
+  opacity: 0.8;
+}
+
+@keyframes nebula-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.03); }
+}
+
+@keyframes nebula-drift {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 100%; }
+}
+
+/* Dynamic stars with realistic twinkling */
+.star {
+  position: absolute;
+  width: var(--size, 2px);
+  height: var(--size, 2px);
+  background-color: white;
+  border-radius: 50%;
+  opacity: var(--opacity, 0.7);
+  filter: 
+    brightness(var(--brightness, 1))
+    drop-shadow(0 0 calc(var(--size, 2px) * 0.5) rgba(255, 255, 255, 0.8));
+  animation: 
+    twinkle calc(var(--duration, 10s) * var(--twinkle-speed, 1)) infinite ease-in-out,
+    drift calc(var(--duration, 10s) * 2) infinite linear alternate;
+  animation-delay: var(--delay, 0s);
+  will-change: transform, opacity;
+  z-index: 2;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: calc(var(--opacity, 0.7) * 0.5); }
+  50% { opacity: var(--opacity, 0.7); }
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(var(--drift-x, 10px), var(--drift-y, 10px)); }
+}
+
+/* Enhanced shooting stars with realistic trails */
+.shooting-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: linear-gradient(
+    to right, 
+    transparent 0%, 
+    hsla(calc(var(--hue, 260) + var(--hue-offset, 0)), 100%, 70%, 1) 30%, 
+    transparent 100%
+  );
+  transform-origin: left center;
+  animation: 
+    shooting-star 3s infinite linear,
+    shooting-star-fade 3s infinite ease-out;
+  animation-delay: var(--delay, 0s);
+  z-index: 3;
+}
+
+.shooting-star::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: inherit;
+  filter: blur(4px);
+  transform: scaleX(5);
+  opacity: 0;
+  animation: shooting-star-trail 3s infinite ease-out;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes shooting-star {
+  0% { transform: translate(0, 0) rotate(var(--angle, 30deg)) scaleX(0); }
+  10% { transform: translate(0, 0) rotate(var(--angle, 30deg)) scaleX(1); }
+  100% { transform: translate(100vw, 100vh) rotate(var(--angle, 30deg)) scaleX(1); }
+}
+
+@keyframes shooting-star-fade {
+  0%, 100% { opacity: 0; }
+  10%, 80% { opacity: 1; }
+}
+
+@keyframes shooting-star-trail {
+  0%, 100% { opacity: 0; transform: scaleX(1); }
+  10% { opacity: 1; transform: scaleX(1); }
+  90% { opacity: 0; transform: scaleX(20); }
+}
+
+/* Physics-based particle movement */
+.cosmic-particle {
+  position: absolute;
+  width: var(--size, 2px);
+  height: var(--size, 2px);
+  background: radial-gradient(
+    circle, 
+    hsla(calc(var(--hue, 260) + var(--hue-offset, 0)), 90%, 70%, 0.9) 0%, 
+    transparent 70%
+  );
+  border-radius: 50%;
+  animation: 
+    particle-move var(--duration, 30s) infinite linear,
+    particle-flicker var(--duration, 30s) infinite ease-in-out;
+  animation-delay: var(--delay, 0s);
+  will-change: transform;
+  filter: 
+    blur(0.5px)
+    drop-shadow(0 0 5px hsla(calc(var(--hue, 260) + var(--hue-offset, 0), 100%, 70%, 0.3)));
+  z-index: 4;
+}
+
+@keyframes particle-move {
+  0% { 
+    transform: 
+      translate(calc(var(--start-x, 0) * 1vw), calc(var(--start-y, 0) * 1vh))
+      scale(0.5);
+    opacity: 0;
+  }
+  10% { 
+    transform: 
+      translate(calc(var(--start-x, 0) * 1vw), calc(var(--start-y, 0) * 1vh))
+      scale(1);
+    opacity: 0.8;
+  }
+  100% { 
+    transform: 
+      translate(
+        calc((var(--start-x, 0) + (100 * var(--path-complexity, 2) * var(--speed, 1))) * 1vw),
+        calc((var(--start-y, 0) + (100 * var(--path-complexity, 2) * var(--speed, 1))) * 1vh)
+      )
+      scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes particle-flicker {
+  0%, 5%, 15%, 25%, 35%, 45%, 55%, 65%, 75%, 85%, 95%, 100% { opacity: 0.8; }
+  10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90% { opacity: 0.3; }
+}
+
+/* Galaxy core with spiral arms */
+.galaxy-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120vmax;
+  height: 120vmax;
+  transform: translate(-50%, -50%);
+  background: 
+    radial-gradient(
+      circle at center,
+      hsla(var(--hue, 260), 80%, 60%, 0.05) 0%,
+      transparent 70%
+    ),
+    repeating-conic-gradient(
+      from 0deg,
+      transparent 0deg 5deg,
+      hsla(var(--hue, 260), 80%, 60%, 0.02) 5deg 10deg
+    );
+  animation: 
+    spiral-rotate 400s infinite linear,
+    galaxy-pulse 60s infinite alternate ease-in-out;
+  z-index: 1;
+  opacity: 0.4;
+  mix-blend-mode: screen;
+}
+
+@keyframes spiral-rotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes galaxy-pulse {
+  0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+/* Orb container with enhanced glow */
+.orb-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70vmin;
+  height: 70vmin;
+  max-width: 500px;
+  max-height: 500px;
+  z-index: 10;
+  filter: 
+    drop-shadow(0 0 15px hsla(var(--hue, 260), 100%, 70%, 0.5))
+    drop-shadow(0 0 30px hsla(var(--hue, 260), 100%, 60%, 0.3))
+    drop-shadow(0 0 60px hsla(var(--hue, 260), 100%, 50%, 0.1));
+}
+
+/* Subtle cosmic grid overlay */
+.cosmic-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 50px 50px;
+  z-index: 1;
+  opacity: 0.3;
+  mix-blend-mode: overlay;
+  animation: grid-shift 200s infinite linear;
+}
+
+@keyframes grid-shift {
+  0% { background-position: 0 0; }
+  100% { background-position: 1000px 1000px; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .orb-container {
+    width: 85vmin;
+    height: 85vmin;
+    filter: 
+      drop-shadow(0 0 10px hsla(var(--hue, 260), 100%, 70%, 0.5))
+      drop-shadow(0 0 20px hsla(var(--hue, 260), 100%, 60%, 0.3));
+  }
+  
+  .star {
+    --size: 1.5px;
+  }
+  
+  .galaxy-core {
+    width: 150vmax;
+    height: 150vmax;
+  }
+  
+  .cosmic-particle {
+    --size: 1.5px;
+  }
+}
+
+/* Performance optimizations */
+@media (prefers-reduced-motion) {
+  .nebula,
+  .star,
+  .shooting-star,
+  .cosmic-particle,
+  .galaxy-core,
+  .cosmic-grid {
+    animation: none !important;
+  }
+}
