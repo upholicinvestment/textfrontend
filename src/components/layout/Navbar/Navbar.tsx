@@ -62,19 +62,19 @@ const Navbar = () => {
       name: "Technical Scanner",
       icon: "📊",
       color: "bg-gradient-to-br from-purple-500 to-blue-500",
-      path: "/technical-scanner",
+      path: "/comming-soon",
     },
     {
       name: "Fundamental Scanner",
       icon: "📚",
       color: "bg-gradient-to-br from-blue-500 to-cyan-500",
-      path: "/fundamental-scanner",
+      path: "/comming-soon",
     },
     {
       name: "ALGO Simulator",
       icon: "🤖",
       color: "bg-gradient-to-br from-pink-500 to-purple-500",
-      path: "/algo-simulator",
+      path: "/comming-soon",
     },
     {
       name: "FNO Khazana",
@@ -86,7 +86,7 @@ const Navbar = () => {
       name: "Journaling",
       icon: "📓",
       color: "bg-gradient-to-br from-indigo-500 to-violet-500",
-      path: "/journaling",
+      path: "/comming-soon",
     },
     {
       name: "FIIs/DIIs Data",

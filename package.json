@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@emotion/styled": "^11.14.0",
+    "@fortawesome/fontawesome-free": "^7.0.0",
     "@mui/icons-material": "^7.1.1",
     "@mui/styled-engine": "^7.1.1",
     "@mui/styled-engine-sc": "^7.1.1",
@@ -39,6 +40,7 @@
     "react-toastify": "^11.0.5",
     "react-tooltip": "^5.28.1",
     "recharts": "^2.15.3",
+    "styled-components": "^6.1.19",
     "three": "^0.179.1",
     "ws": "^8.18.3"
   },
