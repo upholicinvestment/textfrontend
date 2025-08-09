@@ -75,7 +75,7 @@ const Dashboard = () => {
       icon: <BarChart3 className="h-6 w-6" />,
       stats: "1,245 scans today",
       change: "+12.4%",
-      link: "/comming-soon",
+      link: "/lauching-soon",
       gradient: "from-blue-500 to-cyan-400",
       bgColor: "bg-gradient-to-br from-blue-50 to-cyan-50",
       trend: "up",
@@ -88,7 +88,7 @@ const Dashboard = () => {
       icon: <TrendingUp className="h-6 w-6" />,
       stats: "856 scans today",
       change: "+8.2%",
-      link: "/comming-soon",
+      link: "/lauching-soon",
       gradient: "from-emerald-500 to-green-400",
       bgColor: "bg-gradient-to-br from-emerald-50 to-green-50",
       trend: "up",
@@ -101,7 +101,7 @@ const Dashboard = () => {
       icon: <Bot className="h-6 w-6" />,
       stats: "312 simulations running",
       change: "+15.7%",
-      link: "/comming-soon",
+      link: "/lauching-soon",
       gradient: "from-purple-500 to-violet-400",
       bgColor: "bg-gradient-to-br from-purple-50 to-violet-50",
       trend: "up",
@@ -114,7 +114,7 @@ const Dashboard = () => {
       icon: <BookOpen className="h-6 w-6" />,
       stats: "78 new entries today",
       change: "+24.1%",
-      link: "/comming-soon",
+      link: "/lauching-soon",
       gradient: "from-amber-500 to-orange-400",
       bgColor: "bg-gradient-to-br from-amber-50 to-orange-50",
       trend: "up",
@@ -127,7 +127,7 @@ const Dashboard = () => {
       icon: <Coins className="h-6 w-6" />,
       stats: "4,532 contracts analyzed",
       change: "+6.8%",
-      link: "/comming-soon",
+      link: "/lauching-soon",
       gradient: "from-indigo-500 to-blue-400",
       bgColor: "bg-gradient-to-br from-indigo-50 to-blue-50",
       trend: "up",
@@ -140,7 +140,7 @@ const Dashboard = () => {
       icon: <Building2 className="h-6 w-6" />,
       stats: "₹2,456 Cr net inflow",
       change: "-3.2%",
-      link: "/comming-soon",
+      link: "/lauching-soon",
       gradient: "from-rose-500 to-pink-400",
       bgColor: "bg-gradient-to-br from-rose-50 to-pink-50",
       trend: "down",
@@ -726,19 +726,19 @@ const Dashboard = () => {
 
               <div className="flex items-center space-x-6 text-sm">
                 <a
-                  href="/comming-soon"
+                  href="/lauching-soon"
                   className="text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Terms
                 </a>
                 <a
-                  href="/comming-soon"
+                  href="/lauching-soon"
                   className="text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Privacy
                 </a>
                 <a
-                  href="/comming-soon"
+                  href="/lauching-soon"
                   className="text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Support

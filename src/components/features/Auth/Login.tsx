@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../../api';
-import { FiMail, FiLock, FiArrowRight, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiMail, FiLock, FiArrowRight, FiEye, FiEyeOff, FiX } from 'react-icons/fi';
 import { AuthContext } from '../../../context/AuthContext';
 
 const Login = () => {
@@ -37,16 +37,11 @@ const Login = () => {
     setIsLoading(true);
     try {
       const res = await api.post('/auth/login', formData);
-
-      // ✅ Console the token from the API response
       console.log('[Login] Received token:', res.data.token);
-
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       login(res.data.token, res.data.user);
       setSuccessMessage('Login successful! Redirecting...');
-
-      // Use replace so Back doesn't return to /login
       setTimeout(() => navigate('/dashboard'), 1000);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid email or password');
@@ -56,110 +51,138 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/50 via-purple-50/50 to-indigo-100/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white/95 rounded-3xl shadow-2xl overflow-hidden p-10 transition-all duration-300 border border-white/20">
-        <div className="text-center mb-10">
-          <div className="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
-            </svg>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 p-4">
+      <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl overflow-hidden flex relative">
+        {/* Close button */}
+        <Link
+          to="/"
+          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors z-10"
+          aria-label="Close"
+        >
+          <FiX className="w-6 h-6" />
+        </Link>
+
+        {/* Left Side - Illustration */}
+        <div className="hidden md:flex flex-1 bg-indigo-600 p-12 items-center justify-center">
+          <div className="text-white text-center">
+            <img
+              src="https://stories.freepiklabs.com/storage/1765/7-Login_Mesa-de-trabajo-1.svg"
+              alt="Security Illustration"
+              className="w-full h-auto max-w-md mx-auto"
+            />
+            <h2 className="text-3xl font-bold mb-4">Secure Access</h2>
+            <p className="text-indigo-100">
+              Protect your account with our advanced security features
+            </p>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h1>
-          <p className="text-gray-500 font-light">Sign in to continue to your account</p>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50/80 text-red-600 rounded-xl text-center text-sm border border-red-100 backdrop-blur-sm">
-            {error}
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="mb-6 p-4 bg-green-50/80 text-green-600 rounded-xl text-center text-sm border border-green-100 backdrop-blur-sm">
-            {successMessage}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-5">
-            <div className="relative">
-              <FiMail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg" />
-              <input
-                name="email"
-                type="email"
-                placeholder="Email Address"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full pl-12 pr-4 py-3.5 border border-gray-200/80 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all bg-white/50 backdrop-blur-sm text-gray-700 placeholder-gray-400"
-              />
+        {/* Right Side - Form */}
+        <div className="flex-1 p-8 md:p-12">
+          <div className="max-w-md mx-auto">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                Welcome Back
+              </h2>
+              <p className="text-gray-500">Sign in to continue to your account</p>
             </div>
 
-            <div className="relative">
-              <FiLock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg" />
-              <input
-                name="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full pl-12 pr-12 py-3.5 border border-gray-200/80 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all bg-white/50 backdrop-blur-sm text-gray-700 placeholder-gray-400"
-              />
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center">
+                {error}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="mb-4 p-3 bg-green-50 text-green-600 rounded-lg text-sm text-center">
+                {successMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              {/* Email */}
+              <div className="relative">
+                <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  name="email"
+                  type="email"
+                  placeholder="Email Address"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  autoComplete="email"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="relative">
+                <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <FiEyeOff /> : <FiEye />}
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600">
+                    Remember me
+                  </label>
+                </div>
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm text-indigo-600 hover:text-indigo-800 transition-colors font-medium"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
+              {/* Submit Button */}
               <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition-colors"
+                type="submit"
+                disabled={isLoading}
+                className={`w-full py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all ${
+                  isLoading
+                    ? "bg-indigo-400 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-700 shadow-sm hover:shadow-md"
+                }`}
               >
-                {showPassword ? <FiEyeOff className="text-lg" /> : <FiEye className="text-lg" />}
+                <span className="text-white font-medium">
+                  {isLoading ? 'Signing in...' : 'Sign In'}
+                </span>
+                {!isLoading && <FiArrowRight className="text-white" />}
               </button>
+            </form>
+
+            <div className="mt-6 text-center text-sm text-gray-500">
+              Don't have an account?{' '}
+              <Link
+                to="/signup"
+                className="text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+              >
+                Sign up
+              </Link>
             </div>
           </div>
-
-          <div className="flex justify-between items-center">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600">
-                Remember me
-              </label>
-            </div>
-            <Link 
-              to="/forgot-password" 
-              className="text-sm text-indigo-600 hover:text-indigo-800 transition-colors font-medium"
-            >
-              Forgot password?
-            </Link>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-full py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all ${
-              isLoading
-                ? 'bg-indigo-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 shadow-lg hover:shadow-indigo-200'
-            }`}
-          >
-            <span className="text-white font-medium text-lg">
-              {isLoading ? 'Signing in...' : 'Sign In'}
-            </span>
-            {!isLoading && <FiArrowRight className="text-white text-xl" />}
-          </button>
-        </form>
-
-        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-          <p className="text-gray-500 text-sm">
-            Don't have an account?{' '}
-            <Link
-              to="/signup"
-              className="text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
-            >
-              Sign up
-            </Link>
-          </p>
         </div>
       </div>
     </div>
