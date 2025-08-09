@@ -322,9 +322,9 @@ const Navbar = () => {
                       }}
                     >
                       <div className="py-2">
-                        {services.map((service, index) => (
+                        {services.map((service) => (
                           <Link
-                            key={index}
+                            key={service.name}
                             to={service.path}
                             className={`flex items-center px-4 py-3 text-sm text-gray-300 hover:text-white transition-all duration-200 border-b border-purple-500/10 last:border-0 group`}
                           >
@@ -378,7 +378,6 @@ const Navbar = () => {
                 onClick={() => {
                   setSearchOpen((v) => !v);
                   setTimeout(() => {
-                    // small UX: clear results when closing
                     if (searchOpen) setSearchQuery("");
                   }, 0);
                 }}
@@ -387,7 +386,7 @@ const Navbar = () => {
                     ? "ml-2 bg-purple-500/10 text-purple-300"
                     : "bg-transparent text-gray-300 hover:text-white"
                 }`}
-                style={{ backdropFilter: "blur(4px)" }}
+                style={{ backdropFilter: "blur(4px)"}}
                 aria-label="Search"
               >
                 <FiSearch className="text-lg" />
@@ -538,7 +537,7 @@ const Navbar = () => {
                 )}
               </motion.div>
 
-              {navLinks.map((link, index) => (
+              {navLinks.map((link) => (
                 <Link
                   key={link.name}
                   to={link.path}
@@ -573,9 +572,9 @@ const Navbar = () => {
                       transition={{ duration: 0.2 }}
                       className="pl-2 mt-1 space-y-2 overflow-hidden"
                     >
-                      {services.map((service, index) => (
+                      {services.map((service) => (
                         <Link
-                          key={index}
+                          key={service.name}
                           to={service.path}
                           className="flex items-center px-4 py-2.5 rounded-lg text-gray-300 hover:text-white transition-all duration-300 text-sm backdrop-blur-sm border border-transparent hover:border-purple-500/30 hover:bg-purple-500/10"
                           onClick={() => {

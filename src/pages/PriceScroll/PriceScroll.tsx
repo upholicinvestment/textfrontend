@@ -34,7 +34,7 @@ const symbolMap: Record<number, { symbol: string; name: string }> = {
   64229: { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd' },
 };
 
-const API_URL = 'http://localhost:8001/api/stocks';
+const API_URL = 'https://api.upholictech.com/api/stocks';
 const CARD_WIDTH = 320;
 const BASE_SCROLL_SPEED = 40;
 const SCROLL_ACCELERATION = 2;
