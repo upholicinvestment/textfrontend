@@ -55,7 +55,7 @@ const Login = () => {
       <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl overflow-hidden flex relative">
         {/* Close button */}
         <Link
-          to="/"
+          to="/Home"
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors z-10"
           aria-label="Close"
         >

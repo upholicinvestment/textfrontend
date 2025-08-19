@@ -56,9 +56,14 @@ const Client_Index_Fut: React.FC = () => {
           new Set(formattedData.map((d) => d.month))
         ).sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b));
 
+        // Find the most recent date in the dataset
+        const latest = formattedData.reduce((a, b) =>
+          new Date(b.date) > new Date(a.date) ? b : a
+        );
         setData(formattedData);
         setMonths(uniqueMonths);
-        setSelectedMonth(uniqueMonths[0] || "");
+        // setSelectedMonth(uniqueMonths[0] || "");
+        setSelectedMonth(latest?.month || uniqueMonths[uniqueMonths.length - 1] || "");
       })
       .catch((error) => console.error("Error fetching data:", error));
   }, []);

@@ -58,9 +58,15 @@ const Client_OI_Index_Opt: React.FC = () => {
           new Set(formattedData.map((d) => d.month))
         ).sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b));
 
+        // Find the most recent date in the dataset
+        const latest = formattedData.reduce((a, b) =>
+          new Date(b.date) > new Date(a.date) ? b : a
+        );
         setData(formattedData);
         setMonths(uniqueMonths);
-        setSelectedMonth(uniqueMonths[0] || "");
+        
+        // setSelectedMonth(uniqueMonths[0] || "");
+        setSelectedMonth(latest?.month || uniqueMonths[uniqueMonths.length - 1] || "");
       })
       .catch((error) => console.error("Error fetching data:", error));
   }, []);
@@ -122,8 +128,7 @@ const Client_OI_Index_Opt: React.FC = () => {
                 />
                 <YAxis
                   yAxisId="left"
-                  domain={[22000, 23600]}
-                  ticks={[22000, 22500, 23000, 23500]}
+                  domain={['auto', 'auto']}
                   tick={{ fontSize: 12, fill: "#6b7280" }}
                   label={{
                     value: "NIFTY Value",

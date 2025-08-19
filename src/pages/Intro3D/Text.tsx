@@ -1,32 +1,33 @@
-import React from 'react';
-import BUTTON from '../../pages/Intro3D/Button';
+import React from "react";
+import Button from "./Button"; // same folder; adjust path if different
 
 const TickerBanner: React.FC = () => {
   return (
     <div
       style={{
-        position: 'absolute',
-        bottom: '8%',
-        width: '100%',
-        overflow: 'hidden',
+        position: "absolute",
+        bottom: "8%",
+        width: "100%",
+        overflow: "hidden",
         zIndex: 3,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1rem',
-        background: 'transparent',
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1rem",
+        background: "transparent",
         opacity: 0,
-        animation: 'fadeIn 2s ease-out 2s forwards',
+        animation: "fadeIn 2s ease-out 2s forwards",
       }}
     >
-      {/* ✅ Bigger Button with Always-Scrolling Text */}
-      <div style={{ transform: 'scale(1.5)' }}>
-        <BUTTON
-          href="/about"
+      {/* Bigger button; always scrolling */}
+      <div style={{ transform: "scale(1.5)" }}>
+        <Button
+          href="/Home"
           text="Explore the algo world 🚀"
           marqueeText="Explore the algo world 🚀"
           alwaysScroll
+          aria-label="Explore the algo world"
         />
       </div>
 

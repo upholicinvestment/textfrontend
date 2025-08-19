@@ -95,7 +95,7 @@ const Navbar = () => {
       name: "Journaling",
       icon: "📓",
       color: "bg-gradient-to-br from-indigo-500 to-violet-500",
-      path: "/comming-soon",
+      path: "/Journaling",
     },
     {
       name: "FIIs/DIIs Data",
@@ -106,8 +106,8 @@ const Navbar = () => {
   ];
 
   const navLinks = [
-    { name: "Home", path: "/" },
-    { name: "About", path: "/comming-soon" },
+    { name: "Home", path: "/Home" },
+    { name: "About", path: "/about" },
     { name: "Pricing", path: "/comming-soon" },
   ];
 

@@ -47,7 +47,7 @@ const Dii_Index_Opt: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [months, setMonths] = useState<string[]>([]);
   const [avgNifty, setAvgNifty] = useState<number>(0);
-  const [niftyRange, setNiftyRange] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
+  // const [niftyRange, setNiftyRange] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"options" | "futures" | "oi">("options");
@@ -72,9 +72,15 @@ const Dii_Index_Opt: React.FC = () => {
         });
 
         const uniqueMonths = Array.from(new Set(formattedData.map(d => d.month)));
+
+        // Find the most recent date in the dataset
+        const latest = formattedData.reduce((a, b) =>
+          new Date(b.date) > new Date(a.date) ? b : a
+        );
         setData(formattedData);
         setMonths(uniqueMonths);
-        setSelectedMonth(uniqueMonths[0] || "");
+        // setSelectedMonth(uniqueMonths[0] || "");
+        setSelectedMonth(latest?.month || uniqueMonths[uniqueMonths.length - 1] || "");
         setIsLoading(false);
       } catch (err) {
         console.error("Error fetching data:", err);
@@ -95,11 +101,11 @@ const Dii_Index_Opt: React.FC = () => {
       setAvgNifty(average);
 
       // Calculate NIFTY range with 1% buffer
-      const niftyValues = filtered.map(item => item.niftyValue);
-      setNiftyRange({
-        min: Math.min(...niftyValues) * 0.99,
-        max: Math.max(...niftyValues) * 1.01
-      });
+      // const niftyValues = filtered.map(item => item.niftyValue);
+      // setNiftyRange({
+      //   min: Math.min(...niftyValues) * 0.99,
+      //   max: Math.max(...niftyValues) * 1.01
+      // });
     }
   }, [selectedMonth, data]);
 
@@ -229,7 +235,7 @@ const Dii_Index_Opt: React.FC = () => {
                   />
                   <YAxis 
                     yAxisId="left" 
-                    domain={[niftyRange.min, niftyRange.max]}
+                    domain={['auto', 'auto']}
                     tick={{ fontSize: 12, fill: "#6b7280" }}
                     tickFormatter={(value) => value.toLocaleString("en-IN")}
                     label={{ 

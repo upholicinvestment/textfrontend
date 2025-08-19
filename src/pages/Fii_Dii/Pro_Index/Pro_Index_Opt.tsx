@@ -10,7 +10,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  
 } from "recharts";
 import ProIndexFutChart from "../../Fii_Dii/Pro_Index/Pro_Index_Fut";
 import ProOIIndexFutChart from "../../Fii_Dii/Pro_OI_Index/Pro_OI_Index_Fut";
@@ -32,8 +31,18 @@ interface ChartData {
 }
 
 const monthNames = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 const TABS = [
@@ -47,8 +56,10 @@ const Pro_Index_Opt: React.FC = () => {
   const [filteredData, setFilteredData] = useState<ChartData[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [months, setMonths] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"options" | "futures" | "oi">("options");
-  const [niftyRange, setNiftyRange] = useState<{ min: number; max: number }>({ min: 22000, max: 23600 });
+  const [activeTab, setActiveTab] = useState<"options" | "futures" | "oi">(
+    "options"
+  );
+  // const [niftyRange, setNiftyRange] = useState<{ min: number; max: number }>({ min: 22000, max: 23600 });
 
   useEffect(() => {
     axios
@@ -72,18 +83,32 @@ const Pro_Index_Opt: React.FC = () => {
 
         // NIFTY min/max for y-axis range
         const niftyValues = formattedData
-          .map(d => d.niftyValue)
-          .filter(v => typeof v === 'number' && !isNaN(v));
-        let min = 22000, max = 23600;
+          .map((d) => d.niftyValue)
+          .filter((v) => typeof v === "number" && !isNaN(v));
+
+        let min = 22000,
+          max = 23600;
+
         if (niftyValues.length > 0) {
           min = Math.floor(Math.min(...niftyValues) * 0.995);
           max = Math.ceil(Math.max(...niftyValues) * 1.005);
         }
 
+        // 👇 keep TS happy without changing your logic (min/max might be used later)
+        void (min && max);
+
+        // Find the most recent date in the dataset
+        const latest = formattedData.reduce((a, b) =>
+          new Date(b.date) > new Date(a.date) ? b : a
+        );
+
         setData(formattedData);
         setMonths(uniqueMonths);
-        setSelectedMonth(uniqueMonths[0] || "");
-        setNiftyRange({ min, max });
+        // setSelectedMonth(uniqueMonths[0] || "");
+        setSelectedMonth(
+          latest?.month || uniqueMonths[uniqueMonths.length - 1] || ""
+        );
+        // setNiftyRange({ min, max });
       })
       .catch((error) => console.error("Error fetching data:", error));
   }, []);
@@ -100,9 +125,12 @@ const Pro_Index_Opt: React.FC = () => {
       {/* Dashboard Header */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="bg-gradient-to-r from-indigo-700 to-blue-600 p-6 text-white">
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">Pro Derivatives Activity Dashboard</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">
+            Pro Derivatives Activity Dashboard
+          </h1>
           <p className="text-blue-100">
-            Analyze professional (Pro) buy/sell activity in Derivatives (Options, Futures, OI)
+            Analyze professional (Pro) buy/sell activity in Derivatives
+            (Options, Futures, OI)
           </p>
         </div>
       </div>
@@ -110,7 +138,7 @@ const Pro_Index_Opt: React.FC = () => {
       {/* Navigation Tabs */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="flex border-b border-gray-200">
-          {TABS.map(tab => (
+          {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as any)}
@@ -130,9 +158,11 @@ const Pro_Index_Opt: React.FC = () => {
       {activeTab === "options" && (
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4">
-            <h2 className="text-xl font-semibold text-gray-800">Pro Index Options Activity</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Pro Index Options Activity
+            </h2>
             <div className="flex flex-wrap gap-2">
-              {months.map(month => (
+              {months.map((month) => (
                 <button
                   key={month}
                   onClick={() => setSelectedMonth(month)}
@@ -159,14 +189,10 @@ const Pro_Index_Opt: React.FC = () => {
                   <XAxis
                     dataKey="date"
                     tick={{ fontSize: 12, fill: "#5a5c69" }}
-                    // tickFormatter={(value) => {
-                    //   const date = new Date(value);
-                    //   return `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
-                    // }}
                   />
                   <YAxis
                     yAxisId="left"
-                    domain={[niftyRange.min, niftyRange.max]}
+                    domain={["auto", "auto"]}
                     tick={{ fontSize: 12, fill: "#5a5c69" }}
                     label={{
                       value: "NIFTY Value",
@@ -174,7 +200,7 @@ const Pro_Index_Opt: React.FC = () => {
                       position: "insideLeft",
                       style: { fill: "#5a5c69", fontWeight: 700 },
                       fontSize: 13,
-                      offset: -4
+                      offset: -4,
                     }}
                     tickFormatter={(value) => Number(value).toLocaleString()}
                   />
@@ -188,7 +214,7 @@ const Pro_Index_Opt: React.FC = () => {
                       position: "insideRight",
                       style: { fill: "#5a5c69", fontWeight: 700 },
                       fontSize: 13,
-                      offset: 0
+                      offset: 0,
                     }}
                   />
                   <Tooltip
@@ -197,21 +223,17 @@ const Pro_Index_Opt: React.FC = () => {
                       border: "1px solid #e3e6f0",
                       borderRadius: "8px",
                       boxShadow: "0 2px 8px rgba(99,102,241,0.07)",
-                      fontSize: "13px"
+                      fontSize: "13px",
                     }}
                     formatter={(value, name) => {
                       if (name === "NIFTY") return [value, name];
                       return [Number(value).toLocaleString(), name];
                     }}
-                    // labelFormatter={(label) => {
-                    //   const date = new Date(label);
-                    //   return `${date.getDate()} ${monthNames[date.getMonth()]}`;
-                    // }}
                   />
                   <Legend
                     wrapperStyle={{
                       paddingTop: "20px",
-                      fontSize: "14px"
+                      fontSize: "14px",
                     }}
                   />
                   <Bar
@@ -245,8 +267,8 @@ const Pro_Index_Opt: React.FC = () => {
 
           <div className="bg-gray-50 px-6 py-3 text-center text-sm text-gray-500 border-t border-gray-200">
             <p>
-              Data source: Local API | 
-              <span className="text-green-600 mx-2">Green: Call Buying</span> | 
+              Data source: Local API |
+              <span className="text-green-600 mx-2">Green: Call Buying</span> |
               <span className="text-red-500 mx-2">Red: Put Buying</span>
             </p>
           </div>

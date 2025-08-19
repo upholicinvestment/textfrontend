@@ -54,10 +54,15 @@ const Client_OI_Index_Fut: React.FC = () => {
           };
         });
 
+        // Find the most recent date in the dataset
+        const latest = formattedData.reduce((a, b) =>
+          new Date(b.date) > new Date(a.date) ? b : a
+        );
         const uniqueMonths = Array.from(new Set(formattedData.map((d) => d.month)));
         setData(formattedData);
         setMonths(uniqueMonths);
-        setSelectedMonth(uniqueMonths[0] || "");
+        // setSelectedMonth(uniqueMonths[0] || "");
+        setSelectedMonth(latest?.month || uniqueMonths[uniqueMonths.length - 1] || "");
       })
       .catch((error) => console.error("Error fetching data:", error));
   }, []);

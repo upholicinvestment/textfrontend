@@ -1,17 +1,15 @@
 import { useRef, useEffect, useState } from "react";
-import { Renderer, Program, Triangle, Mesh, OGLRenderingContext } from "ogl";
+import { Renderer, Program, Triangle, Mesh } from "ogl";
 
-const DEFAULT_COLOR = "#ffffff";
-
-type RaysOrigin =
+export type RaysOrigin =
+  | "top-center"
   | "top-left"
   | "top-right"
-  | "left"
   | "right"
-  | "bottom-left"
+  | "left"
   | "bottom-center"
   | "bottom-right"
-  | "top-center";
+  | "bottom-left";
 
 interface LightRaysProps {
   raysOrigin?: RaysOrigin;
@@ -29,33 +27,7 @@ interface LightRaysProps {
   className?: string;
 }
 
-interface AnchorAndDir {
-  anchor: [number, number];
-  dir: [number, number];
-}
-
-interface MousePosition {
-  x: number;
-  y: number;
-}
-
-interface Uniforms {
-  iTime: { value: number };
-  iResolution: { value: [number, number] };
-  rayPos: { value: [number, number] };
-  rayDir: { value: [number, number] };
-  raysColor: { value: [number, number, number] };
-  raysSpeed: { value: number };
-  lightSpread: { value: number };
-  rayLength: { value: number };
-  pulsating: { value: number };
-  fadeDistance: { value: number };
-  saturation: { value: number };
-  mousePos: { value: [number, number] };
-  mouseInfluence: { value: number };
-  noiseAmount: { value: number };
-  distortion: { value: number };
-}
+const DEFAULT_COLOR = "#ffffff";
 
 const hexToRgb = (hex: string): [number, number, number] => {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -68,7 +40,11 @@ const hexToRgb = (hex: string): [number, number, number] => {
     : [1, 1, 1];
 };
 
-const getAnchorAndDir = (origin: RaysOrigin, w: number, h: number): AnchorAndDir => {
+const getAnchorAndDir = (
+  origin: RaysOrigin,
+  w: number,
+  h: number
+): { anchor: [number, number]; dir: [number, number] } => {
   const outside = 0.2;
   switch (origin) {
     case "top-left":
@@ -90,7 +66,7 @@ const getAnchorAndDir = (origin: RaysOrigin, w: number, h: number): AnchorAndDir
   }
 };
 
-const LightRays = ({
+const LightRays: React.FC<LightRaysProps> = ({
   raysOrigin = "top-center",
   raysColor = DEFAULT_COLOR,
   raysSpeed = 1,
@@ -104,14 +80,14 @@ const LightRays = ({
   noiseAmount = 0.0,
   distortion = 0.0,
   className = "",
-}: LightRaysProps) => {
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const uniformsRef = useRef<Uniforms | null>(null);
+  const uniformsRef = useRef<any>(null);
   const rendererRef = useRef<Renderer | null>(null);
-  const mouseRef = useRef<MousePosition>({ x: 0.5, y: 0.5 });
-  const smoothMouseRef = useRef<MousePosition>({ x: 0.5, y: 0.5 });
+  const mouseRef = useRef({ x: 0.5, y: 0.5 });
+  const smoothMouseRef = useRef({ x: 0.5, y: 0.5 });
   const animationIdRef = useRef<number | null>(null);
-  const meshRef = useRef<Mesh | null>(null);
+  const meshRef = useRef<any>(null);
   const cleanupFunctionRef = useRef<(() => void) | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -269,7 +245,7 @@ void main() {
   gl_FragColor  = color;
 }`;
 
-      const uniforms: Uniforms = {
+      const uniforms = {
         iTime: { value: 0 },
         iResolution: { value: [1, 1] },
 
@@ -464,7 +440,7 @@ void main() {
   return (
     <div
       ref={containerRef}
-      className={`w-full h-full relative pointer-events-none z-[3] overflow-hidden bg-black ${className}`}
+      className={`light-rays-container ${className}`.trim()}
     />
   );
 };

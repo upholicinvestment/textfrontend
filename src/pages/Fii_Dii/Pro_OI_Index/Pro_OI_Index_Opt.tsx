@@ -43,7 +43,7 @@ const Pro_OI_Index_Opt: React.FC = () => {
   const [filteredData, setFilteredData] = useState<ChartData[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [months, setMonths] = useState<string[]>([]);
-  const [niftyRange, setNiftyRange] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
+  // const [niftyRange, setNiftyRange] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,15 +65,20 @@ const Pro_OI_Index_Opt: React.FC = () => {
           };
         });
         const uniqueMonths = Array.from(new Set(formattedData.map((d) => d.month)));
-        const niftyValues = formattedData.map((d) => d.niftyValue);
+        // const niftyValues = formattedData.map((d) => d.niftyValue);
 
+        // Find the most recent date in the dataset
+        const latest = formattedData.reduce((a, b) =>
+          new Date(b.date) > new Date(a.date) ? b : a
+        );
         setData(formattedData);
         setMonths(uniqueMonths);
-        setSelectedMonth(uniqueMonths[0] || "");
-        setNiftyRange({
-          min: Math.min(...niftyValues) * 0.995,
-          max: Math.max(...niftyValues) * 1.005,
-        });
+        // setSelectedMonth(uniqueMonths[0] || "");
+        setSelectedMonth(latest?.month || uniqueMonths[uniqueMonths.length - 1] || "");
+        // setNiftyRange({
+        //   min: Math.min(...niftyValues) * 0.995,
+        //   max: Math.max(...niftyValues) * 1.005,
+        // });
         setIsLoading(false);
       } catch (err) {
         setError("Failed to load data. Please try again later.");
@@ -176,7 +181,7 @@ const Pro_OI_Index_Opt: React.FC = () => {
                 />
                 <YAxis
                   yAxisId="left"
-                  domain={[niftyRange.min, niftyRange.max]}
+                  domain={['auto', 'auto']}
                   tick={{ fontSize: 12, fill: "#6b7280" }}
                   tickFormatter={(value) => value.toLocaleString("en-IN")}
                   label={{

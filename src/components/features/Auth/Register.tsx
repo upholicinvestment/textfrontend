@@ -1,6 +1,5 @@
-// client/src/pages/Register.tsx
 import { useState, useContext, useEffect, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import api from "../../../api";
 import {
   FiUser,
@@ -46,6 +45,7 @@ type Product = {
   key: string;
   name: string;
   hasVariants: boolean;
+  route: string;              // must be present in /products payload
   variants?: Variant[];
 };
 
@@ -61,21 +61,20 @@ const brokerFieldMap: Record<string, string[]> = {
   upstox: [
     "UPSTOX_API_KEY",
     "UPSTOX_API_SECRET",
-    "UPSTOX_REDIRECT_URI",
+    // "UPSTOX_REDIRECT_URI",
     "UPSTOX_ACCESS_TOKEN",
   ],
-  dhan: ["DHAN_BASE_URL", "DHAN_ACCESS_TOKEN"],
-  hdfc: ["HDFC_BASE_URL", "HDFC_API_KEY"],
-  paytm: ["PAYTM_BASE_URL", "PAYTM_CLIENT_ID", "PAYTM_SECRET_KEY"],
-  kotak: ["KOTAK_API_KEY", "KOTAK_API_SECRET"],
-  icici: ["ICICI_API_KEY", "ICICI_API_SECRET"],
+  dhan: ["DHAN_CLIENT_ID", "DHAN_ACCESS_TOKEN"],
+  // hdfc: ["HDFC_BASE_URL", "HDFC_API_KEY"],
+  // paytm: ["PAYTM_BASE_URL", "PAYTM_CLIENT_ID", "PAYTM_SECRET_KEY"],
+  // kotak: ["KOTAK_API_KEY", "KOTAK_API_SECRET"],
+  // icici: ["ICICI_API_KEY", "ICICI_API_SECRET"],
 };
 
 const OTP_COOLDOWN_DURATION = 60; // seconds
 
 const Register = () => {
   const { login } = useContext(AuthContext);
-  const navigate = useNavigate();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -187,7 +186,9 @@ const Register = () => {
         const retryAfter =
           err.response.data.retryAfter || OTP_COOLDOWN_DURATION;
         setCooldown(retryAfter);
-        setError(`Please wait ${retryAfter} seconds before requesting a new OTP`);
+        setError(
+          `Please wait ${retryAfter} seconds before requesting a new OTP`
+        );
       } else {
         setError("Failed to send OTP. Please try again.");
       }
@@ -215,6 +216,9 @@ const Register = () => {
     }
   };
 
+  // --- Helper: compute where to go after signup/payment
+  const getPostSignupPath = () => selectedProduct?.route || "/dashboard";
+
   // === Payment (Razorpay) flow helpers ===
   const launchRazorpayForIntent = async (signupIntentId: string) => {
     try {
@@ -228,9 +232,15 @@ const Register = () => {
         const fin = await api.post("/auth/finalize-signup", { signupIntentId });
         localStorage.setItem("token", fin.data.token);
         localStorage.setItem("user", JSON.stringify(fin.data.user));
+
+        // Hint the intended target BEFORE flipping auth
+        const to = getPostSignupPath();
+        sessionStorage.setItem("postSignupPath", to);
+
+        // Trigger auth; GuestRoute will redirect once
         login(fin.data.token, fin.data.user);
-        setSuccessMessage("Registration successful! Redirecting…");
-        setTimeout(() => navigate("/dashboard"), 1000);
+
+        setSuccessMessage("Registration successful!");
         return;
       }
 
@@ -266,12 +276,19 @@ const Register = () => {
 
             localStorage.setItem("token", verify.data.token);
             localStorage.setItem("user", JSON.stringify(verify.data.user));
+
+            // Hint destination BEFORE login to avoid bounce
+            const to = getPostSignupPath();
+            sessionStorage.setItem("postSignupPath", to);
+
+            // Flip auth -> GuestRoute redirects to `to`
             login(verify.data.token, verify.data.user);
 
-            setSuccessMessage("Payment successful! Redirecting…");
-            setTimeout(() => navigate("/dashboard"), 1200);
+            setSuccessMessage("Payment successful!");
           } catch (e: any) {
-            setError(e?.response?.data?.message || "Payment verification failed");
+            setError(
+              e?.response?.data?.message || "Payment verification failed"
+            );
           }
         },
         modal: {
@@ -337,9 +354,13 @@ const Register = () => {
         const fin = await api.post("/auth/finalize-signup", { signupIntentId });
         localStorage.setItem("token", fin.data.token);
         localStorage.setItem("user", JSON.stringify(fin.data.user));
+
+        // No product -> default to dashboard
+        sessionStorage.setItem("postSignupPath", "/dashboard");
+
+        // Flip auth; GuestRoute will redirect once
         login(fin.data.token, fin.data.user);
-        setSuccessMessage("Registration successful! Redirecting…");
-        setTimeout(() => navigate("/dashboard"), 1000);
+        setSuccessMessage("Registration successful!");
         return;
       }
 
@@ -361,7 +382,7 @@ const Register = () => {
       <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl overflow-hidden flex relative">
         {/* Close button */}
         <Link
-          to="/"
+          to="/Home"
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors z-10"
           aria-label="Close"
         >
@@ -376,9 +397,12 @@ const Register = () => {
               alt="Trading Illustration"
               className="w-full h-auto max-w-md mx-auto mb-8"
             />
-            <h2 className="text-3xl font-bold mb-4">Start Your Trading Journey</h2>
+            <h2 className="text-3xl font-bold mb-4">
+              Start Your Trading Journey
+            </h2>
             <p className="text-indigo-100">
-              Join thousands of traders using our platform to maximize their profits
+              Join thousands of traders using our platform to maximize their
+              profits
             </p>
           </div>
         </div>
@@ -390,7 +414,9 @@ const Register = () => {
               <h2 className="text-3xl font-bold text-gray-800 mb-2">
                 Create Account
               </h2>
-              <p className="text-gray-500">Get started with your free account</p>
+              <p className="text-gray-500">
+                Get started with your free account
+              </p>
             </div>
 
             {error && (
@@ -481,7 +507,9 @@ const Register = () => {
                         type="text"
                         placeholder="Enter OTP (6 digits)"
                         value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                        onChange={(e) =>
+                          setOtp(e.target.value.replace(/\D/g, ""))
+                        }
                         maxLength={6}
                         className="w-full pl-4 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                       />
@@ -585,50 +613,51 @@ const Register = () => {
               )}
 
               {/* Broker Config (conditional) */}
-              {selectedProduct?.key === "algo_simulator" && initialVariantId && (
-                <>
-                  <div>
-                    <label
-                      htmlFor="brokerName"
-                      className="block text-sm text-gray-600 mb-1"
-                    >
-                      Select Broker
-                    </label>
-                    <select
-                      id="brokerName"
-                      value={brokerName}
-                      onChange={(e) => {
-                        setBrokerName(e.target.value);
-                        setBrokerConfig({});
-                      }}
-                      className="w-full py-2.5 px-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    >
-                      <option value="">Select Broker</option>
-                      {Object.keys(brokerFieldMap).map((key) => (
-                        <option key={key} value={key}>
-                          {key.toUpperCase()}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              {selectedProduct?.key === "algo_simulator" &&
+                initialVariantId && (
+                  <>
+                    <div>
+                      <label
+                        htmlFor="brokerName"
+                        className="block text-sm text-gray-600 mb-1"
+                      >
+                        Select Broker
+                      </label>
+                      <select
+                        id="brokerName"
+                        value={brokerName}
+                        onChange={(e) => {
+                          setBrokerName(e.target.value);
+                          setBrokerConfig({});
+                        }}
+                        className="w-full py-2.5 px-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="">Select Broker</option>
+                        {Object.keys(brokerFieldMap).map((key) => (
+                          <option key={key} value={key}>
+                            {key.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  {brokerFields.map((field) => (
-                    <input
-                      key={field}
-                      name={field}
-                      type={
-                        field.includes("PASSWORD") || field.includes("SECRET")
-                          ? "password"
-                          : "text"
-                      }
-                      placeholder={field.replace(/_/g, " ")}
-                      value={brokerConfig[field] || ""}
-                      onChange={handleBrokerInput}
-                      className="w-full py-2.5 px-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  ))}
-                </>
-              )}
+                    {brokerFields.map((field) => (
+                      <input
+                        key={field}
+                        name={field}
+                        type={
+                          field.includes("PASSWORD") || field.includes("SECRET")
+                            ? "password"
+                            : "text"
+                        }
+                        placeholder={field.replace(/_/g, " ")}
+                        value={brokerConfig[field] || ""}
+                        onChange={handleBrokerInput}
+                        className="w-full py-2.5 px-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    ))}
+                  </>
+                )}
 
               {/* Submit */}
               <button
@@ -645,6 +674,43 @@ const Register = () => {
                 </span>
                 {!isLoading && <FiArrowRight className="text-white" />}
               </button>
+
+              {/* Added legal text */}
+              <div className="text-xs text-gray-500 text-center mt-4">
+                By clicking Register, you agree to our{" "}
+                <Link
+                  to="/terms"
+                  target="_blank"
+                  className="text-indigo-600 hover:underline"
+                >
+                  Terms & Conditions
+                </Link>
+                ,{" "}
+                <Link
+                  to="/privacy"
+                  target="_blank"
+                  className="text-indigo-600 hover:underline"
+                >
+                  Privacy Policy
+                </Link>
+                ,{" "}
+                <Link
+                  to="/refund"
+                  target="_blank"
+                  className="text-indigo-600 hover:underline"
+                >
+                  Refund & Cancellation Policy
+                </Link>{" "}
+                and{" "}
+                <Link
+                  to="/cookies"
+                  target="_blank"
+                  className="text-indigo-600 hover:underline"
+                >
+                  Cookies Policy
+                </Link>
+                .
+              </div>
             </form>
 
             <div className="mt-6 text-center text-sm text-gray-500">
