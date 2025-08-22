@@ -1,16 +1,16 @@
 // src/routes/AppRoutes.tsx
-import React, {Suspense} from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
-import { motion } from 'framer-motion';
+// import { Canvas } from '@react-three/fiber';
+// import { OrbitControls } from '@react-three/drei';
+// import { motion } from 'framer-motion';
 
 // Intro 3D pieces
-import SplashCursor from '../pages/Intro3D/Splashcolour';
-import LightRays from '../pages/Intro3D/Background';
-import RobotModel from '../pages/Intro3D/Robot';
-import TickerBanner from '../pages/Intro3D/Text';
-import RightPanel from '../pages/Intro3D/RightPanel';
+// import SplashCursor from '../pages/Intro3D/Splashcolour';
+// import LightRays from '../pages/Intro3D/Background';
+// import RobotModel from '../pages/Intro3D/Robot';
+// import TickerBanner from '../pages/Intro3D/Text';
+// import RightPanel from '../pages/Intro3D/RightPanel';
 
 // Import your components/pages
 import Home from '../pages/Home/Home';

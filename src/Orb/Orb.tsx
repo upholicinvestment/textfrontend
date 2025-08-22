@@ -181,7 +181,6 @@ export default function Orb({ height = 680 }: OrbProps) {
     startAutoScroll();
   };
 
-  const progressWidth = 500 * (1 / data.length) * (currentIndex + 1);
 
   // container height style
   const containerStyle =
