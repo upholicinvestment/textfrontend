@@ -1,147 +1,102 @@
-
-
 const PrivacyPolicy = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
       <div className="bg-white shadow-md rounded-lg p-6 md:p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">PRIVACY STATEMENT</h1>
-          <div className="w-20 h-1 bg-indigo-600 mx-auto"></div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Privacy Policy</h1>
+          <p className="text-gray-500">Last updated on Aug 21st 2025</p>
+          <div className="w-20 h-1 bg-indigo-600 mx-auto mt-4"></div>
         </div>
 
         <div className="prose prose-indigo max-w-none">
           <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              SECTION 1 - WHAT DO WE DO WITH YOUR INFORMATION?
-            </h2>
-            <p className="text-gray-600 mb-4">
-              When you purchase something from our store, as part of the buying and selling process, we collect the personal information you give us such as your name, address and email address.
+            <p className="text-gray-600 mb-6">
+              This privacy policy sets out how UPHOLIC TECH PRIVATE LIMITED uses and protects any information that you give UPHOLIC TECH PRIVATE LIMITED when you visit their website and/or agree to purchase from them.
             </p>
-            <p className="text-gray-600 mb-4">
-              When you browse our store, we also automatically receive your computer's internet protocol (IP) address in order to provide us with information that helps us learn about your browser and operating system.
+            <p className="text-gray-600 mb-6">
+              UPHOLIC TECH PRIVATE LIMITED is committed to ensuring that your privacy is protected. Should we ask you to provide certain information by which you can be identified when using this website, and then you can be assured that it will only be used in accordance with this privacy statement.
             </p>
             <p className="text-gray-600">
-              Email marketing (if applicable): With your permission, we may send you emails about our store, new products and other updates.
+              UPHOLIC TECH PRIVATE LIMITED may change this policy from time to time by updating this page. You should check this page from time to time to ensure that you adhere to these changes.
             </p>
           </div>
 
           <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">SECTION 2 - CONSENT</h2>
-            <h3 className="font-medium text-gray-700 mb-2">How do you get my consent?</h3>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">We may collect the following information:</h2>
+            <ul className="text-gray-600 list-disc pl-5 mb-4 space-y-2">
+              <li>Name</li>
+              <li>Contact information including email address</li>
+              <li>Demographic information such as postcode, preferences and interests, if required</li>
+              <li>Other information relevant to customer surveys and/or offers</li>
+            </ul>
+          </div>
+
+          <div className="mb-10">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">What we do with the information we gather</h2>
             <p className="text-gray-600 mb-4">
-              When you provide us with personal information to complete a transaction, verify your credit card, place an order, arrange for a delivery or return a purchase, we imply that you consent to our collecting it and using it for that specific reason only.
+              We require this information to understand your needs and provide you with a better service, and in particular for the following reasons:
             </p>
-            <p className="text-gray-600 mb-4">
-              If we ask for your personal information for a secondary reason, like marketing, we will either ask you directly for your expressed consent, or provide you with an opportunity to say no.
-            </p>
-            
-            <h3 className="font-medium text-gray-700 mb-2">How do I withdraw my consent?</h3>
+            <ul className="text-gray-600 list-disc pl-5 mb-4 space-y-2">
+              <li>Internal record keeping.</li>
+              <li>We may use the information to improve our products and services.</li>
+              <li>We may periodically send promotional emails about new products, special offers or other information which we think you may find interesting using the email address which you have provided.</li>
+              <li>From time to time, we may also use your information to contact you for market research purposes. We may contact you by email, phone, fax or mail. We may use the information to customise the website according to your interests.</li>
+            </ul>
             <p className="text-gray-600">
-              If after you opt-in, you change your mind, you may withdraw your consent for us to contact you, for the continued collection, use or disclosure of your information, at anytime, by contacting us at{' '}
-              <a href="mailto:upholictech@upholic.in" className="text-indigo-600 hover:underline">
-                upholictech@upholic.in
-              </a>{' '}
-              or mailing us at: FA-05/9, Vikas Business Centre, Thane(W), 400601
+              We are committed to ensuring that your information is secure. In order to prevent unauthorised access or disclosure we have put in suitable measures.
             </p>
           </div>
 
           <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">SECTION 3 - DISCLOSURE</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">How we use cookies</h2>
+            <p className="text-gray-600 mb-4">
+              A cookie is a small file which asks permission to be placed on your computer's hard drive. Once you agree, the file is added and the cookie helps analyze web traffic or lets you know when you visit a particular site. Cookies allow web applications to respond to you as an individual. The web application can tailor its operations to your needs, likes and dislikes by gathering and remembering information about your preferences.
+            </p>
+            <p className="text-gray-600 mb-4">
+              We use traffic log cookies to identify which pages are being used. This helps us analyze data about webpage traffic and improve our website in order to tailor it to customer needs. We only use this information for statistical analysis purposes and then the data is removed from the system.
+            </p>
+            <p className="text-gray-600 mb-4">
+              Overall, cookies help us provide you with a better website, by enabling us to monitor which pages you find useful and which you do not. A cookie in no way gives us access to your computer or any information about you, other than the data you choose to share with us.
+            </p>
             <p className="text-gray-600">
-              We may disclose your personal information if we are required by law to do so or if you violate our Terms of Service.
+              You can choose to accept or decline cookies. Most web browsers automatically accept cookies, but you can usually modify your browser setting to decline cookies if you prefer. This may prevent you from taking full advantage of the website.
             </p>
           </div>
 
           <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">SECTION 4 - PAYMENT</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Controlling your personal information</h2>
             <p className="text-gray-600 mb-4">
-              We use Razorpay for processing payments. We/Razorpay do not store your card data on their servers. The data is encrypted through the Payment Card Industry Data Security Standard (PCI-DSS) when processing payment. Your purchase transaction data is only used as long as is necessary to complete your purchase transaction. After that is complete, your purchase transaction information is not saved.
+              You may choose to restrict the collection or use of your personal information in the following ways:
             </p>
+            <ul className="text-gray-600 list-disc pl-5 mb-4 space-y-2">
+              <li>whenever you are asked to fill in a form on the website, look for the box that you can click to indicate that you do not want the information to be used by anybody for direct marketing purposes</li>
+              <li>if you have previously agreed to us using your personal information for direct marketing purposes, you may change your mind at any time by writing to or emailing us at</li>
+            </ul>
             <p className="text-gray-600 mb-4">
-              Our payment gateway adheres to the standards set by PCI-DSS as managed by the PCI Security Standards Council, which is a joint effort of brands like Visa, MasterCard, American Express and Discover.
-            </p>
-            <p className="text-gray-600 mb-4">
-              PCI-DSS requirements help ensure the secure handling of credit card information by our store and its service providers.
+              We will not sell, distribute or lease your personal information to third parties unless we have your permission or are required by law to do so. We may use your personal information to send you promotional information about third parties which we think you may find interesting if you tell us that you wish this to happen.
             </p>
             <p className="text-gray-600">
-              For more insight, you may also want to read terms and conditions of razorpay on{' '}
-              <a href="https://razorpay.com" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                https://razorpay.com
-              </a>
+              If you believe that any information we are holding on you is incorrect or incomplete, please write to 1401 maple, mahavir kalpravrisha, ksarwadawali road Thane MAHARASHTRA 400615 or contact us at or as soon as possible. We will promptly correct any information found to be incorrect.
             </p>
           </div>
 
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">SECTION 5 - THIRD-PARTY SERVICES</h2>
-            <p className="text-gray-600 mb-4">
-              In general, the third-party providers used by us will only collect, use and disclose your information to the extent necessary to allow them to perform the services they provide to us.
+          <div className="bg-gray-100 p-4 rounded-md mt-6">
+            <p className="text-gray-600 text-sm italic">
+              Disclaimer: The above content is created at UPHOLIC TECH PRIVATE LIMITED's sole discretion. 
+              Razorpay shall not be liable for any content provided here and shall not be responsible for 
+              any claims and liability that may arise due to merchant's non-adherence to it.
             </p>
-            <p className="text-gray-600 mb-4">
-              However, certain third-party service providers, such as payment gateways and other payment transaction processors, have their own privacy policies in respect to the information we are required to provide to them for your purchase-related transactions.
-            </p>
-            <p className="text-gray-600 mb-4">
-              For these providers, we recommend that you read their privacy policies so you can understand the manner in which your personal information will be handled by these providers.
-            </p>
-            <p className="text-gray-600 mb-4">
-              In particular, remember that certain providers may be located in or have facilities that are located a different jurisdiction than either you or us. So if you elect to proceed with a transaction that involves the services of a third-party service provider, then your information may become subject to the laws of the jurisdiction(s) in which that service provider or its facilities are located.
-            </p>
-            <p className="text-gray-600 mb-4">
-              Once you leave our store's website or are redirected to a third-party website or application, you are no longer governed by this Privacy Policy or our website's Terms of Service. 
-            </p>
-            <h3 className="font-medium text-gray-700 mb-2">Links</h3>
-            <p className="text-gray-600">
-              When you click on links on our store, they may direct you away from our site. We are not responsible for the privacy practices of other sites and encourage you to read their privacy statements.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">SECTION 6 - SECURITY</h2>
-            <p className="text-gray-600">
-              To protect your personal information, we take reasonable precautions and follow industry best practices to make sure it is not inappropriately lost, misused, accessed, disclosed, altered or destroyed.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">SECTION 7 - COOKIES</h2>
-            <p className="text-gray-600">
-              We use cookies to maintain session of your user. It is not used to personally identify you on other websites.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">SECTION 8 - AGE OF CONSENT</h2>
-            <p className="text-gray-600">
-              By using this site, you represent that you are at least the age of majority in your state or province of residence, or that you are the age of majority in your state or province of residence and you have given us your consent to allow any of your minor dependents to use this site.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">SECTION 9 - CHANGES TO THIS PRIVACY POLICY</h2>
-            <p className="text-gray-600 mb-4">
-              We reserve the right to modify this privacy policy at any time, so please review it frequently. Changes and clarifications will take effect immediately upon their posting on the website. If we make material changes to this policy, we will notify you here that it has been updated, so that you are aware of what information we collect, how we use it, and under what circumstances, if any, we use and/or disclose it.
-            </p>
-            <p className="text-gray-600">
-              If our store is acquired or merged with another company, your information may be transferred to the new owners so that we may continue to sell products to you.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">QUESTIONS AND CONTACT INFORMATION</h2>
-            <p className="text-gray-600 mb-4">
-              If you would like to: access, correct, amend or delete any personal information we have about you, register a complaint, or simply want more information contact our Privacy Compliance Officer at{' '}
-              <a href="mailto:upholictech@upholic.in" className="text-indigo-600 hover:underline">
-                upholictech@upholic.in
-              </a>{' '}
-              or by mail at:
-            </p>
-            <address className="text-gray-600 not-italic">
-              [Re: Privacy Compliance Officer]<br />
-              FA-05/9, Vikas Business Centre,<br />
-              Thane(W), 400601
-            </address>
           </div>
         </div>
 
+        <div className="mt-10 pt-6 border-t border-gray-200">
+          <p className="text-gray-600 text-center">
+            For any questions regarding this policy, please contact us at{' '}
+            <a href="mailto:upholictech@upholic.in" className="text-indigo-600 hover:underline">
+              upholictech@upholic.in
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

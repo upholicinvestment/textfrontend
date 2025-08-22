@@ -1,0 +1,299 @@
+import React, { useState, FormEvent } from "react";
+import {
+  FiCheckCircle,
+  FiPhone,
+  FiMail,
+  FiMapPin,
+  FiChevronDown,
+  FiX,
+  FiBriefcase,
+} from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
+
+type FormState = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  company: string; // reused to store mobile number
+  persona: string; // selected product
+  message: string;
+  agree: boolean;
+};
+
+// Products interested in
+const personas = [
+  "Select a product",
+  "5-in-1 Trader's Essential Bundle",
+  "ALGO Simulator",
+
+  "Both / Not sure",
+];
+
+const ContactUs: React.FC = () => {
+  const navigate = useNavigate();
+
+  const [form, setForm] = useState<FormState>({
+    firstName: "",
+    lastName: "",
+    email: "",
+    company: "", // mobile number
+    persona: "", // product
+    message: "",
+    agree: false,
+  });
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    console.log("Submitted:", form);
+    alert("Form submitted (replace with your API).");
+  };
+
+  return (
+    <section className="relative min-h-screen w-full overflow-hidden bg-[#0b0d10] text-white text-left">
+      {/* Close button */}
+      <button
+        aria-label="Close"
+        onClick={() => navigate("/")}
+        className="absolute right-6 top-6 z-20 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 backdrop-blur hover:bg-white/10 active:translate-y-px"
+      >
+        <FiX className="h-5 w-5 text-gray-200" />
+      </button>
+
+      {/* background accents (soft beams + dotted grid) */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(1200px 600px at 70% -10%, rgba(255,255,255,0.08), transparent 60%), radial-gradient(900px 500px at -10% 20%, rgba(99,102,241,0.12), transparent 60%)",
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.12] [background:radial-gradient(circle,rgba(255,255,255,0.6)_1px,transparent_1px)] [background-size:18px_18px]" />
+
+      <div className="relative mx-auto max-w-7xl px-6 py-14 md:py-20">
+        <div className="grid gap-12 md:grid-cols-2 md:gap-16">
+          {/* LEFT: copy + features + contact info */}
+          <div className="max-w-xl text-left">
+            <div className="mb-3 text-left text-md font-semibold uppercase tracking-[0.2em] text-gray-300">
+              Contact Us
+            </div>
+            <h1 className="text-left text-4xl font-bold leading-tight md:text-5xl">
+              Get in Touch with Us
+            </h1>
+
+            <p className="mt-4 text-left text-sm leading-relaxed text-gray-400">
+              We’re here to help. Whether you’re interested in learning more
+              about our services or need support, we’re happy to assist you.
+            </p>
+
+            <ul className="mt-4 space-y-2 text-left">
+              {[
+                "Product Demo & Use-Case Guidance",
+                "Broker/API Integration Help (Zerodha, Angel One, Dhan, Upstox)",
+                "Auto-Trading Setup & Risk Controls",
+                "Pricing, Plans & Enterprise Trials",
+                "Support, Bug Reports & Feature Requests",
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-3 text-left">
+                  <span className="mt-[2px] text-emerald-400">
+                    <FiCheckCircle className="h-5 w-5" />
+                  </span>
+                  <span className="text-sm text-gray-200">{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-10 text-left">
+              <div className="text-2xl font-semibold text-white">
+                General Contact Info
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-gray-400">
+                We’re here to help. Whether you’re interested in learning more
+                about our services or need support, we’re happy to assist you.
+              </p>
+
+              <div className="mt-6 space-y-3 text-sm">
+                <div className="flex items-center gap-3 text-gray-200">
+                  <FiBriefcase className="h-4 w-4 text-gray-400" />
+                  <span>
+                    <span className="text-gray-400">Legal Entity Name:</span>{" "}
+                    Upholic Tech Private Limited
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 text-gray-200">
+                  <FiPhone className="h-4 w-4 text-gray-400" />
+                  <span>
+                    <span className="text-gray-400">Phone:</span> 2244511316
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-gray-200">
+                  <FiMail className="h-4 w-4 text-gray-400" />
+                  <span>
+                    <span className="text-gray-400">Email:</span>{" "}
+                    ithelpdesk@upholic.in
+                  </span>
+                </div>
+                <div className="flex items-start gap-3 text-gray-200">
+                  <FiMapPin className="mt-0.5 h-4 w-4 text-gray-400" />
+                  <span>
+                    <span className="text-gray-400">Location:</span> FA-05/9,
+                    Vikas Business Centre, Thane(W), 400601
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: form */}
+          <div className="md:pl-2 text-left">
+            <form
+              onSubmit={handleSubmit}
+              className="rounded-2xl border border-white/10 bg-white/5 p-5 text-left backdrop-blur-sm md:p-6"
+            >
+              {/* First/Last name */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="text-left">
+                  <label className="mb-1 block text-left text-xs text-gray-400">
+                    First Name
+                  </label>
+                  <input
+                    className="h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                    placeholder="Enter First Name"
+                    value={form.firstName}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, firstName: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="text-left">
+                  <label className="mb-1 block text-left text-xs text-gray-400">
+                    Last Name
+                  </label>
+                  <input
+                    className="h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                    placeholder="Enter Last Name"
+                    value={form.lastName}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, lastName: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="mt-3 text-left">
+                <label className="mb-1 block text-left text-xs text-gray-400">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  className="h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                  placeholder="albert@susanto.com"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm((s) => ({ ...s, email: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+
+              {/* Mobile Number (replaces Company Name) */}
+              <div className="mt-3 text-left">
+                <label className="mb-1 block text-left text-xs text-gray-400">
+                  Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  className="h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                  placeholder="+91 98765 43210"
+                  value={form.company}
+                  onChange={(e) =>
+                    setForm((s) => ({ ...s, company: e.target.value }))
+                  }
+                />
+              </div>
+
+              {/* Products Interested In (replaces 'Which best describes you?') */}
+              <div className="mt-3 text-left">
+                <label className="mb-1 block text-left text-xs text-gray-400">
+                  Products Interested In
+                </label>
+                <div className="relative text-left">
+                  <select
+                    className="h-11 w-full appearance-none rounded-full border border-white/10 bg-white/5 px-4 pr-10 text-left text-sm text-white outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                    value={form.persona || "Select a product"}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, persona: e.target.value }))
+                    }
+                    required
+                  >
+                    {personas.map((p) => (
+                      <option key={p} value={p} className="bg-[#0b0d10]">
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                  <FiChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                </div>
+              </div>
+
+              {/* Message */}
+              <div className="mt-3 text-left">
+                <label className="mb-1 block text-left text-xs text-gray-400">
+                  Message
+                </label>
+                <textarea
+                  className="min-h-[160px] w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                  placeholder="Write your message..."
+                  value={form.message}
+                  onChange={(e) =>
+                    setForm((s) => ({ ...s, message: e.target.value }))
+                  }
+                />
+              </div>
+
+              {/* Terms + Submit */}
+              <div className="mt-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                <label className="flex cursor-pointer select-none items-center gap-2 text-left text-xs text-gray-400">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-white/10 bg-white/5 accent-emerald-500"
+                    checked={form.agree}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, agree: e.target.checked }))
+                    }
+                    required
+                  />
+                  <span className="text-left">
+                    I agree to Fireside{" "}
+                    <a className="underline underline-offset-2" href="#">
+                      Terms of Use
+                    </a>{" "}
+                    and{" "}
+                    <a className="underline underline-offset-2" href="#">
+                      Privacy Policy
+                    </a>{" "}
+                    <span className="text-emerald-400">*</span>
+                  </span>
+                </label>
+
+                <button
+                  type="submit"
+                  className="ml-auto inline-flex items-center justify-center rounded-md bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 px-5 py-2 text-sm font-semibold text-white shadow-md shadow-purple-500/20 transition active:translate-y-[1px]"
+                >
+                  Submit
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default ContactUs;

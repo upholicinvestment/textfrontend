@@ -33,32 +33,23 @@ const Navbar = () => {
   const searchRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Handle scroll effect
+  // Scroll shadow / bg state
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Handle click outside
+  // Click outside to close popovers
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        servicesRef.current &&
-        !servicesRef.current.contains(event.target as Node)
-      ) {
+      if (servicesRef.current && !servicesRef.current.contains(event.target as Node)) {
         setIsServicesOpen(false);
       }
-      if (
-        searchRef.current &&
-        !searchRef.current.contains(event.target as Node)
-      ) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setSearchOpen(false);
       }
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(event.target as Node)
-      ) {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
       }
     };
@@ -67,100 +58,52 @@ const Navbar = () => {
   }, []);
 
   const services = [
-    {
-      name: "Technical Scanner",
-      icon: "📊",
-      color: "bg-gradient-to-br from-purple-500 to-blue-500",
-      path: "/comming-soon",
-    },
-    {
-      name: "Fundamental Scanner",
-      icon: "📚",
-      color: "bg-gradient-to-br from-blue-500 to-cyan-500",
-      path: "/comming-soon",
-    },
-    {
-      name: "ALGO Simulator",
-      icon: "🤖",
-      color: "bg-gradient-to-br from-pink-500 to-purple-500",
-      path: "/comming-soon",
-    },
-    {
-      name: "FNO Khazana",
-      icon: "💰",
-      color: "bg-gradient-to-br from-green-500 to-teal-500",
-      path: "/fno-khazana",
-    },
-    {
-      name: "Journaling",
-      icon: "📓",
-      color: "bg-gradient-to-br from-indigo-500 to-violet-500",
-      path: "/Journaling",
-    },
-    {
-      name: "FIIs/DIIs Data",
-      icon: "📈",
-      color: "bg-gradient-to-br from-cyan-500 to-blue-500",
-      path: "/main-fii-dii",
-    },
+    { name: "Technical Scanner", icon: "📊", color: "bg-gradient-to-br from-purple-500 to-blue-500", path: "/comming-soon" },
+    { name: "Fundamental Scanner", icon: "📚", color: "bg-gradient-to-br from-blue-500 to-cyan-500", path: "/comming-soon" },
+    { name: "ALGO Simulator", icon: "🤖", color: "bg-gradient-to-br from-pink-500 to-purple-500", path: "/comming-soon" },
+    { name: "FNO Khazana", icon: "💰", color: "bg-gradient-to-br from-green-500 to-teal-500", path: "/fno-khazana" },
+    { name: "Journaling", icon: "📓", color: "bg-gradient-to-br from-indigo-500 to-violet-500", path: "/Journaling" },
+    { name: "FIIs/DIIs Data", icon: "📈", color: "bg-gradient-to-br from-cyan-500 to-blue-500", path: "/main-fii-dii" },
   ];
 
   const navLinks = [
     { name: "Home", path: "/Home" },
     { name: "About", path: "/about" },
-    { name: "Pricing", path: "/comming-soon" },
+    { name: "Pricing", path: "/pricing" },
   ];
 
-  // Close services when mobile menu closes
   useEffect(() => {
     if (!isMenuOpen) setIsServicesOpen(false);
   }, [isMenuOpen]);
 
-  // ---------- SEARCH LOGIC ----------
+  // ---- Search logic ----
   const searchable: SearchItem[] = useMemo(() => {
-    const pages: SearchItem[] = navLinks.map((l) => ({
-      label: l.name,
-      path: l.path,
-      group: "Pages",
-    }));
-    const svc: SearchItem[] = services.map((s) => ({
-      label: s.name,
-      path: s.path,
-      group: "Services",
-    }));
+    const pages: SearchItem[] = navLinks.map((l) => ({ label: l.name, path: l.path, group: "Pages" }));
+    const svc: SearchItem[] = services.map((s) => ({ label: s.name, path: s.path, group: "Services" }));
     return [...pages, ...svc];
   }, []);
 
   const results = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
-    // Simple weighted match: startsWith gets priority
     const scored = searchable
       .map((item) => {
         const label = item.label.toLowerCase();
         const idx = label.indexOf(q);
         const score =
-          idx === 0
-            ? 3
-            : idx > 0
-            ? 2
-            : label.split(" ").some((w) => w.startsWith(q))
-            ? 1
-            : 0;
+          idx === 0 ? 3 :
+          idx > 0 ? 2 :
+          label.split(" ").some((w) => w.startsWith(q)) ? 1 : 0;
         return { item, score };
       })
       .filter((x) => x.score > 0)
-      .sort(
-        (a, b) => b.score - a.score || a.item.label.localeCompare(b.item.label)
-      )
+      .sort((a, b) => b.score - a.score || a.item.label.localeCompare(b.item.label))
       .slice(0, 8)
       .map((x) => x.item);
-    // Reset active index when results recalc
     setActiveIdx(0);
     return scored;
   }, [searchQuery, searchable]);
 
-  // Keyboard navigation for desktop search
   useEffect(() => {
     if (!searchOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -215,7 +158,9 @@ const Navbar = () => {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className={`fixed w-full z-50 ${
+
+      // Sticky keeps navbar in normal flow + pins at top
+      className={`sticky top-0 z-50 w-full ${
         isScrolled ? "bg-[#0a0b2a]/95 backdrop-blur-md" : "bg-[#0a0b2a]/80"
       }`}
       style={{
@@ -233,21 +178,10 @@ const Navbar = () => {
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex-shrink-0 flex items-center"
-          >
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex-shrink-0 flex items-center">
             <motion.a href="/" className="relative">
-              <motion.img
-                src={upholictech}
-                alt="UpHolic Logo"
-                className="h-10 w-auto"
-              />
-              <motion.span
-                initial={{ opacity: 0 }}
-                whileHover={{ opacity: 0.3 }}
-              />
+              <motion.img src={upholictech} alt="UpHolic Logo" className="h-10 w-auto" />
+              <motion.span initial={{ opacity: 0 }} whileHover={{ opacity: 0.3 }} />
             </motion.a>
           </motion.div>
 
@@ -283,10 +217,7 @@ const Navbar = () => {
                   onClick={() => setIsServicesOpen(!isServicesOpen)}
                   className="flex items-center px-4 lg:px-6 py-2.5 text-gray-300 hover:text-white text-sm font-medium transition-colors duration-300"
                 >
-                  <span className="relative">
-                    Services
-                    <span className="absolute -right-2 -top-1 w-2 h-2 bg-purple-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  </span>
+                  <span className="relative">Services</span>
                   <motion.span
                     animate={{ rotate: isServicesOpen ? 180 : 0 }}
                     transition={{ type: "spring", stiffness: 300 }}
@@ -311,30 +242,23 @@ const Navbar = () => {
                       initial={{ opacity: 0, y: -15, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -15, scale: 0.95 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 20,
-                      }}
+                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
                       className="absolute left-1/2 transform -translate-x-1/2 mt-3 w-72 rounded-xl shadow-2xl bg-[#0e102b] border border-purple-500/20 overflow-hidden z-50 backdrop-blur-lg"
-                      style={{
-                        boxShadow: "0 10px 30px -10px rgba(98, 70, 234, 0.3)",
-                      }}
+                      style={{ boxShadow: "0 10px 30px -10px rgba(98, 70, 234, 0.3)" }}
                     >
                       <div className="py-2">
                         {services.map((service) => (
                           <Link
                             key={service.name}
                             to={service.path}
-                            className={`flex items-center px-4 py-3 text-sm text-gray-300 hover:text-white transition-all duration-200 border-b border-purple-500/10 last:border-0 group`}
+                            className="flex items-center px-4 py-3 text-sm text-gray-300 hover:text-white transition-all duration-200 border-b border-purple-500/10 last:border-0 group"
+                            onClick={() => setIsServicesOpen(false)}
                           >
-                            <span
-                              className={`mr-3 text-lg ${service.color} rounded-full w-8 h-8 flex items-center justify-center text-white`}
-                            >
+                            <span className={`mr-3 text-lg ${service.color} rounded-full w-8 h-8 flex items-center justify-center text-white`}>
                               {service.icon}
                             </span>
                             <span>{service.name}</span>
-                            <span className="ml-auto text-xs bg-purple-500/10 text-purple-300 px-2 py-1 rounded-full group-hover:bg-purple-500/20 group-hover:text-purple-100 transition-colors">
+                            <span className="ml-auto text-xs bg-purple-500/10 text-purple-300 px-2 py-1 rounded-full">
                               New
                             </span>
                           </Link>
@@ -366,10 +290,7 @@ const Navbar = () => {
                   placeholder="Search features..."
                   className="bg-[#0e102b] rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 w-full text-gray-200 placeholder-gray-500"
                   autoFocus={searchOpen}
-                  style={{
-                    boxShadow: "0 0 10px rgba(98, 70, 234, 0.2)",
-                    border: "1px solid rgba(98, 70, 234, 0.2)",
-                  }}
+                  style={{ boxShadow: "0 0 10px rgba(98, 70, 234, 0.2)", border: "1px solid rgba(98, 70, 234, 0.2)" }}
                 />
               )}
               <motion.button
@@ -381,11 +302,7 @@ const Navbar = () => {
                     if (searchOpen) setSearchQuery("");
                   }, 0);
                 }}
-                className={`p-2 rounded-full ${
-                  searchOpen
-                    ? "ml-2 bg-purple-500/10 text-purple-300"
-                    : "bg-transparent text-gray-300 hover:text-white"
-                }`}
+                className={`p-2 rounded-full ${searchOpen ? "ml-2 bg-purple-500/10 text-purple-300" : "bg-transparent text-gray-300 hover:text-white"}`}
                 style={{ backdropFilter: "blur(4px)"}}
                 aria-label="Search"
               >
@@ -401,9 +318,7 @@ const Navbar = () => {
                     exit={{ opacity: 0, y: 6 }}
                     transition={{ duration: 0.15 }}
                     className="absolute top-full mt-2 left-0 right-0 rounded-xl bg-[#0e102b] border border-purple-500/20 shadow-2xl overflow-hidden z-50"
-                    style={{
-                      boxShadow: "0 10px 30px -10px rgba(98, 70, 234, 0.3)",
-                    }}
+                    style={{ boxShadow: "0 10px 30px -10px rgba(98, 70, 234, 0.3)" }}
                   >
                     <div className="max-h-72 overflow-auto py-2">
                       {results.map((r, i) => (
@@ -412,9 +327,7 @@ const Navbar = () => {
                           onMouseEnter={() => setActiveIdx(i)}
                           onClick={() => goTo(r.path)}
                           className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${
-                            i === activeIdx
-                              ? "bg-purple-500/15 text-white"
-                              : "text-gray-300 hover:bg-purple-500/10 hover:text-white"
+                            i === activeIdx ? "bg-purple-500/15 text-white" : "text-gray-300 hover:bg-purple-500/10 hover:text-white"
                           }`}
                         >
                           <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300">
@@ -456,16 +369,12 @@ const Navbar = () => {
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className={`inline-flex items-center justify-center p-2 rounded-full ${
-                  isMenuOpen
-                    ? "bg-purple-500 text-white"
-                    : "text-gray-300 hover:text-white"
+                  isMenuOpen ? "bg-purple-500 text-white" : "text-gray-300 hover:text-white"
                 } transition-all duration-300`}
                 aria-label="Toggle menu"
                 style={{
                   backdropFilter: "blur(4px)",
-                  boxShadow: isMenuOpen
-                    ? "0 0 15px rgba(98, 70, 234, 0.5)"
-                    : "0 0 10px rgba(98, 70, 234, 0.2)",
+                  boxShadow: isMenuOpen ? "0 0 15px rgba(98, 70, 234, 0.5)" : "0 0 10px rgba(98, 70, 234, 0.2)",
                 }}
               >
                 {isMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
@@ -555,10 +464,7 @@ const Navbar = () => {
                   className="w-full flex justify-between items-center px-4 py-3 rounded-lg text-base font-medium text-gray-300 hover:text-white transition-all duration-300 backdrop-blur-sm border border-transparent hover:border-purple-500/30 hover:bg-purple-500/10"
                 >
                   <span>Services</span>
-                  <motion.span
-                    animate={{ rotate: isServicesOpen ? 180 : 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                  <motion.span animate={{ rotate: isServicesOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
                     <FiChevronDown />
                   </motion.span>
                 </button>
@@ -582,9 +488,7 @@ const Navbar = () => {
                             setIsMenuOpen(false);
                           }}
                         >
-                          <span
-                            className={`mr-3 text-lg ${service.color} rounded-full w-7 h-7 flex items-center justify-center text-white`}
-                          >
+                          <span className={`mr-3 text-lg ${service.color} rounded-full w-7 h-7 flex items-center justify-center text-white`}>
                             {service.icon}
                           </span>
                           {service.name}

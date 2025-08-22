@@ -37,85 +37,86 @@ import Price from '../pages/Price/Price';
 import About from '../pages/About/About';
 import Journal_Home from '../pages/Journals/Journal_Home/Journal_Home';
 import Journal_Layout from '../pages/Journals/JournalLayout/Journal_Layout';
+import ContactUs from '../pages/Policies/ContactUs';
 // import NotFound from '../pages/404';
 
 // ---------- Local wrapper for page transitions ----------
-const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 50 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: -50 }}
-    transition={{ duration: 0.6 }}
-    style={{
-      width: '100%',
-      height: '100vh',
-      position: 'relative',
-      overflow: 'hidden',
-      backgroundColor: '#0a0a0a',
-    }}
-  >
-    {children}
-  </motion.div>
-);
+// const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+//   <motion.div
+//     initial={{ opacity: 0, y: 50 }}
+//     animate={{ opacity: 1, y: 0 }}
+//     exit={{ opacity: 0, y: -50 }}
+//     transition={{ duration: 0.6 }}
+//     style={{
+//       width: '100%',
+//       height: '100vh',
+//       position: 'relative',
+//       overflow: 'hidden',
+//       backgroundColor: '#0a0a0a',
+//     }}
+//   >
+//     {children}
+//   </motion.div>
+// );
 
 // ---------- Inline Intro HomePage (3D splash) ----------
-const HomePage: React.FC = () => (
-  <PageWrapper>
-    <SplashCursor />
+// const HomePage: React.FC = () => (
+//   <PageWrapper>
+//     <SplashCursor />
 
-    {/* Light Rays Background */}
-    <div style={{ position: 'absolute', width: '100%', height: '100%', zIndex: 0 }}>
-      <LightRays
-        raysOrigin="top-center"
-        raysColor="#eceeeeff"
-        raysSpeed={1.5}
-        lightSpread={0.8}
-        rayLength={1.2}
-        followMouse={true}
-        mouseInfluence={0.1}
-        noiseAmount={0.1}
-        distortion={0.05}
-        className="light-rays-container"
-      />
-    </div>
+//     {/* Light Rays Background */}
+//     <div style={{ position: 'absolute', width: '100%', height: '100%', zIndex: 0 }}>
+//       <LightRays
+//         raysOrigin="top-center"
+//         raysColor="#eceeeeff"
+//         raysSpeed={1.5}
+//         lightSpread={0.8}
+//         rayLength={1.2}
+//         followMouse={true}
+//         mouseInfluence={0.1}
+//         noiseAmount={0.1}
+//         distortion={0.05}
+//         className="light-rays-container"
+//       />
+//     </div>
 
-    {/* 3D Canvas */}
-    <Canvas
-      camera={{ position: [0, 2, 8], fov: 50 }}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 1,
-        background: 'transparent',
-      }}
-    >
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 10, 5]} intensity={1} />
+//     {/* 3D Canvas */}
+//     <Canvas
+//       camera={{ position: [0, 2, 8], fov: 50 }}
+//       style={{
+//         position: 'absolute',
+//         top: 0,
+//         left: 0,
+//         width: '100%',
+//         height: '100%',
+//         zIndex: 1,
+//         background: 'transparent',
+//       }}
+//     >
+//       <ambientLight intensity={0.6} />
+//       <directionalLight position={[5, 10, 5]} intensity={1} />
 
-      <Suspense fallback={null}>
-        <RobotModel />
-      </Suspense>
+//       <Suspense fallback={null}>
+//         <RobotModel />
+//       </Suspense>
 
-      <OrbitControls />
-    </Canvas>
+//       <OrbitControls />
+//     </Canvas>
 
-    {/* Right-side panel + ticker */}
-    <RightPanel />
-    <TickerBanner />
+//     {/* Right-side panel + ticker */}
+//     <RightPanel />
+//     <TickerBanner />
 
-    <style>
-      {`
-        @keyframes ticker-scroll {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-100%); }
-        }
-      `}
-    </style>
-  </PageWrapper>
-);
+//     <style>
+//       {`
+//         @keyframes ticker-scroll {
+//           0% { transform: translateX(0); }
+//           100% { transform: translateX(-100%); }
+//         }
+//       `}
+//     </style>
+//   </PageWrapper>
+// );
 
 
 const AppRoutes: React.FC = () => {
@@ -123,10 +124,10 @@ const AppRoutes: React.FC = () => {
     <Router>
       <Routes>
         {/* 3D splash/intro first */}
-        <Route path='/' element={<HomePage />} />
+        {/* <Route path='/' element={<HomePage />} /> */}
 
         {/* Public routes */}
-        <Route path="/Home" element={<Home/>} />
+        <Route path="/" element={<Home/>} />
         <Route path="/fno-khazana" element={<Layout/>} />
         <Route path='/fii-dii-activity' element={<Fii_Dii_Activity/>} />
         <Route path='/fii-dii-fno' element={<Fii_Dii_Fno/>} />
@@ -143,6 +144,7 @@ const AppRoutes: React.FC = () => {
         <Route path='/pricing' element={<Price/>}/>
         <Route path='/about' element={<About/>}/>
         <Route path='/journaling' element={<Journal_Home/>} />
+        <Route path='/contact-us' element={<ContactUs/>} />
         
         {/* <Route path="*" element={<NotFound />} /> */}
 

@@ -72,7 +72,7 @@ const DisclaimerModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => 
               </Dialog.Title>
               <div className="mt-3">
                 <p className="text-xs text-gray-400 mb-2">
-                  The analytics and insights provided by this trading journal are for educational purposes only. Results may differ from your broker's official statements due to:
+                  The analytics and insights provided by this TradeKhata are for educational purposes only. Results may differ from your broker's official statements due to:
                 </p>
                 <ul className="list-disc pl-4 space-y-0.5 text-xs text-gray-500 mb-2">
                   <li>Missing or unmatched trades in provided data</li>

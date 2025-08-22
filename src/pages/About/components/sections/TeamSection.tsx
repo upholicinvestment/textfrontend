@@ -9,7 +9,6 @@ import shraddha from "../../../../assets/shraddha.jpg";
 import angat from "../../../../assets/angat.png";
 import anil from "../../../../assets/anil.jpg";
 import shehla from '../../../../assets/shehla.jpg';
-import Footer from "../../../../components/layout/Footer/Footer";
 
 /** Brand gradient */
 const GRAD = "from-[#1a237e] to-[#4a56d2]";
@@ -156,7 +155,6 @@ const TeamSection = () => {
         </motion.div>
       </div>
     </section>
-    <Footer/>
     </>
   );
 };

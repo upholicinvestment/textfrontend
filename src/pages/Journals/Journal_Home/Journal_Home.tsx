@@ -6,6 +6,7 @@ import FAQSection from './FAQSection';
 import TestimonialSection from './TestimonialSection';
 
 import Navbar from '../../../components/layout/Navbar/Navbar';
+import Footer from '../../../components/layout/Footer/Footer';
 // import PriceScroll from '../../PriceScroll/PriceScroll';
 const Journal_Home = () => {
   return (
@@ -21,7 +22,7 @@ const Journal_Home = () => {
       <StatsSection />
       <FAQSection />
       <TestimonialSection />
-      
+      <Footer/>
     </div>
   );
 };

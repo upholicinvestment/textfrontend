@@ -1,127 +1,51 @@
-
 const RefundCancellationPolicy = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
       <div className="bg-white shadow-md rounded-lg p-6 md:p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Refund Policy</h1>
-          <div className="w-20 h-1 bg-indigo-600 mx-auto"></div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Cancellation & Refund Policy</h1>
+          <p className="text-gray-500">Last updated on Aug 21st 2025</p>
+          <div className="w-20 h-1 bg-indigo-600 mx-auto mt-4"></div>
         </div>
 
         <div className="prose prose-indigo max-w-none">
           <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Returns</h2>
-            <p className="text-gray-600 mb-4">
-              Our policy lasts 30 days. If 30 days have gone by since your purchase, unfortunately we can't offer you a refund or exchange.
+            <p className="text-gray-600 mb-6">
+              UPHOLIC TECH PRIVATE LIMITED believes in helping its customers as far as possible, and has therefore a liberal cancellation policy. Under this policy:
             </p>
-            <p className="text-gray-600 mb-4">
-              To be eligible for a return, your item must be unused and in the same condition that you received it. It must also be in the original packaging.
-            </p>
-            <p className="text-gray-600 mb-4">
-              Several types of goods are exempt from being returned. Perishable goods such as food, flowers, newspapers or magazines cannot be returned. We also do not accept products that are intimate or sanitary goods, hazardous materials, or flammable liquids or gases.
-            </p>
-            <p className="text-gray-600 mb-4">
-              Additional non-returnable items:
-            </p>
-            <ul className="text-gray-600 list-disc pl-5 mb-4">
-              <li>Gift cards</li>
-              <li>Downloadable software products</li>
-              <li>Some health and personal care items</li>
+            
+            <ul className="text-gray-600 list-disc pl-5 mb-4 space-y-3">
+              <li>Cancellations will be considered only if the request is made within 1-2 days of placing the order. However, the cancellation request may not be entertained if the orders have been communicated to the vendors/merchants and they have initiated the process of shipping them.</li>
+              
+              <li>UPHOLIC TECH PRIVATE LIMITED does not accept cancellation requests for perishable items like flowers, eatables etc. However, refund/replacement can be made if the customer establishes that the quality of product delivered is not good.</li>
+              
+              <li>In case of receipt of damaged or defective items please report the same to our Customer Service team. The request will, however, be entertained once the merchant has checked and determined the same at his own end. This should be reported within 1-2 days of receipt of the products.</li>
+              
+              <li>In case you feel that the product received is not as shown on the site or as per your expectations, you must bring it to the notice of our customer service within 1-2 days of receiving the product. The Customer Service Team after looking into your complaint will take an appropriate decision.</li>
+              
+              <li>In case of complaints regarding products that come with a warranty from manufacturers, please refer the issue to them.</li>
+              
+              <li>In case of any Refunds approved by the UPHOLIC TECH PRIVATE LIMITED, it'll take 1-2 days for the refund to be processed to the end customer.</li>
             </ul>
-            <p className="text-gray-600 mb-4">
-              To complete your return, we require a receipt or proof of purchase.
-            </p>
-            <p className="text-gray-600">
-              Please do not send your purchase back to the manufacturer.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              There are certain situations where only partial refunds are granted:
-            </h2>
-            <ul className="text-gray-600 list-disc pl-5 mb-4">
-              <li>Book with obvious signs of use</li>
-              <li>CD, DVD, VHS tape, software, video game, cassette tape, or vinyl record that has been opened.</li>
-              <li>Any item not in its original condition, is damaged or missing parts for reasons not due to our error.</li>
-              <li>Any item that is returned more than 30 days after delivery</li>
-            </ul>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Refunds (if applicable)</h2>
-            <p className="text-gray-600 mb-4">
-              Once your return is received and inspected, we will send you an email to notify you that we have received your returned item. We will also notify you of the approval or rejection of your refund.
-            </p>
-            <p className="text-gray-600">
-              If you are approved, then your refund will be processed, and a credit will automatically be applied to your credit card or original method of payment, within a certain amount of days.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Late or missing refunds (if applicable)</h2>
-            <p className="text-gray-600 mb-4">
-              If you haven't received a refund yet, first check your bank account again.
-            </p>
-            <p className="text-gray-600 mb-4">
-              Then contact your credit card company, it may take some time before your refund is officially posted.
-            </p>
-            <p className="text-gray-600 mb-4">
-              Next contact your bank. There is often some processing time before a refund is posted.
-            </p>
-            <p className="text-gray-600">
-              If you've done all of this and you still have not received your refund yet, please contact us at{' '}
-              <a href="mailto:upholictech@upholic.in" className="text-indigo-600 hover:underline">
-                upholictech@upholic.in
-              </a>.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Sale items (if applicable)</h2>
-            <p className="text-gray-600">
-              Only regular priced items may be refunded, unfortunately sale items cannot be refunded.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Exchanges (if applicable)</h2>
-            <p className="text-gray-600 mb-4">
-              We only replace items if they are defective or damaged. If you need to exchange it for the same item, send us an email at{' '}
-              <a href="mailto:upholictech@upholic.in" className="text-indigo-600 hover:underline">
-                upholictech@upholic.in
-              </a>{' '}
-              and send your item to: 622 Manglam Electronic Market, Jaipur, Rajasthan, India 302001.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Gifts</h2>
-            <p className="text-gray-600 mb-4">
-              If the item was marked as a gift when purchased and shipped directly to you, you'll receive a gift credit for the value of your return. Once the returned item is received, a gift certificate will be mailed to you.
-            </p>
-            <p className="text-gray-600">
-              If the item wasn't marked as a gift when purchased, or the gift giver had the order shipped to themselves to give to you later, we will send a refund to the gift giver and he will find out about your return.
-            </p>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Shipping</h2>
-            <p className="text-gray-600 mb-4">
-              To return your product, you should mail your product to: 622 Manglam Electronic Market, Jaipur, Rajasthan, India 302001.
-            </p>
-            <p className="text-gray-600 mb-4">
-              You will be responsible for paying for your own shipping costs for returning your item. Shipping costs are non-refundable. If you receive a refund, the cost of return shipping will be deducted from your refund.
-            </p>
-            <p className="text-gray-600 mb-4">
-              Depending on where you live, the time it may take for your exchanged product to reach you, may vary.
-            </p>
-            <p className="text-gray-600">
-              If you are shipping an item over $75, you should consider using a trackable shipping service or purchasing shipping insurance. We don't guarantee that we will receive your returned item.
-            </p>
+            
+            <div className="bg-gray-100 p-4 rounded-md mt-6">
+              <p className="text-gray-600 text-sm italic">
+                Disclaimer: The above content is created at UPHOLIC TECH PRIVATE LIMITED's sole discretion. 
+                Razorpay shall not be liable for any content provided here and shall not be responsible for 
+                any claims and liability that may arise due to merchant's non-adherence to it.
+              </p>
+            </div>
           </div>
         </div>
 
+        <div className="mt-10 pt-6 border-t border-gray-200">
+          <p className="text-gray-600 text-center">
+            For any questions regarding this policy, please contact us at{' '}
+            <a href="mailto:upholictech@upholic.in" className="text-indigo-600 hover:underline">
+              upholictech@upholic.in
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

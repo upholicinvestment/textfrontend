@@ -3,7 +3,7 @@ import { Rocket, Globe2, HandHeart,} from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import CountUp from "react-countup";
 import { useInView } from "react-intersection-observer";
-import Footer from "../../../../components/layout/Footer/Footer";
+import { Link } from "react-router-dom";
 
 /** Brand gradient */
 const GRAD = "from-[#1a237e] to-[#4a56d2]";
@@ -390,19 +390,18 @@ export default function AboutSection() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button className="group relative px-8 py-4 text-white font-bold rounded-xl overflow-hidden transition-all duration-300 bg-gradient-to-r from-[#2a36a8] to-[#5a66e0] hover:from-[#25309a] hover:to-[#505cdc]">
                 <div className="flex items-center gap-2">
-                  <span>Start Algo Trading Now</span>
+                  <Link to='/signup'> Start Algo Trading Now</Link>
                   <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">→</span>
                 </div>
               </button>
-              <button className="px-8 py-4 bg-transparent text-white font-bold rounded-xl border-2 border-white/30 hover:border-white/50 transition-all duration-300">
+              <Link to='/comming-soon' className="px-8 py-4 bg-transparent text-white font-bold rounded-xl border-2 border-white/30 hover:border-white/50 transition-all duration-300">
                 See Platform Demo
-              </button>
+              </Link>
             </div>
           </div>
         </motion.div>
       </div>
     </section>
-    <Footer/>
     </>
   );
 }

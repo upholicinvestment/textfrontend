@@ -1,21 +1,26 @@
 import Navbar from "../../../src/components/layout/Navbar/Navbar";
-import Model_Home from "../Algo_Simulator/Algo_Razorpay_UI/Model_Home/Model_Home";
+import Footer from "../../components/layout/Footer/Footer";
+import Orb from "../../Orb/Orb";
 import PriceScroll from "../PriceScroll/PriceScroll";
 
 const Home = () => {
   return (
-    <div className="relative min-h-screen bg-[#0a0b2a]">
+    <div className="min-h-screen bg-[#0a0b2a] relative overflow-x-hidden">
+
+      {/* Sticky Navbar at top (in flow) */}
       <Navbar />
       
-      {/* Fixed PriceScroll - Adjusted to account for Navbar height */}
-      <div className="fixed top-16 left-0 w-full z-30 bg-[#0a0b2a] border-b border-purple-500/20">
+            {/* Ticker just below navbar */}
+      {/* <div className="mt-1"> */}
         <PriceScroll />
-      </div>
+      {/* </div> */}
 
-      {/* Main content with proper spacing */}
-      <main className="pt-32 pb-10 min-h-screen"> {/* Increased pt to account for both Navbar and PriceScroll */}
-        <Model_Home />
-      </main>
+      {/* <div className=" inset-0 -z-10 pointer-events-none"> */}
+        <Orb />
+      {/* </div> */}
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

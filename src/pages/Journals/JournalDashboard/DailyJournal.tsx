@@ -573,7 +573,7 @@ export default function DailyJournal() {
                 <BarChart3 className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white mb-1">Trading Journal</h1>
+                <h1 className="text-3xl font-bold text-white mb-1">TradeKhata</h1>
                 <p className="text-slate-400">Professional trade planning and execution tracking</p>
               </div>
             </div>

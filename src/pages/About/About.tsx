@@ -4,6 +4,7 @@ import AboutSection from "./components/sections/AboutSection";
 import TeamSection from "./components/sections/TeamSection";
 import CareersSection from "./components/sections/CareersSection";
 import Navbar from '../../../src/components/layout/Navbar/Navbar';
+import Footer from "../../components/layout/Footer/Footer";
 
 type TabKey = "about" | "team" | "careers";
 
@@ -142,6 +143,7 @@ export default function About() {
         transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
       />
     </div>
+    <Footer/>
     </>
   );
 }
