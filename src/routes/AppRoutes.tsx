@@ -136,7 +136,7 @@ const AppRoutes: React.FC = () => {
         <Route path='/client-index-opt' element={<Client_Index_Opt />} />
         <Route path='/summary' element={<Summary/>} />
         <Route path='/main-fii-dii' element={<Main_Page_Fii_Dii/>} />
-        <Route path='/comming-soon' element={<ComingSoon/>}></Route>
+        <Route path='/comming-soon' element={<ComingSoon/>}/>
         <Route path="/forgot-password" element={<ForgetPassword />} />
         <Route path="/terms" element={<OurTerms/>} />
         <Route path='/privacy' element={<PrivacyPolicy/>} />

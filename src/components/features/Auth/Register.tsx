@@ -1,5 +1,6 @@
+// client/src/pages/Auth/Register.tsx
 import { useState, useContext, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../../../api";
 import {
   FiUser,
@@ -36,6 +37,7 @@ const loadRazorpay = (): Promise<boolean> =>
 
 type Variant = {
   _id: string;
+  key?: string; // 🔹 allow key for query preselect
   name: string;
   priceMonthly?: number;
 };
@@ -45,7 +47,7 @@ type Product = {
   key: string;
   name: string;
   hasVariants: boolean;
-  route: string;              // must be present in /products payload
+  route: string; // present in /products payload
   variants?: Variant[];
 };
 
@@ -58,23 +60,15 @@ const brokerFieldMap: Record<string, string[]> = {
     "ANGEL_TOTP_SECRET",
   ],
   zerodha: ["ZERODHA_API_KEY", "ZERODHA_API_SECRET", "ZERODHA_ACCESS_TOKEN"],
-  upstox: [
-    "UPSTOX_API_KEY",
-    "UPSTOX_API_SECRET",
-    // "UPSTOX_REDIRECT_URI",
-    "UPSTOX_ACCESS_TOKEN",
-  ],
+  upstox: ["UPSTOX_API_KEY", "UPSTOX_API_SECRET", "UPSTOX_ACCESS_TOKEN"],
   dhan: ["DHAN_CLIENT_ID", "DHAN_ACCESS_TOKEN"],
-  // hdfc: ["HDFC_BASE_URL", "HDFC_API_KEY"],
-  // paytm: ["PAYTM_BASE_URL", "PAYTM_CLIENT_ID", "PAYTM_SECRET_KEY"],
-  // kotak: ["KOTAK_API_KEY", "KOTAK_API_SECRET"],
-  // icici: ["ICICI_API_KEY", "ICICI_API_SECRET"],
 };
 
 const OTP_COOLDOWN_DURATION = 60; // seconds
 
 const Register = () => {
   const { login } = useContext(AuthContext);
+  const [searchParams] = useSearchParams();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -136,6 +130,31 @@ const Register = () => {
     };
     loadProducts();
   }, []);
+
+  // 🔹 Preselect product/variant from URL query (productKey & variantKey)
+  useEffect(() => {
+    if (!products.length) return;
+
+    const qpProductKey = searchParams.get("productKey") || "";
+    const qpVariantKey = searchParams.get("variantKey") || "";
+
+    if (qpProductKey) {
+      const p = products.find((x) => x.key === qpProductKey);
+      if (p) {
+        setInitialProductId(p._id);
+        if (p.hasVariants && qpVariantKey && p.variants?.length) {
+          const v =
+            p.variants.find((vv) => vv.key === qpVariantKey) ||
+            p.variants.find((vv) =>
+              vv.name?.toLowerCase().includes(qpVariantKey.toLowerCase())
+            );
+          if (v) setInitialVariantId(v._id);
+        } else {
+          setInitialVariantId("");
+        }
+      }
+    }
+  }, [products, searchParams]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.currentTarget;
@@ -375,8 +394,6 @@ const Register = () => {
     }
   };
 
-  const noProducts = !catalogLoading && products.length === 0;
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 p-4">
       <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl overflow-hidden flex relative">
@@ -571,7 +588,7 @@ const Register = () => {
                   <option value="">
                     {catalogLoading
                       ? "Loading…"
-                      : noProducts
+                      : !products.length
                       ? "No products found"
                       : "Select"}
                   </option>
@@ -675,7 +692,7 @@ const Register = () => {
                 {!isLoading && <FiArrowRight className="text-white" />}
               </button>
 
-              {/* Added legal text */}
+              {/* Legal */}
               <div className="text-xs text-gray-500 text-center mt-4">
                 By clicking Register, you agree to our{" "}
                 <Link

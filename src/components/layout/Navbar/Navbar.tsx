@@ -67,9 +67,10 @@ const Navbar = () => {
   ];
 
   const navLinks = [
-    { name: "Home", path: "/Home" },
+    { name: "Home", path: "/" },
     { name: "About", path: "/about" },
     { name: "Pricing", path: "/pricing" },
+    { name: "contact", path: "/contact-us" },
   ];
 
   useEffect(() => {

@@ -16,7 +16,7 @@ const ComeSoon = () => {
   const progress = 75;
 
   const calculateTimeLeft = () => {
-    const targetDate = new Date("2025-08-31");
+    const targetDate = new Date("2025-09-21");
     const now = new Date();
     const difference = targetDate.getTime() - now.getTime();
 

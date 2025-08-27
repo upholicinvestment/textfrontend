@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useEffect, useMemo, useState, useContext } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import upholictech from "../../assets/Upholictech.png";
 import {
@@ -19,14 +19,42 @@ import {
   Menu,
   X,
   ChevronRight,
+  ChevronDown,
   Activity,
   DollarSign,
   Users,
+  PackageOpen,
 } from "lucide-react";
+import api from "../../api";
 
-// Type Definitions
-interface Product {
-  id: number;
+// ---- API Types (match /api/products payload) ----
+type VariantApi = {
+  _id: string;
+  key: string; // "starter" | "pro" | "swing"
+  name: string;
+  description?: string;
+  priceMonthly?: number;
+  interval?: string;
+  isActive: boolean;
+  productId?: string;
+};
+
+type ProductApi = {
+  _id: string;
+  key: "essentials_bundle" | "algo_simulator";
+  name: string;
+  isActive: boolean;
+  hasVariants: boolean;
+  forSale?: boolean;
+  route: string;
+  priceMonthly?: number; // bundle price
+  components?: string[]; // bundle components
+  variants?: VariantApi[]; // algo variants
+};
+
+// ---- UI Types (local to dashboard) ----
+interface ProductUI {
+  id: string;
   name: string;
   description: string;
   icon: React.ReactNode;
@@ -34,12 +62,14 @@ interface Product {
   change: string;
   link: string;
   gradient: string;
-  bgColor: string;
   trend: "up" | "down";
   newFeature: boolean;
+  // Extras for rendering
+  bundleComponents?: { key: string; label: string; icon: React.ReactNode }[];
+  algoVariants?: { key: string; label: string; price?: string }[];
 }
 
-interface Activity {
+interface ActivityItem {
   id: number;
   product: string;
   action: string;
@@ -60,96 +90,165 @@ interface Stat {
   progress: number;
 }
 
+// Component meta -> label/icon
+const componentLabelMap: Record<
+  string,
+  { label: string; icon: React.ReactNode }
+> = {
+  technical_scanner: {
+    label: "Technical Scanner",
+    icon: <BarChart3 className="h-4 w-4" />,
+  },
+  fundamental_scanner: {
+    label: "Fundamental Scanner",
+    icon: <TrendingUp className="h-4 w-4" />,
+  },
+  fno_khazana: { label: "F&O Khazana", icon: <Coins className="h-4 w-4" /> },
+  journaling: { label: "Smart Journaling", icon: <BookOpen className="h-4 w-4" /> },
+  fii_dii_data: { label: "FII/DII Data", icon: <Building2 className="h-4 w-4" /> },
+};
+
+// Component -> route
+const componentRouteMap: Record<string, string> = {
+  technical_scanner: "/technical",
+  fundamental_scanner: "/fundamental",
+  fno_khazana: "/fno",
+  journaling: "/journal",
+  fii_dii_data: "/fii-dii",
+};
+
+const prettyINR = (n?: number) =>
+  typeof n === "number" ? `₹${n.toLocaleString("en-IN")}` : undefined;
+
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [bundleOpen, setBundleOpen] = useState(false); // <-- NEW for dropdown
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [apiProducts, setApiProducts] = useState<ProductApi[]>([]);
 
-  // Product Data
-  const products: Product[] = [
-    {
-      id: 1,
-      name: "Technical Scanner",
-      description: "AI-powered technical analysis with real-time alerts",
-      icon: <BarChart3 className="h-6 w-6" />,
-      stats: "1,245 scans today",
-      change: "+12.4%",
-      link: "/lauching-soon",
-      gradient: "from-blue-500 to-cyan-400",
-      bgColor: "bg-gradient-to-br from-blue-50 to-cyan-50",
-      trend: "up",
-      newFeature: false,
-    },
-    {
-      id: 2,
-      name: "Fundamental Scanner",
-      description: "Deep financial metrics analysis with sector insights",
-      icon: <TrendingUp className="h-6 w-6" />,
-      stats: "856 scans today",
-      change: "+8.2%",
-      link: "/lauching-soon",
-      gradient: "from-emerald-500 to-green-400",
-      bgColor: "bg-gradient-to-br from-emerald-50 to-green-50",
-      trend: "up",
-      newFeature: false,
-    },
-    {
-      id: 3,
-      name: "ALGO Simulator",
-      description: "Advanced backtesting with ML optimization",
-      icon: <Bot className="h-6 w-6" />,
-      stats: "312 simulations running",
-      change: "+15.7%",
-      link: "/lauching-soon",
-      gradient: "from-purple-500 to-violet-400",
-      bgColor: "bg-gradient-to-br from-purple-50 to-violet-50",
-      trend: "up",
-      newFeature: true,
-    },
-    {
-      id: 4,
-      name: "Smart Journaling",
-      description: "AI-enhanced trading journal with pattern recognition",
-      icon: <BookOpen className="h-6 w-6" />,
-      stats: "78 new entries today",
-      change: "+24.1%",
-      link: "/lauching-soon",
-      gradient: "from-amber-500 to-orange-400",
-      bgColor: "bg-gradient-to-br from-amber-50 to-orange-50",
-      trend: "up",
-      newFeature: false,
-    },
-    {
-      id: 5,
-      name: "FNO Khazana",
-      description: "Options flow analysis with sentiment tracking",
-      icon: <Coins className="h-6 w-6" />,
-      stats: "4,532 contracts analyzed",
-      change: "+6.8%",
-      link: "/lauching-soon",
-      gradient: "from-indigo-500 to-blue-400",
-      bgColor: "bg-gradient-to-br from-indigo-50 to-blue-50",
-      trend: "up",
-      newFeature: false,
-    },
-    {
-      id: 6,
-      name: "FII/DII",
-      description: "Real-time FII/DII tracking with smart money alerts",
-      icon: <Building2 className="h-6 w-6" />,
-      stats: "₹2,456 Cr net inflow",
-      change: "-3.2%",
-      link: "/lauching-soon",
-      gradient: "from-rose-500 to-pink-400",
-      bgColor: "bg-gradient-to-br from-rose-50 to-pink-50",
-      trend: "down",
-      newFeature: false,
-    },
-  ];
+  // Fetch products (bundle + algo) from backend
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get<ProductApi[]>("/products");
+        setApiProducts(Array.isArray(res.data) ? res.data : []);
+      } catch {
+        setApiProducts([]);
+      }
+    })();
+  }, []);
+
+  const bundle = useMemo(
+    () => apiProducts.find((p) => p.key === "essentials_bundle"),
+    [apiProducts]
+  );
+  const algo = useMemo(
+    () => apiProducts.find((p) => p.key === "algo_simulator"),
+    [apiProducts]
+  );
+
+  // Build UI product cards
+  const products: ProductUI[] = useMemo(() => {
+    const ui: ProductUI[] = [];
+
+    // Essentials Bundle
+    if (bundle) {
+      const components =
+        (bundle.components || []).map((key) => ({
+          key,
+          label: componentLabelMap[key]?.label || key,
+          icon: componentLabelMap[key]?.icon || <PackageOpen className="h-4 w-4" />,
+        })) || [];
+
+      ui.push({
+        id: bundle._id,
+        name: bundle.name,
+        description: "All 5 premium tools for the price of one",
+        icon: <PackageOpen className="h-6 w-6" />,
+        stats: "5 tools included",
+        change: "+12.4%",
+        link: bundle.route || "/bundle",
+        gradient: "from-blue-500 to-cyan-400",
+        trend: "up",
+        newFeature: false,
+        bundleComponents: components,
+      });
+    } else {
+      // Fallback if API not ready
+      ui.push({
+        id: "bundle-fallback",
+        name: "Trader's Essential Bundle (5-in-1)",
+        description: "All 5 premium tools for the price of one",
+        icon: <PackageOpen className="h-6 w-6" />,
+        stats: "5 tools included",
+        change: "+12.4%",
+        link: "/bundle",
+        gradient: "from-blue-500 to-cyan-400",
+        trend: "up",
+        newFeature: false,
+        bundleComponents: Object.keys(componentLabelMap).map((k) => ({
+          key: k,
+          label: componentLabelMap[k].label,
+          icon: componentLabelMap[k].icon,
+        })),
+      });
+    }
+
+    // ALGO Simulator
+    if (algo) {
+      const variants = (algo.variants || [])
+        .slice()
+        .sort((a, b) => {
+          const rank = (x: string) => (x === "starter" ? 1 : x === "pro" ? 2 : 3);
+          return rank(a.key) - rank(b.key);
+        })
+        .map((v) => ({
+          key: v.key,
+          label: v.name,
+          price: prettyINR(v.priceMonthly),
+        }));
+
+      ui.push({
+        id: algo._id,
+        name: algo.name,
+        description: "Advanced backtesting and execution-ready strategies",
+        icon: <Bot className="h-6 w-6" />,
+        stats: `${variants.length} plans available`,
+        change: "+15.7%",
+        link: algo.route || "/algo",
+        gradient: "from-purple-500 to-violet-400",
+        trend: "up",
+        newFeature: true,
+        algoVariants: variants,
+      });
+    } else {
+      ui.push({
+        id: "algo-fallback",
+        name: "ALGO Simulator",
+        description: "Advanced backtesting and execution-ready strategies",
+        icon: <Bot className="h-6 w-6" />,
+        stats: "3 plans available",
+        change: "+15.7%",
+        link: "/algo",
+        gradient: "from-purple-500 to-violet-400",
+        trend: "up",
+        newFeature: true,
+        algoVariants: [
+          { key: "starter", label: "Starter Scalping", price: "₹5,999" },
+          { key: "pro", label: "Option Scalper PRO", price: "₹14,999" },
+          { key: "swing", label: "Swing Trader Master", price: "₹99,999" },
+        ],
+      });
+    }
+
+    return ui;
+  }, [bundle, algo]);
 
   // Recent Activity Data
-  const recentActivity: Activity[] = [
+  const recentActivity: ActivityItem[] = [
     {
       id: 1,
       product: "Technical Scanner",
@@ -171,7 +270,7 @@ const Dashboard = () => {
     {
       id: 3,
       product: "ALGO Simulator",
-      action: "Mean Reversion strategy: 94.2% accuracy",
+      action: "PRO strategy execution: 94.2% accuracy",
       time: "32 mins ago",
       icon: <Bot className="h-4 w-4" />,
       type: "backtest",
@@ -188,7 +287,7 @@ const Dashboard = () => {
     },
   ];
 
-  // Stats Data
+  // Stats
   const stats: Stat[] = [
     {
       title: "Trade Triggered",
@@ -232,60 +331,58 @@ const Dashboard = () => {
     },
   ];
 
-  // Filter activities based on active filter
   const filteredActivities =
     activeFilter === "All"
       ? recentActivity
-      : recentActivity.filter(
-          (activity) => activity.type === activeFilter.toLowerCase()
-        );
+      : recentActivity.filter((a) => a.type === activeFilter.toLowerCase());
 
-  // Toggle sidebar visibility
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  const toggleSidebar = () => setIsSidebarOpen((v) => !v);
+  const handleFilterChange = (filter: string) => setActiveFilter(filter);
 
-  // Filter activities by type
-  const handleFilterChange = (filter: string) => {
-    setActiveFilter(filter);
-  };
-
-  // Render progress bar with proper accessibility attributes
   const renderProgressBar = (
     progress: number,
     gradient: string,
     title: string
   ) => {
-    const clampedProgress = Math.max(0, Math.min(100, Math.round(progress)));
-
+    const clamped = Math.max(0, Math.min(100, Math.round(progress)));
     return (
       <div className="mt-4 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div
           className={`h-full bg-gradient-to-r ${gradient}`}
-          style={{ width: `${clampedProgress}%` }}
+          style={{ width: `${clamped}%` }}
           role="progressbar"
-          {...{
-            "aria-valuenow": clampedProgress,
-            "aria-valuemin": 0,
-            "aria-valuemax": 100,
-            "aria-label": `${title} progress: ${clampedProgress}%`,
-          }}
+          aria-valuenow={clamped}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${title} progress: ${clamped}%`}
         />
       </div>
     );
   };
 
+  // Sidebar bundle items (from API or fallback)
+  const sidebarBundleComponents =
+    (bundle?.components?.length
+      ? bundle.components
+      : Object.keys(componentLabelMap)
+    ).map((key) => ({
+      key,
+      label: componentLabelMap[key]?.label || key,
+      icon: componentLabelMap[key]?.icon || <PackageOpen className="h-4 w-4" />,
+      href: componentRouteMap[key] || "#",
+    }));
+
   return (
     <div className="flex h-screen bg-gray-50/50">
       {/* Sidebar */}
       <div
-        className={`${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} 
-  md:translate-x-0 fixed md:static inset-y-0 left-0 z-50 w-72 
-  bg-gradient-to-b from-[#1a237e] to-[#4a56d2]
-  shadow-xl md:shadow-none transition-transform duration-300 ease-in-out`}
+        className={`${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0 fixed md:static inset-y-0 left-0 z-50 w-72 
+        bg-gradient-to-b from-[#1a237e] to-[#4a56d2] shadow-xl md:shadow-none transition-transform duration-300 ease-in-out`}
       >
         <div className="flex flex-col h-full">
-          {/* Logo Section */}
+          {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-[#7986cb]/30">
             <div className="flex-1 flex justify-center">
               <img src={upholictech} alt="Upholic" className="h-12 w-auto" />
@@ -299,7 +396,7 @@ const Dashboard = () => {
             </button>
           </div>
 
-          {/* Navigation */}
+          {/* Nav */}
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
             <div className="mb-4">
               <a
@@ -314,35 +411,79 @@ const Dashboard = () => {
 
             <div className="space-y-1">
               <h3 className="px-3 text-xs font-semibold text-white/70 uppercase tracking-wider mb-3">
-                Trading Tools
+                Trading Products
               </h3>
-              {products.map((product) => (
-                <a
-                  key={product.id}
-                  href={product.link}
-                  className="group flex items-center justify-between px-3 py-3 text-sm font-medium text-white rounded-xl hover:bg-white/10 transition-all duration-200"
-                  aria-label={`Go to ${product.name}`}
-                >
-                  <div className="flex items-center">
-                    <div className="p-2 rounded-lg bg-white/10 text-white mr-3">
-                      {product.icon}
-                    </div>
-                    <span className="truncate">{product.name}</span>
+
+              {/* Essentials Bundle with DROPDOWN */}
+              <button
+                type="button"
+                onClick={() => setBundleOpen((v) => !v)}
+                aria-expanded={bundleOpen}
+                aria-controls="bundle-submenu"
+                className="w-full group flex items-center justify-between px-3 py-3 text-left text-sm font-medium text-white rounded-xl hover:bg-white/10 transition-all duration-200"
+              >
+                <div className="flex items-center">
+                  <div className="p-2 rounded-lg bg-white/10 text-white mr-3">
+                    <PackageOpen className="h-6 w-6" />
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {product.newFeature && (
-                      <span className="px-2 py-1 text-xs font-medium bg-white text-[#1a237e] rounded-full">
-                        NEW
+                  <span className="truncate">
+                    Trader&apos;s Essential Bundle
+                  </span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-white transition-transform ${
+                    bundleOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {/* Submenu */}
+              {bundleOpen && (
+                <div
+                  id="bundle-submenu"
+                  className="ml-4 mt-1 space-y-1 border-l border-white/20 pl-3"
+                >
+                  {sidebarBundleComponents.map((c) => (
+                    <a
+                      key={c.key}
+                      href={c.href}
+                      className="flex items-center justify-between px-2 py-2 text-sm text-white/90 rounded-lg hover:bg-white/10"
+                    >
+                      <span className="flex items-center gap-2">
+                        {c.icon}
+                        {c.label}
                       </span>
-                    )}
+                      <ChevronRight className="h-4 w-4 opacity-50" />
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {/* ALGO Simulator */}
+              <a
+                href={products[1]?.link || "/algo"}
+                className="group flex items-center justify-between px-3 py-3 text-sm font-medium text-white rounded-xl hover:bg-white/10 transition-all duration-200"
+                aria-label="Go to ALGO Simulator"
+              >
+                <div className="flex items-center">
+                  <div className="p-2 rounded-lg bg-white/10 text-white mr-3">
+                    <Bot className="h-6 w-6" />
+                  </div>
+                </div>
+                <div className="flex-1 flex items-center justify-between">
+                  <span className="truncate">ALGO Simulator</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="px-2 py-1 text-xs font-medium bg-white text-[#1a237e] rounded-full">
+                      NEW
+                    </span>
                     <ChevronRight className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                </a>
-              ))}
+                </div>
+              </a>
             </div>
           </nav>
 
-          {/* User Profile */}
+          {/* Profile */}
           <div className="p-4 border-t border-[#7986cb]/30">
             <div className="flex items-center space-x-3 p-3 bg-white/10 rounded-xl">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#1a237e] font-semibold text-sm">
@@ -356,7 +497,7 @@ const Dashboard = () => {
               </div>
               <button
                 className="p-1.5 rounded-lg hover:bg-white/20 transition-colors"
-                aria-label="User menu"
+                aria-label="Logout"
                 onClick={logout}
               >
                 <LogOut className="h-4 w-4 text-white" />
@@ -366,7 +507,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Overlay for mobile */}
+      {/* Mobile overlay */}
       {isSidebarOpen && (
         <div
           className="md:hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-40"
@@ -375,7 +516,7 @@ const Dashboard = () => {
         />
       )}
 
-      {/* Main Content */}
+      {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-30">
@@ -434,7 +575,7 @@ const Dashboard = () => {
         <main className="flex-1 overflow-auto">
           <div className="px-4 sm:px-6 lg:px-8 py-8">
             <div className="max-w-7xl mx-auto">
-              {/* Welcome Section */}
+              {/* Welcome */}
               <div className="mb-8">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                   <div>
@@ -454,12 +595,6 @@ const Dashboard = () => {
                   </div>
 
                   <div className="flex items-center space-x-3">
-                    {/* <button
-                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium"
-                      aria-label="Quick scan"
-                    >
-                      Quick Scan
-                    </button> */}
                     <button
                       className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium"
                       aria-label="Export data"
@@ -470,11 +605,11 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Stats Grid */}
+              {/* Stats */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {stats.map((stat, index) => (
+                {stats.map((stat, i) => (
                   <div
-                    key={index}
+                    key={i}
                     className="bg-white p-6 rounded-2xl border border-gray-100 hover:shadow-lg shadow-xl transition-all duration-200 group"
                   >
                     <div className="flex items-center justify-between mb-4">
@@ -513,18 +648,14 @@ const Dashboard = () => {
                       </p>
                     </div>
 
-                    {renderProgressBar(
-                      stat.progress,
-                      stat.gradient,
-                      stat.title
-                    )}
+                    {renderProgressBar(stat.progress, stat.gradient, stat.title)}
                   </div>
                 ))}
               </div>
 
               {/* Main Grid */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                {/* Trading Tools */}
+                {/* Trading Products */}
                 <div className="xl:col-span-2">
                   <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md">
                     <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
@@ -534,16 +665,17 @@ const Dashboard = () => {
                             Trading Arsenal
                           </h2>
                           <p className="text-slate-500">
-                            Your powerful trading tools at a glance
+                            Your powerful trading products at a glance
                           </p>
                         </div>
-                        <button
+                        <a
                           className="text-indigo-800 font-medium flex items-center transition-colors"
                           aria-label="View all tools"
+                          href="#"
                         >
                           View All
                           <ChevronRight className="h-4 w-4 ml-1" />
-                        </button>
+                        </a>
                       </div>
                     </div>
 
@@ -561,9 +693,10 @@ const Dashboard = () => {
                             <div className="relative">
                               <div className="flex items-start justify-between mb-3">
                                 <div
-                                  className="p-2 rounded-lg text-indigo-600"
+                                  className="p-2 rounded-lg text-white"
                                   style={{
-                                    backgroundColor: "oklch(0.89 0.01 272.41)",
+                                    background:
+                                      "linear-gradient(90deg, #6366F1 0%, #8B5CF6 100%)",
                                   }}
                                 >
                                   {product.icon}
@@ -581,6 +714,43 @@ const Dashboard = () => {
                               <p className="text-sm text-slate-500 mb-3">
                                 {product.description}
                               </p>
+
+                              {/* Extra Info Rows */}
+                              {product.bundleComponents && (
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                  {product.bundleComponents.map((c) => (
+                                    <span
+                                      key={c.key}
+                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] bg-indigo-100 text-indigo-700"
+                                    >
+                                      {c.icon}
+                                      {c.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {product.algoVariants && (
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                  {product.algoVariants.map((v) => (
+                                    <span
+                                      key={v.key}
+                                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] ${
+                                        v.key === "pro"
+                                          ? "bg-yellow-100 text-yellow-800"
+                                          : "bg-indigo-100 text-indigo-700"
+                                      }`}
+                                    >
+                                      {v.label}
+                                      {v.price && (
+                                        <span className="opacity-80">
+                                          · {v.price}
+                                        </span>
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
 
                               <div className="flex items-center justify-between">
                                 <span className="text-xs text-slate-400">
@@ -629,7 +799,7 @@ const Dashboard = () => {
                       </div>
                     </div>
 
-                    {/* Activity Filters */}
+                    {/* Filters */}
                     <div className="flex space-x-2">
                       {["All", "Scans", "Trades", "Alerts"].map((filter) => (
                         <button

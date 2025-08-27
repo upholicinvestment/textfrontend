@@ -8,26 +8,27 @@ import {
   FiX,
   FiBriefcase,
 } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 type FormState = {
   firstName: string;
   lastName: string;
   email: string;
-  company: string; // reused to store mobile number
+  company: string; // mobile number
   persona: string; // selected product
   message: string;
   agree: boolean;
+  website?: string; // honeypot (anti-spam)
 };
 
-// Products interested in
 const personas = [
-  "Select a product",
-  "5-in-1 Trader's Essential Bundle",
-  "ALGO Simulator",
-
-  "Both / Not sure",
+  { label: "Select a product", value: "" },
+  { label: "5-in-1 Trader's Essential Bundle", value: "5-in-1 Trader's Essential Bundle" },
+  { label: "ALGO Simulator", value: "ALGO Simulator" },
+  { label: "Both / Not sure", value: "Both / Not sure" },
 ];
+
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || "http://localhost:8000";
 
 const ContactUs: React.FC = () => {
   const navigate = useNavigate();
@@ -36,20 +37,93 @@ const ContactUs: React.FC = () => {
     firstName: "",
     lastName: "",
     email: "",
-    company: "", // mobile number
-    persona: "", // product
+    company: "",
+    persona: "",
     message: "",
     agree: false,
+    website: "", // honeypot must stay empty
   });
 
-  const handleSubmit = (e: FormEvent) => {
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  const isEmail = (x: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x);
+  const isPhoneLike = (x: string) => (x.replace(/\D/g, "").length >= 8);
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!form.firstName.trim()) e.firstName = "First name is required";
+    if (!form.lastName.trim()) e.lastName = "Last name is required";
+    if (!form.email.trim() || !isEmail(form.email)) e.email = "Valid email is required";
+    if (form.company && !isPhoneLike(form.company)) e.company = "Mobile number looks invalid";
+    if (!form.persona) e.persona = "Please select a product";
+    if (!form.agree) e.agree = "You must agree to Terms & Privacy";
+    if (form.website && form.website.trim().length > 0) e.website = "Spam detected";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    console.log("Submitted:", form);
-    alert("Form submitted (replace with your API).");
+    if (!validate()) return;
+
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/api/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          company: form.company, // mobile
+          persona: form.persona,
+          message: form.message,
+          agree: form.agree,
+          website: form.website, // honeypot
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data?.error || "Submission failed");
+        return;
+      }
+
+      alert("Thanks! We received your message.");
+      // Optional reset
+      setForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        company: "",
+        persona: "",
+        message: "",
+        agree: false,
+        website: "",
+      });
+      setErrors({});
+    } catch (err) {
+      console.error(err);
+      alert("Network error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <section className="relative min-h-screen w-full overflow-hidden bg-[#0b0d10] text-white text-left">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 z-0 opacity-20"
+        style={{
+          backgroundImage: "url('https://static.vecteezy.com/system/resources/previews/025/481/738/large_2x/bull-with-background-of-uptrend-stock-market-concept-of-bullish-market-ai-generated-free-photo.jpeg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        }}
+      />
+
       {/* Close button */}
       <button
         aria-label="Close"
@@ -59,17 +133,18 @@ const ContactUs: React.FC = () => {
         <FiX className="h-5 w-5 text-gray-200" />
       </button>
 
-      {/* background accents (soft beams + dotted grid) */}
+      {/* Background accents */}
       <div
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 z-10"
         style={{
           backgroundImage:
             "radial-gradient(1200px 600px at 70% -10%, rgba(255,255,255,0.08), transparent 60%), radial-gradient(900px 500px at -10% 20%, rgba(99,102,241,0.12), transparent 60%)",
         }}
       />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.12] [background:radial-gradient(circle,rgba(255,255,255,0.6)_1px,transparent_1px)] [background-size:18px_18px]" />
+      {/* Darker dotted grid */}
+      <div className="pointer-events-none absolute inset-0 z-10 opacity-[0.22] [background:radial-gradient(circle,rgba(255,255,255,0.7)_1px,transparent_1px)] [background-size:18px_18px]" />
 
-      <div className="relative mx-auto max-w-7xl px-6 py-14 md:py-20">
+      <div className="relative z-10 mx-auto max-w-7xl px-6 py-14 md:py-20">
         <div className="grid gap-12 md:grid-cols-2 md:gap-16">
           {/* LEFT: copy + features + contact info */}
           <div className="max-w-xl text-left">
@@ -149,7 +224,21 @@ const ContactUs: React.FC = () => {
             <form
               onSubmit={handleSubmit}
               className="rounded-2xl border border-white/10 bg-white/5 p-5 text-left backdrop-blur-sm md:p-6"
+              noValidate
             >
+              {/* Honeypot (hide visually, keep in DOM) */}
+              <div className="sr-only" aria-hidden="true">
+                <label>
+                  Website
+                  <input
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={form.website}
+                    onChange={(e) => setForm((s) => ({ ...s, website: e.target.value }))}
+                  />
+                </label>
+              </div>
+
               {/* First/Last name */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="text-left">
@@ -157,7 +246,7 @@ const ContactUs: React.FC = () => {
                     First Name
                   </label>
                   <input
-                    className="h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                    className={`h-11 w-full rounded-full border ${errors.firstName ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
                     placeholder="Enter First Name"
                     value={form.firstName}
                     onChange={(e) =>
@@ -165,13 +254,16 @@ const ContactUs: React.FC = () => {
                     }
                     required
                   />
+                  {errors.firstName && (
+                    <p className="mt-1 text-xs text-red-400">{errors.firstName}</p>
+                  )}
                 </div>
                 <div className="text-left">
                   <label className="mb-1 block text-left text-xs text-gray-400">
                     Last Name
                   </label>
                   <input
-                    className="h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                    className={`h-11 w-full rounded-full border ${errors.lastName ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
                     placeholder="Enter Last Name"
                     value={form.lastName}
                     onChange={(e) =>
@@ -179,6 +271,9 @@ const ContactUs: React.FC = () => {
                     }
                     required
                   />
+                  {errors.lastName && (
+                    <p className="mt-1 text-xs text-red-400">{errors.lastName}</p>
+                  )}
                 </div>
               </div>
 
@@ -189,7 +284,7 @@ const ContactUs: React.FC = () => {
                 </label>
                 <input
                   type="email"
-                  className="h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                  className={`h-11 w-full rounded-full border ${errors.email ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
                   placeholder="albert@susanto.com"
                   value={form.email}
                   onChange={(e) =>
@@ -197,9 +292,12 @@ const ContactUs: React.FC = () => {
                   }
                   required
                 />
+                {errors.email && (
+                  <p className="mt-1 text-xs text-red-400">{errors.email}</p>
+                )}
               </div>
 
-              {/* Mobile Number (replaces Company Name) */}
+              {/* Mobile Number */}
               <div className="mt-3 text-left">
                 <label className="mb-1 block text-left text-xs text-gray-400">
                   Mobile Number
@@ -208,37 +306,43 @@ const ContactUs: React.FC = () => {
                   type="tel"
                   inputMode="tel"
                   autoComplete="tel"
-                  className="h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                  className={`h-11 w-full rounded-full border ${errors.company ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
                   placeholder="+91 98765 43210"
                   value={form.company}
                   onChange={(e) =>
                     setForm((s) => ({ ...s, company: e.target.value }))
                   }
                 />
+                {errors.company && (
+                  <p className="mt-1 text-xs text-red-400">{errors.company}</p>
+                )}
               </div>
 
-              {/* Products Interested In (replaces 'Which best describes you?') */}
+              {/* Products Interested In */}
               <div className="mt-3 text-left">
                 <label className="mb-1 block text-left text-xs text-gray-400">
                   Products Interested In
                 </label>
                 <div className="relative text-left">
                   <select
-                    className="h-11 w-full appearance-none rounded-full border border-white/10 bg-white/5 px-4 pr-10 text-left text-sm text-white outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
-                    value={form.persona || "Select a product"}
+                    className={`h-11 w-full appearance-none rounded-full border ${errors.persona ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 pr-10 text-left text-sm text-white outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
+                    value={form.persona}
                     onChange={(e) =>
                       setForm((s) => ({ ...s, persona: e.target.value }))
                     }
                     required
                   >
                     {personas.map((p) => (
-                      <option key={p} value={p} className="bg-[#0b0d10]">
-                        {p}
+                      <option key={p.value + p.label} value={p.value} className="bg-[#0b0d10]">
+                        {p.label}
                       </option>
                     ))}
                   </select>
                   <FiChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
+                {errors.persona && (
+                  <p className="mt-1 text-xs text-red-400">{errors.persona}</p>
+                )}
               </div>
 
               {/* Message */}
@@ -270,22 +374,27 @@ const ContactUs: React.FC = () => {
                   />
                   <span className="text-left">
                     I agree to Fireside{" "}
-                    <a className="underline underline-offset-2" href="#">
+                    <Link className="underline underline-offset-2" to='/terms'>
                       Terms of Use
-                    </a>{" "}
+                    </Link>{" "}
                     and{" "}
-                    <a className="underline underline-offset-2" href="#">
+                    <Link className="underline underline-offset-2" to='/privacy'>
                       Privacy Policy
-                    </a>{" "}
+                    </Link>{" "}
                     <span className="text-emerald-400">*</span>
                   </span>
                 </label>
 
+                {errors.agree && (
+                  <p className="text-xs text-red-400">{errors.agree}</p>
+                )}
+
                 <button
                   type="submit"
-                  className="ml-auto inline-flex items-center justify-center rounded-md bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 px-5 py-2 text-sm font-semibold text-white shadow-md shadow-purple-500/20 transition active:translate-y-[1px]"
+                  disabled={loading}
+                  className={`ml-auto inline-flex items-center justify-center rounded-md px-5 py-2 text-sm font-semibold shadow-md shadow-purple-500/20 transition active:translate-y-[1px] bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white ${loading ? "opacity-70 cursor-not-allowed" : ""}`}
                 >
-                  Submit
+                  {loading ? "Submitting..." : "Submit"}
                 </button>
               </div>
             </form>

@@ -19,7 +19,12 @@ export default function Orb({ height = 680 }: OrbProps) {
   // ---- height handling ----
   const heightIsVh = typeof height === "string";
   const CONTAINER_HEIGHT_PX = heightIsVh
-    ? Math.max(0, Math.round((Number.parseFloat(height) / 100) * window.innerHeight || 700))
+    ? Math.max(
+        0,
+        Math.round(
+          (Number.parseFloat(height) / 100) * window.innerHeight || 700
+        )
+      )
     : (height as number);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -92,7 +97,8 @@ export default function Orb({ height = 680 }: OrbProps) {
       title2: "DATA",
       description:
         "Monitor Foreign Institutional Investors and Domestic Institutional Investors activity with our comprehensive data dashboard to gauge market sentiment.",
-      image: "https://morganfranklinfoundation.org/wp-content/uploads/stockbrokers.jpg",
+      image:
+        "https://morganfranklinfoundation.org/wp-content/uploads/stockbrokers.jpg",
     },
   ];
 
@@ -181,7 +187,6 @@ export default function Orb({ height = 680 }: OrbProps) {
     startAutoScroll();
   };
 
-
   // container height style
   const containerStyle =
     typeof height === "string"
@@ -197,8 +202,8 @@ export default function Orb({ height = 680 }: OrbProps) {
       onMouseLeave={startAutoScroll}
     >
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,_rgba(255,255,255,0.15)_1px,_transparent_0)] bg-[size:20px_20px]"></div>
+      <div className="absolute inset-0 opacity-80">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,_rgba(255,255,255,0.6)_1px,_transparent_0)] bg-[size:20px_20px]"></div>
       </div>
 
       {/* Cards */}
@@ -308,13 +313,17 @@ export default function Orb({ height = 680 }: OrbProps) {
           <Link to="/signup">
             <button className="border border-amber-500 bg-amber-500/10 hover:bg-amber-500/20 h-10 rounded-full text-white px-6 text-sm uppercase font-medium transition-all duration-300 flex items-center group">
               Explore Feature
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 20 20" 
-                fill="currentColor" 
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
                 className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform"
               >
-                <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z"
+                  clipRule="evenodd"
+                />
               </svg>
             </button>
           </Link>
@@ -378,7 +387,9 @@ export default function Orb({ height = 680 }: OrbProps) {
         </div>
 
         <div className="ml-6 flex items-center text-sm text-gray-300 font-medium">
-          <span className="text-amber-400 text-lg font-bold">{currentIndex + 1}</span>
+          <span className="text-amber-400 text-lg font-bold">
+            {currentIndex + 1}
+          </span>
           <span className="mx-1">/</span>
           <span>{data.length}</span>
         </div>
@@ -399,8 +410,8 @@ export default function Orb({ height = 680 }: OrbProps) {
               }
             }}
             className={`w-2 h-2 rounded-full transition-all duration-300 ${
-              index === currentIndex 
-                ? "w-6 bg-amber-500" 
+              index === currentIndex
+                ? "w-6 bg-amber-500"
                 : "bg-white/30 hover:bg-white/50"
             }`}
           />
