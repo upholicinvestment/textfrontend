@@ -7,7 +7,7 @@ import rupam from "../../../../assets/rupam.jpg";
 import deep from "../../../../assets/deep.jpg";
 import shraddha from "../../../../assets/shraddha.jpg";
 import angat from "../../../../assets/angat.png";
-import anil from "../../../../assets/anil.jpg";
+import anil from "../../../../assets/anil.png";
 import shehla from '../../../../assets/shehla.jpg';
 
 /** Brand gradient */

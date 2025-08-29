@@ -60,7 +60,7 @@ const Navbar = () => {
   const services = [
     { name: "Technical Scanner", icon: "📊", color: "bg-gradient-to-br from-purple-500 to-blue-500", path: "/comming-soon" },
     { name: "Fundamental Scanner", icon: "📚", color: "bg-gradient-to-br from-blue-500 to-cyan-500", path: "/comming-soon" },
-    { name: "ALGO Simulator", icon: "🤖", color: "bg-gradient-to-br from-pink-500 to-purple-500", path: "/comming-soon" },
+    { name: "ALGO Simulator", icon: "🤖", color: "bg-gradient-to-br from-pink-500 to-purple-500", path: "/algo-simulator" },
     { name: "FNO Khazana", icon: "💰", color: "bg-gradient-to-br from-green-500 to-teal-500", path: "/fno-khazana" },
     { name: "Journaling", icon: "📓", color: "bg-gradient-to-br from-indigo-500 to-violet-500", path: "/Journaling" },
     { name: "FIIs/DIIs Data", icon: "📈", color: "bg-gradient-to-br from-cyan-500 to-blue-500", path: "/main-fii-dii" },
@@ -70,7 +70,7 @@ const Navbar = () => {
     { name: "Home", path: "/" },
     { name: "About", path: "/about" },
     { name: "Pricing", path: "/pricing" },
-    { name: "contact", path: "/contact-us" },
+    { name: "Contact", path: "/contact-us" },
   ];
 
   useEffect(() => {

@@ -38,6 +38,7 @@ import About from '../pages/About/About';
 import Journal_Home from '../pages/Journals/Journal_Home/Journal_Home';
 import Journal_Layout from '../pages/Journals/JournalLayout/Journal_Layout';
 import ContactUs from '../pages/Policies/ContactUs';
+import Algo_Similator_Home from '../pages/Algo_Simulator/Algo_Home/Algo_Similator_Home';
 // import NotFound from '../pages/404';
 
 // ---------- Local wrapper for page transitions ----------
@@ -145,6 +146,7 @@ const AppRoutes: React.FC = () => {
         <Route path='/about' element={<About/>}/>
         <Route path='/journaling' element={<Journal_Home/>} />
         <Route path='/contact-us' element={<ContactUs/>} />
+        <Route path="/algo-simulator" element={<Algo_Similator_Home/>} />
         
         {/* <Route path="*" element={<NotFound />} /> */}
 
