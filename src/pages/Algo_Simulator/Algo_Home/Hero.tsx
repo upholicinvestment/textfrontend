@@ -1,6 +1,8 @@
 // src/.../Hero.tsx
 import { motion } from "framer-motion";
-import heroVideo from "../../../assets/algo.mp4";
+
+// Use external video URL instead of importing a local file
+const VIDEO_SRC = "https://cdn.pixabay.com/video/2023/04/15/159053-818026314_large.mp4";
 
 type Props = {
   onScrollToProducts?: () => void; // keep optional
@@ -54,11 +56,13 @@ export default function Hero({ onScrollToProducts, onScrollToHow, headerOffset =
       {/* Background video */}
       <video
         className="absolute inset-0 h-full w-full object-cover"
-        src={heroVideo}
+        src={VIDEO_SRC}
         autoPlay
         muted
         loop
         playsInline
+        aria-hidden="true"
+        preload="auto"
       />
 
       {/* Overlays */}

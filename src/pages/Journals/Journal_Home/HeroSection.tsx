@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import videoUrl from '../../../assets/vid.mp4'; // adjust the relative path
-const VIDEO_SRC = videoUrl;
 
-
+const VIDEO_SRC = 'https://cdn.pixabay.com/video/2019/03/19/22098-325253535_large.mp4';
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -76,7 +74,7 @@ const HeroSection = () => {
           TradeKhata
         </h1>
         <p className="text-cyan-300/90 text-lg md:text-2xl font-medium mb-8">
-          Smart TradeKhata — built for real traders
+          Smart Trading Journal — built for real traders
         </p>
 
         <div className="h-16 md:h-20 mb-8">
