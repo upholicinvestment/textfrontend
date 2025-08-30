@@ -6,11 +6,17 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Debug logs so you can confirm method and URL
+// Attach JWT to every request
 api.interceptors.request.use((cfg) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    cfg.headers = cfg.headers ?? {};
+    cfg.headers.Authorization = `Bearer ${token}`;
+  }
   console.log("[API REQ]", cfg.method?.toUpperCase(), cfg.baseURL, cfg.url);
   return cfg;
 });
+
 api.interceptors.response.use(
   (res) => {
     console.log("[API RES]", res.status, res.config.url);

@@ -149,7 +149,7 @@ const TradesTable = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/stats");
+        const response = await fetch("https://api.upholictech.com/api/stats");
         if (!response.ok) throw new Error('Failed to fetch');
         const data: StatsData = await response.json();
         setStats(data.empty ? null : data);

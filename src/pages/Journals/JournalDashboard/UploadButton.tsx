@@ -26,7 +26,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUpload }) => {
       const formData = new FormData();
       formData.append("orderbook", file);
 
-      const response = await fetch("http://localhost:8000/api/upload-orderbook", {
+      const response = await fetch("https://api.upholictech.com/api/upload-orderbook", {
         method: 'POST',
         body: formData
       });

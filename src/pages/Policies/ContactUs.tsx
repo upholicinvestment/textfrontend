@@ -28,7 +28,7 @@ const personas = [
   { label: "Both / Not sure", value: "Both / Not sure" },
 ];
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || "https://api.upholictech.com";
 
 const ContactUs: React.FC = () => {
   const navigate = useNavigate();

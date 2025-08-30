@@ -8,6 +8,7 @@ interface CardData {
   title2: string;
   description: string;
   image: string;
+  href: string; // NEW
 }
 
 type OrbProps = {
@@ -50,6 +51,7 @@ export default function Orb({ height = 680 }: OrbProps) {
         "Our advanced technical scanner identifies patterns, trends, and key support/resistance levels across multiple timeframes to help you make informed trading decisions.",
       image:
         "https://www.carsongroup.com/wp-content/uploads/2024/05/GettyImages-1645923179-1980x1304.jpg",
+      href: "/comming-soon",
     },
     {
       id: 1,
@@ -60,6 +62,7 @@ export default function Orb({ height = 680 }: OrbProps) {
         "Comprehensive fundamental analysis tool that screens stocks based on financial metrics, valuation ratios, and growth indicators to identify quality investments.",
       image:
         "https://img.freepik.com/premium-photo/close-view-monitor-displaying-live-stock-market-chart_975188-94465.jpg",
+      href: "/comming-soon",
     },
     {
       id: 2,
@@ -70,6 +73,7 @@ export default function Orb({ height = 680 }: OrbProps) {
         "Backtest and optimize your trading strategies with our powerful algorithm simulator. Test various parameters and market conditions to refine your approach.",
       image:
         "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
+      href: "/algo-simulator",
     },
     {
       id: 3,
@@ -79,6 +83,7 @@ export default function Orb({ height = 680 }: OrbProps) {
       description:
         "Your treasure trove for Futures and Options data. Analyze open interest, PCR, premium decay, and max pain theory for better derivatives trading.",
       image: "https://wallpaperaccess.com/full/1393720.jpg",
+      href: "/comming-soon",
     },
     {
       id: 4,
@@ -89,6 +94,7 @@ export default function Orb({ height = 680 }: OrbProps) {
         "Systematically record, analyze, and improve your trading performance. Track your trades, identify patterns in your wins and losses, and refine your strategy.",
       image:
         "https://assets.technologyadvice.com/uploads/2023/05/AdobeStock-558328967-scaled-e1683576636349.jpeg",
+      href: "/Journaling",
     },
     {
       id: 5,
@@ -99,6 +105,7 @@ export default function Orb({ height = 680 }: OrbProps) {
         "Monitor Foreign Institutional Investors and Domestic Institutional Investors activity with our comprehensive data dashboard to gauge market sentiment.",
       image:
         "https://morganfranklinfoundation.org/wp-content/uploads/stockbrokers.jpg",
+      href: "/main-fii-dii",
     },
   ];
 
@@ -189,9 +196,7 @@ export default function Orb({ height = 680 }: OrbProps) {
 
   // container height style
   const containerStyle =
-    typeof height === "string"
-      ? { height }
-      : { height: `${CONTAINER_HEIGHT_PX}px` };
+    typeof height === "string" ? { height } : { height: `${CONTAINER_HEIGHT_PX}px` };
 
   return (
     <div
@@ -229,9 +234,11 @@ export default function Orb({ height = 680 }: OrbProps) {
               borderRadius: "12px",
             };
 
+        // Wrap card in Link so whole card is clickable
         return (
-          <div
+          <Link
             key={item.id}
+            to={item.href}
             className="absolute bg-cover bg-center shadow-xl transition-all duration-700 overflow-hidden group"
             style={cardStyle}
           >
@@ -265,7 +272,7 @@ export default function Orb({ height = 680 }: OrbProps) {
                 </div>
               </div>
             )}
-          </div>
+          </Link>
         );
       })}
 
@@ -310,7 +317,8 @@ export default function Orb({ height = 680 }: OrbProps) {
             </svg>
           </button>
 
-          <Link to="/signup">
+          {/* Explore button now routes to active card */}
+          <Link to={data[currentIndex].href}>
             <button className="border border-amber-500 bg-amber-500/10 hover:bg-amber-500/20 h-10 rounded-full text-white px-6 text-sm uppercase font-medium transition-all duration-300 flex items-center group">
               Explore Feature
               <svg

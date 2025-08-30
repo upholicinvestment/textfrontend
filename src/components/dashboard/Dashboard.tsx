@@ -8,7 +8,7 @@ import {
   BookOpen,
   Coins,
   Building2,
-  Home,
+  Home as HomeIcon,
   Calendar,
   LogOut,
   ArrowUpRight,
@@ -27,32 +27,28 @@ import {
 } from "lucide-react";
 import api from "../../api";
 
-// ---- API Types (match /api/products payload) ----
-type VariantApi = {
-  _id: string;
-  key: string; // "starter" | "pro" | "swing"
+// ---------- Types returned by /users/me/products ----------
+interface MyVariant {
+  variantId: string;
+  key: string;      // starter | pro | swing
   name: string;
-  description?: string;
-  priceMonthly?: number;
-  interval?: string;
-  isActive: boolean;
-  productId?: string;
-};
-
-type ProductApi = {
-  _id: string;
-  key: "essentials_bundle" | "algo_simulator";
+  priceMonthly?: number | null;
+  interval?: string | null;
+}
+interface MyProduct {
+  productId: string;
+  key: string;      // component keys, algo_simulator, journaling_solo, etc.
   name: string;
-  isActive: boolean;
+  route: string;    // e.g. "/fii-dii"
   hasVariants: boolean;
-  forSale?: boolean;
-  route: string;
-  priceMonthly?: number; // bundle price
-  components?: string[]; // bundle components
-  variants?: VariantApi[]; // algo variants
-};
+  forSale: boolean;
+  status: string;   // "active"
+  startedAt: string | null;
+  endsAt: string | null;
+  variant: MyVariant | null;
+}
 
-// ---- UI Types (local to dashboard) ----
+// ---------- UI Types ----------
 interface ProductUI {
   id: string;
   name: string;
@@ -64,7 +60,6 @@ interface ProductUI {
   gradient: string;
   trend: "up" | "down";
   newFeature: boolean;
-  // Extras for rendering
   bundleComponents?: { key: string; label: string; icon: React.ReactNode }[];
   algoVariants?: { key: string; label: string; price?: string }[];
 }
@@ -90,25 +85,14 @@ interface Stat {
   progress: number;
 }
 
-// Component meta -> label/icon
-const componentLabelMap: Record<
-  string,
-  { label: string; icon: React.ReactNode }
-> = {
-  technical_scanner: {
-    label: "Technical Scanner",
-    icon: <BarChart3 className="h-4 w-4" />,
-  },
-  fundamental_scanner: {
-    label: "Fundamental Scanner",
-    icon: <TrendingUp className="h-4 w-4" />,
-  },
+const componentLabelMap: Record<string, { label: string; icon: React.ReactNode }> = {
+  technical_scanner: { label: "Technical Scanner", icon: <BarChart3 className="h-4 w-4" /> },
+  fundamental_scanner: { label: "Fundamental Scanner", icon: <TrendingUp className="h-4 w-4" /> },
   fno_khazana: { label: "F&O Khazana", icon: <Coins className="h-4 w-4" /> },
   journaling: { label: "Smart Journaling", icon: <BookOpen className="h-4 w-4" /> },
   fii_dii_data: { label: "FII/DII Data", icon: <Building2 className="h-4 w-4" /> },
 };
 
-// Component -> route
 const componentRouteMap: Record<string, string> = {
   technical_scanner: "/technical",
   fundamental_scanner: "/fundamental",
@@ -117,69 +101,90 @@ const componentRouteMap: Record<string, string> = {
   fii_dii_data: "/fii-dii",
 };
 
-const prettyINR = (n?: number) =>
+const bundleComponentKeys = [
+  "technical_scanner",
+  "fundamental_scanner",
+  "fno_khazana",
+  "journaling",
+  "fii_dii_data",
+];
+
+const prettyINR = (n?: number | null) =>
   typeof n === "number" ? `₹${n.toLocaleString("en-IN")}` : undefined;
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [bundleOpen, setBundleOpen] = useState(false); // <-- NEW for dropdown
+  const [bundleOpen, setBundleOpen] = useState(false);
+  const [algoOpen, setAlgoOpen] = useState(false); // NEW: collapsible ALGO like bundle
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [apiProducts, setApiProducts] = useState<ProductApi[]>([]);
+  const [myProducts, setMyProducts] = useState<MyProduct[]>([]);
+  const [loadingEntitlements, setLoadingEntitlements] = useState<boolean>(true);
 
-  // Fetch products (bundle + algo) from backend
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get<ProductApi[]>("/products");
-        setApiProducts(Array.isArray(res.data) ? res.data : []);
-      } catch {
-        setApiProducts([]);
+        setLoadingEntitlements(true);
+        const res = await api.get("/users/me/products");
+        const items: MyProduct[] = Array.isArray(res.data?.items) ? res.data.items : [];
+        setMyProducts(items);
+      } catch (e) {
+        console.error("Failed to load my products:", e);
+        setMyProducts([]);
+      } finally {
+        setLoadingEntitlements(false);
       }
     })();
   }, []);
 
-  const bundle = useMemo(
-    () => apiProducts.find((p) => p.key === "essentials_bundle"),
-    [apiProducts]
+  const ownedKeys = useMemo(() => new Set(myProducts.map(p => p.key)), [myProducts]);
+  const hasAllBundle = useMemo(
+    () => bundleComponentKeys.every(k => ownedKeys.has(k)),
+    [ownedKeys]
   );
-  const algo = useMemo(
-    () => apiProducts.find((p) => p.key === "algo_simulator"),
-    [apiProducts]
-  );
+  const ownsAlgo = ownedKeys.has("algo_simulator");
+  const ownsJournalingSolo = ownedKeys.has("journaling_solo");
+  const ownsAnyJournaling = hasAllBundle || ownsJournalingSolo || ownedKeys.has("journaling");
 
-  // Build UI product cards
-  const products: ProductUI[] = useMemo(() => {
+  const algoEntitlements = useMemo(
+    () => myProducts.filter(p => p.key === "algo_simulator"),
+    [myProducts]
+  );
+  const algoVariantBadges = useMemo(() => {
+    const variants = algoEntitlements
+      .map((p) => p.variant)
+      .filter((v): v is MyVariant => !!v);
+    const dedup = new Map(variants.map((v) => [v.key, v]));
+    return Array.from(dedup.values());
+  }, [algoEntitlements]);
+
+  const variantBadgeClass = (key: string) => {
+    switch (key) {
+      case "pro":
+        return "bg-yellow-100 text-yellow-800";
+      case "starter":
+        return "bg-indigo-100 text-indigo-700";
+      case "swing":
+        return "bg-emerald-100 text-emerald-700";
+      default:
+        return "bg-white text-[#1a237e]";
+    }
+  };
+
+  const productsUI: ProductUI[] = useMemo(() => {
     const ui: ProductUI[] = [];
 
-    // Essentials Bundle
-    if (bundle) {
-      const components =
-        (bundle.components || []).map((key) => ({
-          key,
-          label: componentLabelMap[key]?.label || key,
-          icon: componentLabelMap[key]?.icon || <PackageOpen className="h-4 w-4" />,
-        })) || [];
+    if (hasAllBundle) {
+      const components = bundleComponentKeys.map((key) => ({
+        key,
+        label: componentLabelMap[key]?.label || key,
+        icon: componentLabelMap[key]?.icon || <PackageOpen className="h-4 w-4" />,
+      }));
 
       ui.push({
-        id: bundle._id,
-        name: bundle.name,
-        description: "All 5 premium tools for the price of one",
-        icon: <PackageOpen className="h-6 w-6" />,
-        stats: "5 tools included",
-        change: "+12.4%",
-        link: bundle.route || "/bundle",
-        gradient: "from-blue-500 to-cyan-400",
-        trend: "up",
-        newFeature: false,
-        bundleComponents: components,
-      });
-    } else {
-      // Fallback if API not ready
-      ui.push({
-        id: "bundle-fallback",
+        id: "bundle-owned",
         name: "Trader's Essential Bundle (5-in-1)",
         description: "All 5 premium tools for the price of one",
         icon: <PackageOpen className="h-6 w-6" />,
@@ -189,146 +194,82 @@ const Dashboard = () => {
         gradient: "from-blue-500 to-cyan-400",
         trend: "up",
         newFeature: false,
-        bundleComponents: Object.keys(componentLabelMap).map((k) => ({
-          key: k,
-          label: componentLabelMap[k].label,
-          icon: componentLabelMap[k].icon,
-        })),
+        bundleComponents: components,
+      });
+    } else {
+      const ownedComponents = myProducts.filter(p =>
+        bundleComponentKeys.includes(p.key)
+      );
+      ownedComponents.forEach((p) => {
+        const label = componentLabelMap[p.key]?.label ?? p.name;
+        const icon = componentLabelMap[p.key]?.icon ?? <PackageOpen className="h-6 w-6" />;
+        ui.push({
+          id: p.productId,
+          name: label,
+          description: "Included in your plan",
+          icon,
+          stats: "Active",
+          change: "+2.3%",
+          link: p.route || componentRouteMap[p.key] || "#",
+          gradient: "from-indigo-500 to-sky-400",
+          trend: "up",
+          newFeature: false,
+        });
       });
     }
 
-    // ALGO Simulator
-    if (algo) {
-      const variants = (algo.variants || [])
-        .slice()
-        .sort((a, b) => {
-          const rank = (x: string) => (x === "starter" ? 1 : x === "pro" ? 2 : 3);
-          return rank(a.key) - rank(b.key);
-        })
-        .map((v) => ({
-          key: v.key,
-          label: v.name,
-          price: prettyINR(v.priceMonthly),
-        }));
+    if (ownedKeys.has("algo_simulator")) {
+      const algo = myProducts.find((p) => p.key === "algo_simulator");
+      const chip = algo?.variant
+        ? [{ key: algo.variant.key, label: algo.variant.name, price: prettyINR(algo.variant.priceMonthly ?? undefined) }]
+        : [];
 
       ui.push({
-        id: algo._id,
-        name: algo.name,
-        description: "Advanced backtesting and execution-ready strategies",
-        icon: <Bot className="h-6 w-6" />,
-        stats: `${variants.length} plans available`,
-        change: "+15.7%",
-        link: algo.route || "/algo",
-        gradient: "from-purple-500 to-violet-400",
-        trend: "up",
-        newFeature: true,
-        algoVariants: variants,
-      });
-    } else {
-      ui.push({
-        id: "algo-fallback",
+        id: algo?.productId || "algo-owned",
         name: "ALGO Simulator",
         description: "Advanced backtesting and execution-ready strategies",
         icon: <Bot className="h-6 w-6" />,
-        stats: "3 plans available",
+        stats: chip.length ? `${chip[0].label} plan` : "Active",
         change: "+15.7%",
-        link: "/algo",
+        link: algo?.route || "/comming-soon",
         gradient: "from-purple-500 to-violet-400",
         trend: "up",
         newFeature: true,
-        algoVariants: [
-          { key: "starter", label: "Starter Scalping", price: "₹5,999" },
-          { key: "pro", label: "Option Scalper PRO", price: "₹14,999" },
-          { key: "swing", label: "Swing Trader Master", price: "₹99,999" },
-        ],
+        algoVariants: chip,
+      });
+    }
+
+    if (!hasAllBundle && ownsJournalingSolo) {
+      const j = myProducts.find((p) => p.key === "journaling_solo");
+      ui.push({
+        id: j?.productId || "journal-solo",
+        name: "Journaling (Solo)",
+        description: "Personal trade journaling & analytics",
+        icon: <BookOpen className="h-6 w-6" />,
+        stats: "Active",
+        change: "+3.1%",
+        link: j?.route || "/journal",
+        gradient: "from-emerald-500 to-green-400",
+        trend: "up",
+        newFeature: false,
       });
     }
 
     return ui;
-  }, [bundle, algo]);
+  }, [myProducts, hasAllBundle, ownsJournalingSolo, ownedKeys]);
 
-  // Recent Activity Data
   const recentActivity: ActivityItem[] = [
-    {
-      id: 1,
-      product: "Technical Scanner",
-      action: "Nifty 50 breakout pattern detected",
-      time: "2 mins ago",
-      icon: <BarChart3 className="h-4 w-4" />,
-      type: "scan",
-      priority: "high",
-    },
-    {
-      id: 2,
-      product: "Smart Journaling",
-      action: "New trade recorded: RELIANCE (+2.4%)",
-      time: "15 mins ago",
-      icon: <BookOpen className="h-4 w-4" />,
-      type: "trade",
-      priority: "medium",
-    },
-    {
-      id: 3,
-      product: "ALGO Simulator",
-      action: "PRO strategy execution: 94.2% accuracy",
-      time: "32 mins ago",
-      icon: <Bot className="h-4 w-4" />,
-      type: "backtest",
-      priority: "high",
-    },
-    {
-      id: 4,
-      product: "FII/DII",
-      action: "Major FII buying in Banking sector",
-      time: "1 hour ago",
-      icon: <Building2 className="h-4 w-4" />,
-      type: "alert",
-      priority: "high",
-    },
+    { id: 1, product: "Technical Scanner", action: "Nifty 50 breakout pattern detected", time: "2 mins ago", icon: <BarChart3 className="h-4 w-4" />, type: "scan", priority: "high" },
+    { id: 2, product: "Smart Journaling", action: "New trade recorded: RELIANCE (+2.4%)", time: "15 mins ago", icon: <BookOpen className="h-4 w-4" />, type: "trade", priority: "medium" },
+    { id: 3, product: "ALGO Simulator", action: "PRO strategy execution: 94.2% accuracy", time: "32 mins ago", icon: <Bot className="h-4 w-4" />, type: "backtest", priority: "high" },
+    { id: 4, product: "FII/DII", action: "Major FII buying in Banking sector", time: "1 hour ago", icon: <Building2 className="h-4 w-4" />, type: "alert", priority: "high" },
   ];
 
-  // Stats
   const stats: Stat[] = [
-    {
-      title: "Trade Triggered",
-      value: "2,101",
-      icon: <Activity className="h-5 w-5" />,
-      trend: "up",
-      change: "12%",
-      gradient: "from-blue-500 to-cyan-400",
-      period: "Today",
-      progress: 85,
-    },
-    {
-      title: "Portfolio Value",
-      value: "₹8.4L",
-      icon: <DollarSign className="h-5 w-5" />,
-      trend: "up",
-      change: "5.2%",
-      gradient: "from-emerald-500 to-green-400",
-      period: "Total",
-      progress: 72,
-    },
-    {
-      title: "Live Positions",
-      value: "24",
-      icon: <TrendingUp className="h-5 w-5" />,
-      trend: "up",
-      change: "8",
-      gradient: "from-purple-500 to-violet-400",
-      period: "Open",
-      progress: 91,
-    },
-    {
-      title: "Success Rate",
-      value: "78%",
-      icon: <Users className="h-5 w-5" />,
-      trend: "up",
-      change: "4.1%",
-      gradient: "from-amber-500 to-orange-400",
-      period: "This Month",
-      progress: 78,
-    },
+    { title: "Trade Triggered", value: "2,101", icon: <Activity className="h-5 w-5" />, trend: "up", change: "12%", gradient: "from-blue-500 to-cyan-400", period: "Today", progress: 85 },
+    { title: "Portfolio Value", value: "₹8.4L", icon: <DollarSign className="h-5 w-5" />, trend: "up", change: "5.2%", gradient: "from-emerald-500 to-green-400", period: "Total", progress: 72 },
+    { title: "Live Positions", value: "24", icon: <TrendingUp className="h-5 w-5" />, trend: "up", change: "8", gradient: "from-purple-500 to-violet-400", period: "Open", progress: 91 },
+    { title: "Success Rate", value: "78%", icon: <Users className="h-5 w-5" />, trend: "up", change: "4.1%", gradient: "from-amber-500 to-orange-400", period: "This Month", progress: 78 },
   ];
 
   const filteredActivities =
@@ -339,11 +280,7 @@ const Dashboard = () => {
   const toggleSidebar = () => setIsSidebarOpen((v) => !v);
   const handleFilterChange = (filter: string) => setActiveFilter(filter);
 
-  const renderProgressBar = (
-    progress: number,
-    gradient: string,
-    title: string
-  ) => {
+  const renderProgressBar = (progress: number, gradient: string, title: string) => {
     const clamped = Math.max(0, Math.min(100, Math.round(progress)));
     return (
       <div className="mt-4 h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -360,25 +297,28 @@ const Dashboard = () => {
     );
   };
 
-  // Sidebar bundle items (from API or fallback)
-  const sidebarBundleComponents =
-    (bundle?.components?.length
-      ? bundle.components
-      : Object.keys(componentLabelMap)
-    ).map((key) => ({
-      key,
-      label: componentLabelMap[key]?.label || key,
-      icon: componentLabelMap[key]?.icon || <PackageOpen className="h-4 w-4" />,
-      href: componentRouteMap[key] || "#",
-    }));
+  const sidebarBundleComponents = (hasAllBundle
+    ? bundleComponentKeys
+    : myProducts.filter(p => bundleComponentKeys.includes(p.key)).map(p => p.key)
+  ).map((key) => ({
+    key,
+    label: componentLabelMap[key]?.label || key,
+    icon: componentLabelMap[key]?.icon || <PackageOpen className="h-4 w-4" />,
+    href: myProducts.find(p => p.key === key)?.route || componentRouteMap[key] || "#",
+  }));
+
+  const algoLink = myProducts.find(p => p.key === "algo_simulator")?.route || "/comming-soon";
+  const journalingLink = (myProducts.find(p => p.key === "journaling")?.route)
+    || (myProducts.find(p => p.key === "journaling_solo")?.route)
+    || "/journal";
+
+  const algoVariantHref = (key: string) => `${algoLink}?plan=${encodeURIComponent(key)}`;
 
   return (
     <div className="flex h-screen bg-gray-50/50">
       {/* Sidebar */}
       <div
-        className={`${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 fixed md:static inset-y-0 left-0 z-50 w-72 
+        className={`${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 fixed md:static inset-y-0 left-0 z-50 w-72 
         bg-gradient-to-b from-[#1a237e] to-[#4a56d2] shadow-xl md:shadow-none transition-transform duration-300 ease-in-out`}
       >
         <div className="flex flex-col h-full">
@@ -404,7 +344,7 @@ const Dashboard = () => {
                 className="flex items-center px-3 py-3 text-sm font-semibold text-white bg-white/20 rounded-xl border border-white/30"
                 aria-current="page"
               >
-                <Home className="mr-3 h-5 w-5 text-white" />
+                <HomeIcon className="mr-3 h-5 w-5 text-white" />
                 Dashboard
               </a>
             </div>
@@ -414,72 +354,124 @@ const Dashboard = () => {
                 Trading Products
               </h3>
 
-              {/* Essentials Bundle with DROPDOWN */}
-              <button
-                type="button"
-                onClick={() => setBundleOpen((v) => !v)}
-                aria-expanded={bundleOpen}
-                aria-controls="bundle-submenu"
-                className="w-full group flex items-center justify-between px-3 py-3 text-left text-sm font-medium text-white rounded-xl hover:bg-white/10 transition-all duration-200"
-              >
-                <div className="flex items-center">
-                  <div className="p-2 rounded-lg bg-white/10 text-white mr-3">
-                    <PackageOpen className="h-6 w-6" />
-                  </div>
-                  <span className="truncate">
-                    Trader&apos;s Essential Bundle
-                  </span>
-                </div>
-                <ChevronDown
-                  className={`h-4 w-4 text-white transition-transform ${
-                    bundleOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {/* Submenu */}
-              {bundleOpen && (
-                <div
-                  id="bundle-submenu"
-                  className="ml-4 mt-1 space-y-1 border-l border-white/20 pl-3"
-                >
-                  {sidebarBundleComponents.map((c) => (
-                    <a
-                      key={c.key}
-                      href={c.href}
-                      className="flex items-center justify-between px-2 py-2 text-sm text-white/90 rounded-lg hover:bg-white/10"
-                    >
-                      <span className="flex items-center gap-2">
-                        {c.icon}
-                        {c.label}
+              {/* Bundle / Owned Components */}
+              {(hasAllBundle || sidebarBundleComponents.length > 0) && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setBundleOpen((v) => !v)}
+                    aria-expanded={bundleOpen}
+                    aria-controls="bundle-submenu"
+                    className="w-full group flex items-center justify-between px-3 py-3 text-left text-sm font-medium text-white rounded-xl hover:bg-white/10 transition-all duration-200"
+                  >
+                    <div className="flex items-center">
+                      <div className="p-2 rounded-lg bg-white/10 text-white mr-3">
+                        <PackageOpen className="h-6 w-6" />
+                      </div>
+                      <span className="truncate">
+                        {hasAllBundle ? "Trader's Essential Bundle" : "Your Tools"}
                       </span>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </a>
-                  ))}
-                </div>
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 text-white transition-transform ${bundleOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  {bundleOpen && (
+                    <div id="bundle-submenu" className="ml-4 mt-1 space-y-1 border-l border-white/20 pl-3">
+                      {sidebarBundleComponents.map((c) => (
+                        <a
+                          key={c.key}
+                          href={c.href}
+                          className="flex items-center justify-between px-2 py-2 text-sm text-white/90 rounded-lg hover:bg-white/10"
+                        >
+                          <span className="flex items-center gap-2">
+                            {c.icon}
+                            {c.label}
+                          </span>
+                          <ChevronRight className="h-4 w-4 opacity-50" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* ALGO Simulator */}
-              <a
-                href={products[1]?.link || "/algo"}
-                className="group flex items-center justify-between px-3 py-3 text-sm font-medium text-white rounded-xl hover:bg-white/10 transition-all duration-200"
-                aria-label="Go to ALGO Simulator"
-              >
-                <div className="flex items-center">
-                  <div className="p-2 rounded-lg bg-white/10 text-white mr-3">
-                    <Bot className="h-6 w-6" />
+              {/* ALGO Simulator — NOW LIKE BUNDLE (collapsible with submenu) */}
+              {ownsAlgo && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setAlgoOpen((v) => !v)}
+                    aria-expanded={algoOpen}
+                    aria-controls="algo-submenu"
+                    className="w-full group flex items-center justify-between px-3 py-3 text-left text-sm font-medium text-white rounded-xl hover:bg-white/10 transition-all duration-200"
+                  >
+                    <div className="flex items-center">
+                      <div className="p-2 rounded-lg bg-white/10 text-white mr-3">
+                        <Bot className="h-6 w-6" />
+                      </div>
+                      <span className="truncate">ALGO Simulator</span>
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 text-white transition-transform ${algoOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  {algoOpen && (
+                    <div id="algo-submenu" className="ml-4 mt-1 space-y-1 border-l border-white/20 pl-3">
+                      {algoVariantBadges.length > 0 ? (
+                        algoVariantBadges.map((v) => (
+                          <a
+                            key={v.key}
+                            href={algoVariantHref(v.key)}
+                            className="flex items-center justify-between px-2 py-2 text-sm text-white/90 rounded-lg hover:bg-white/10"
+                            title={v.name}
+                          >
+                            <span className="flex items-center gap-2">
+                              <Bot className="h-4 w-4" />
+                              {v.name}
+                            </span>
+                            <span className={`px-2 py-0.5 text-[10px] rounded-full ${variantBadgeClass(v.key)}`}>
+                              {v.key.toUpperCase()}
+                            </span>
+                          </a>
+                        ))
+                      ) : (
+                        <a
+                          href={algoLink}
+                          className="flex items-center justify-between px-2 py-2 text-sm text-white/90 rounded-lg hover:bg-white/10"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Bot className="h-4 w-4" />
+                            Open ALGO
+                          </span>
+                          <ChevronRight className="h-4 w-4 opacity-50" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Journaling (only if owned in any form) */}
+              {ownsAnyJournaling && (
+                <a
+                  href={journalingLink}
+                  className="group flex items-center justify-between px-3 py-3 text-sm font-medium text-white rounded-xl hover:bg-white/10 transition-all duration-200"
+                  aria-label="Go to Smart Journaling"
+                >
+                  <div className="flex items-center">
+                    <div className="p-2 rounded-lg bg-white/10 text-white mr-3">
+                      <BookOpen className="h-6 w-6" />
+                    </div>
                   </div>
-                </div>
-                <div className="flex-1 flex items-center justify-between">
-                  <span className="truncate">ALGO Simulator</span>
-                  <div className="flex items-center space-x-2">
-                    <span className="px-2 py-1 text-xs font-medium bg-white text-[#1a237e] rounded-full">
-                      NEW
-                    </span>
+                  <div className="flex-1 flex items-center justify-between">
+                    <span className="truncate">Smart Journaling</span>
                     <ChevronRight className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                </div>
-              </a>
+                </a>
+              )}
             </div>
           </nav>
 
@@ -493,7 +485,7 @@ const Dashboard = () => {
                 <p className="text-sm font-semibold text-white truncate">
                   {user?.name}
                 </p>
-                <p className="text-xs text-white/70">Premium Member</p>
+                <p className="text-xs text-white/70">Member</p>
               </div>
               <button
                 className="p-1.5 rounded-lg hover:bg-white/20 transition-colors"
@@ -547,11 +539,18 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-4">
-                <button
-                  className="p-2 rounded-xl bg-gray-100 relative"
-                  aria-label="Notifications"
+              <div className="flex items-center space-x-3">
+                {/* NEW: Home button */}
+                <a
+                  href="/"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium inline-flex items-center gap-2"
+                  aria-label="Go home"
                 >
+                  <HomeIcon className="h-4 w-4" />
+                  Home
+                </a>
+
+                <button className="p-2 rounded-xl bg-gray-100 relative" aria-label="Notifications">
                   <Bell className="h-5 w-5 text-gray-600" />
                   <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
                 </button>
@@ -595,6 +594,7 @@ const Dashboard = () => {
                   </div>
 
                   <div className="flex items-center space-x-3">
+                    {/* You can keep or remove this export button */}
                     <button
                       className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium"
                       aria-label="Export data"
@@ -613,39 +613,21 @@ const Dashboard = () => {
                     className="bg-white p-6 rounded-2xl border border-gray-100 hover:shadow-lg shadow-xl transition-all duration-200 group"
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <div
-                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.gradient} text-white`}
-                      >
+                      <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.gradient} text-white`}>
                         {stat.icon}
                       </div>
                       <div className="text-right">
-                        <div
-                          className={`flex items-center text-sm font-medium ${
-                            stat.trend === "up"
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {stat.trend === "up" ? (
-                            <ArrowUpRight className="h-4 w-4" />
-                          ) : (
-                            <ArrowDownRight className="h-4 w-4" />
-                          )}
+                        <div className={`flex items-center text-sm font-medium ${stat.trend === "up" ? "text-green-600" : "text-red-600"}`}>
+                          {stat.trend === "up" ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
                           {stat.change}
                         </div>
-                        <span className="text-xs text-gray-500">
-                          {stat.period}
-                        </span>
+                        <span className="text-xs text-gray-500">{stat.period}</span>
                       </div>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-medium text-gray-600 mb-1">
-                        {stat.title}
-                      </h3>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {stat.value}
-                      </p>
+                      <h3 className="text-sm font-medium text-gray-600 mb-1">{stat.title}</h3>
+                      <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                     </div>
 
                     {renderProgressBar(stat.progress, stat.gradient, stat.title)}
@@ -662,119 +644,100 @@ const Dashboard = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <h2 className="text-xl font-bold text-slate-800 mb-1">
-                            Trading Arsenal
+                            Your Trading Arsenal
                           </h2>
                           <p className="text-slate-500">
-                            Your powerful trading products at a glance
+                            Only the tools you own are shown here
                           </p>
                         </div>
-                        <a
-                          className="text-indigo-800 font-medium flex items-center transition-colors"
-                          aria-label="View all tools"
-                          href="#"
-                        >
-                          View All
-                          <ChevronRight className="h-4 w-4 ml-1" />
-                        </a>
                       </div>
                     </div>
 
                     <div className="p-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {products.map((product) => (
-                          <a
-                            key={product.id}
-                            href={product.link}
-                            className="group relative p-5 rounded-xl border border-indigo-100 shadow-sm transition-all duration-200 overflow-hidden bg-gradient-to-br from-indigo-50 to-white"
-                            aria-label={`Access ${product.name}`}
-                          >
-                            <div className="absolute inset-0 opacity-100 transition-opacity duration-300" />
+                      {loadingEntitlements ? (
+                        <div className="text-sm text-slate-500">Loading your products…</div>
+                      ) : productsUI.length === 0 ? (
+                        <div className="text-slate-600 text-sm">
+                          You don’t have any products yet.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {productsUI.map((product) => (
+                            <a
+                              key={product.id}
+                              href={product.link}
+                              className="group relative p-5 rounded-xl border border-indigo-100 shadow-sm transition-all duration-200 overflow-hidden bg-gradient-to-br from-indigo-50 to-white"
+                              aria-label={`Access ${product.name}`}
+                            >
+                              <div className="absolute inset-0 opacity-100 transition-opacity duration-300" />
 
-                            <div className="relative">
-                              <div className="flex items-start justify-between mb-3">
-                                <div
-                                  className="p-2 rounded-lg text-white"
-                                  style={{
-                                    background:
-                                      "linear-gradient(90deg, #6366F1 0%, #8B5CF6 100%)",
-                                  }}
-                                >
-                                  {product.icon}
-                                </div>
-                                {product.newFeature && (
-                                  <span className="px-2 py-1 text-xs font-medium bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-full shadow-sm">
-                                    NEW
-                                  </span>
-                                )}
-                              </div>
-
-                              <h3 className="font-semibold text-indigo-700 mb-1 transition-colors">
-                                {product.name}
-                              </h3>
-                              <p className="text-sm text-slate-500 mb-3">
-                                {product.description}
-                              </p>
-
-                              {/* Extra Info Rows */}
-                              {product.bundleComponents && (
-                                <div className="flex flex-wrap gap-2 mb-3">
-                                  {product.bundleComponents.map((c) => (
-                                    <span
-                                      key={c.key}
-                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] bg-indigo-100 text-indigo-700"
-                                    >
-                                      {c.icon}
-                                      {c.label}
+                              <div className="relative">
+                                <div className="flex items-start justify-between mb-3">
+                                  <div
+                                    className="p-2 rounded-lg text-white"
+                                    style={{ background: "linear-gradient(90deg, #6366F1 0%, #8B5CF6 100%)" }}
+                                  >
+                                    {product.icon}
+                                  </div>
+                                  {product.newFeature && (
+                                    <span className="px-2 py-1 text-xs font-medium bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-full shadow-sm">
+                                      NEW
                                     </span>
-                                  ))}
-                                </div>
-                              )}
-
-                              {product.algoVariants && (
-                                <div className="flex flex-wrap gap-2 mb-3">
-                                  {product.algoVariants.map((v) => (
-                                    <span
-                                      key={v.key}
-                                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] ${
-                                        v.key === "pro"
-                                          ? "bg-yellow-100 text-yellow-800"
-                                          : "bg-indigo-100 text-indigo-700"
-                                      }`}
-                                    >
-                                      {v.label}
-                                      {v.price && (
-                                        <span className="opacity-80">
-                                          · {v.price}
-                                        </span>
-                                      )}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-slate-400">
-                                  {product.stats}
-                                </span>
-                                <div
-                                  className={`flex items-center text-sm font-medium ${
-                                    product.trend === "up"
-                                      ? "text-emerald-600"
-                                      : "text-rose-600"
-                                  }`}
-                                >
-                                  {product.trend === "up" ? (
-                                    <ArrowUpRight className="h-3 w-3" />
-                                  ) : (
-                                    <ArrowDownRight className="h-3 w-3" />
                                   )}
-                                  {product.change}
+                                </div>
+
+                                <h3 className="font-semibold text-indigo-700 mb-1 transition-colors">
+                                  {product.name}
+                                </h3>
+                                <p className="text-sm text-slate-500 mb-3">
+                                  {product.description}
+                                </p>
+
+                                {/* Bundle-style chips remain on the card */}
+                                {product.bundleComponents && (
+                                  <div className="flex flex-wrap gap-2 mb-3">
+                                    {product.bundleComponents.map((c) => (
+                                      <span
+                                        key={c.key}
+                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] bg-indigo-100 text-indigo-700"
+                                      >
+                                        {c.icon}
+                                        {c.label}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {product.algoVariants && (
+                                  <div className="flex flex-wrap gap-2 mb-3">
+                                    {product.algoVariants.map((v) => (
+                                      <span
+                                        key={v.key}
+                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] ${
+                                          v.key === "pro"
+                                            ? "bg-yellow-100 text-yellow-800"
+                                            : "bg-indigo-100 text-indigo-700"
+                                        }`}
+                                      >
+                                        {v.label}
+                                        {v.price && <span className="opacity-80">· {v.price}</span>}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-slate-400">{product.stats}</span>
+                                  <div className={`flex items-center text-sm font-medium ${product.trend === "up" ? "text-emerald-600" : "text-rose-600"}`}>
+                                    {product.trend === "up" ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                    {product.change}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </a>
-                        ))}
-                      </div>
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -784,18 +747,12 @@ const Dashboard = () => {
                   <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h2 className="text-xl font-bold text-slate-800 mb-1">
-                          Live Activity
-                        </h2>
-                        <p className="text-sm text-slate-500">
-                          Real-time trading updates
-                        </p>
+                        <h2 className="text-xl font-bold text-slate-800 mb-1">Live Activity</h2>
+                        <p className="text-sm text-slate-500">Real-time trading updates</p>
                       </div>
                       <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                        <span className="text-xs text-emerald-600 font-medium">
-                          Live
-                        </span>
+                        <span className="text-xs text-emerald-600 font-medium">Live</span>
                       </div>
                     </div>
 
@@ -885,8 +842,7 @@ const Dashboard = () => {
             <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0">
               <div className="flex items-center space-x-6">
                 <p className="text-sm text-gray-600">
-                  © {new Date().getFullYear()} Upholic. Empowering traders
-                  worldwide.
+                  © {new Date().getFullYear()} Upholic. Empowering traders worldwide.
                 </p>
                 <div className="hidden sm:flex items-center space-x-1 text-xs text-gray-500">
                   <div className="w-2 h-2 bg-green-500 rounded-full" />
@@ -895,24 +851,9 @@ const Dashboard = () => {
               </div>
 
               <div className="flex items-center space-x-6 text-sm">
-                <a
-                  href="/lauching-soon"
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  Terms
-                </a>
-                <a
-                  href="/lauching-soon"
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  Privacy
-                </a>
-                <a
-                  href="/lauching-soon"
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  Support
-                </a>
+                <a href="/lauching-soon" className="text-gray-500 hover:text-gray-700 transition-colors">Terms</a>
+                <a href="/lauching-soon" className="text-gray-500 hover:text-gray-700 transition-colors">Privacy</a>
+                <a href="/lauching-soon" className="text-gray-500 hover:text-gray-700 transition-colors">Support</a>
               </div>
             </div>
           </div>

@@ -197,7 +197,7 @@ const Journal_Dashboard = forwardRef((_props, ref) => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get("http://localhost:8000/api/stats");
+      const { data } = await axios.get("https://api.upholictech.com/api/stats");
       setStats(data.empty ? null : data);
     } catch (error) {
       setStats(null);

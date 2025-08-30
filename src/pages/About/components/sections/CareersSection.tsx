@@ -20,6 +20,7 @@ import {
   Share2,
   Phone,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 // ——————————————————————————————————————————————————————————
 // CareersSection — Modal version (no layout shift)
@@ -466,18 +467,18 @@ export default function CareersSection() {
               <p className="text-slate-300 mt-2">Tell us how you’d like to contribute. We love proactive builders.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 justify-end">
-              <a
-                href="#send-resume"
+              <Link
+                to="/comming-soon"
                 className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 font-semibold text-white transition ${GRAD} ${GRAD_HOVER}`}
               >
                 Send Resume <ArrowRight className="w-4 h-4" />
-              </a>
-              <a
-                href="#learn-more"
+              </Link>
+              <Link
+                to="/comming-soon"
                 className="inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-3 font-semibold border-slate-700 hover:border-[#4a56d2]/50 hover:text-[#cdd0ff] transition"
               >
                 Learn More
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -595,12 +596,12 @@ function JobCard({ job, saved, onSave, onOpenModal, onCopy, copied }: JobCardPro
 
         {/* Actions */}
         <div className="mt-auto flex items-center gap-2 pt-4">
-          <a
-            href={job.apply}
+          <Link to="/comming-soon"
+            // href={job.apply}
             className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition ${GRAD} ${GRAD_HOVER}`}
           >
             Apply Now <ArrowRight className="w-4 h-4" />
-          </a>
+          </Link>
           <button
             onClick={onOpenModal}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-800 px-4 py-2 text-sm font-semibold hover:border-[#4a56d2]/50 hover:text-[#cdd0ff] transition"

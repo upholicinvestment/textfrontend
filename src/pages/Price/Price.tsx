@@ -68,17 +68,17 @@ const Price = () => {
 
   const bundlePrice = bundle?.priceMonthly
     ? `₹${bundle.priceMonthly.toLocaleString("en-IN")}`
-    : "₹4,999";
+    : "₹4999";
   const bundlePeriod = "month";
 
   const algoPlans = useMemo(() => {
     const vs = (algo?.variants || []).map((v) => ({
       id: v.key === "starter" ? 1 : v.key === "pro" ? 2 : 3,
-      key: v.key, // <-- used in URL
+      key: v.key, // <-- used in URL and for ordering
       name: v.name,
       price: v.priceMonthly
         ? `₹${v.priceMonthly.toLocaleString("en-IN")}`
-        : "₹—",
+        : "₹",
       period: "month",
       description:
         v.key === "starter"
@@ -115,15 +115,21 @@ const Price = () => {
       popular: v.key === "pro",
       variantId: v._id,
     }));
+
+    // ✅ Force the desired visual order: STARTER (left), PRO (middle), SWING (right)
+    const rank = (k: string) => ({ starter: 1, pro: 2, swing: 3 } as const)[k] ?? 99;
+    vs.sort((a, b) => rank(a.key) - rank(b.key));
+
     if (vs.length && selectedAlgo === null)
       setSelectedAlgo(vs.find((x) => x.popular)?.id ?? vs[0].id);
+
     return vs;
   }, [algo, selectedAlgo]);
 
   const journalingPrice =
     typeof journaling?.priceMonthly === "number"
       ? `₹${journaling.priceMonthly.toLocaleString("en-IN")}`
-      : "₹999";
+      : "₹299";
   const journalingPeriod = "month";
 
   const journalingFeatures = [
@@ -390,111 +396,109 @@ const Price = () => {
                 </div>
 
                 <div className="flex flex-col lg:flex-row gap-8 items-stretch justify-center">
-                  {algoPlans.map((plan) => (
-                    <motion.div
-                      key={plan.id}
-                      whileHover={{ y: -5 }}
-                      className={`flex-1 rounded-2xl overflow-hidden shadow-xl max-w-md mx-auto lg:max-w-none ${
-                        plan.popular
-                          ? "border-2 border-yellow-400 transform scale-105"
-                          : "border border-gray-700"
-                      } bg-gray-800 relative transition-all duration-300`}
-                      onClick={() => setSelectedAlgo(plan.id)}
-                    >
-                      <div
-                        className={`${
+                  {algoPlans.map((plan) => {
+                    // ✅ Ensure PRO is visually centered on desktop
+                    const orderClass =
+                      plan.key === "starter"
+                        ? "lg:order-1"
+                        : plan.key === "pro"
+                        ? "lg:order-2"
+                        : "lg:order-3";
+
+                    return (
+                      <motion.div
+                        key={plan.id}
+                        whileHover={{ y: -5 }}
+                        className={`flex-1 rounded-2xl overflow-hidden shadow-xl max-w-md mx-auto lg:max-w-none ${
                           plan.popular
-                            ? "bg-gradient-to-b from-blue-700 to-indigo-800 pt-10"
-                            : "bg-gray-700 pt-8"
-                        } p-8 text-white relative`}
+                            ? "border-2 border-yellow-400 transform scale-105"
+                            : "border border-gray-700"
+                        } bg-gray-800 relative transition-all duration-300 ${orderClass}`}
+                        onClick={() => setSelectedAlgo(plan.id)}
                       >
-                        <div className="flex justify-between items-start mb-6">
-                          <h3 className="text-xl font-bold">{plan.name}</h3>
-                          <div className="text-right">
-                            <div className="text-3xl font-bold">
-                              {plan.price}
-                            </div>
-                            <div className="text-sm text-gray-300">
-                              per {plan.period}
-                            </div>
-                          </div>
-                        </div>
-
-                        <p className="text-blue-100 mb-6 text-sm">
-                          {plan.description}
-                        </p>
-
-                        <div className="bg-black/20 rounded-lg p-4 mb-6">
-                          <div className="text-center text-sm font-semibold mb-2">
-                            BROKER INTEGRATION
-                          </div>
-                          <div className="flex justify-center gap-3 text-xs text-gray-300">
-                            <span>Zerodha</span>
-                            <span>•</span>
-                            <span>Upstox</span>
-                            <span>•</span>
-                            <span>Angel One</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-6 bg-gray-800">
-                        <div className="mb-6 text-sm font-semibold text-gray-300 border-b border-gray-700 pb-2">
-                          FEATURES
-                        </div>
-                        <ul className="space-y-3 mb-8">
-                          {plan.features.map((feature, index) => (
-                            <li
-                              key={index}
-                              className="flex items-start text-sm"
-                            >
-                              <svg
-                                className="h-5 w-5 mr-3 flex-shrink-0 text-green-400"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M5 13l4 4L19 7"
-                                />
-                              </svg>
-                              <span className="text-gray-300">{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
-
-                        {/* 🔗 Pass productKey=algo_simulator & variantKey=<plan.key> */}
-                        <Link
-                          to={toRegister(
-                            algo?.key || "algo_simulator",
-                            plan.key
-                          )}
-                          aria-label={`Get started with ${plan.name}`}
+                        <div
+                          className={`${
+                            plan.popular
+                              ? "bg-gradient-to-b from-blue-700 to-indigo-800 pt-10"
+                              : "bg-gray-700 pt-8"
+                          } p-8 text-white relative`}
                         >
-                          <motion.button
-                            whileHover={{ scale: 1.03 }}
-                            whileTap={{ scale: 0.97 }}
-                            className={`w-full py-4 rounded-lg font-semibold transition-all duration-300 ${
-                              plan.popular
-                                ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 hover:from-yellow-300 hover:to-orange-400"
-                                : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-500 hover:to-purple-500"
-                            } ${
-                              selectedAlgo === plan.id
-                                ? "ring-2 ring-blue-400"
-                                : ""
-                            }`}
+                          <div className="flex justify-between items-start mb-6">
+                            <h3 className="text-xl font-bold">{plan.name}</h3>
+                            <div className="text-right">
+                              <div className="text-3xl font-bold">
+                                {plan.price}
+                              </div>
+                              <div className="text-sm text-gray-300">
+                                per {plan.period}
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-blue-100 mb-6 text-sm">
+                            {plan.description}
+                          </p>
+
+                          <div className="bg-black/20 rounded-lg p-4 mb-6">
+                            <div className="text-center text-sm font-semibold mb-2">
+                              BROKER INTEGRATION
+                            </div>
+                            <div className="flex justify-center gap-3 text-xs text-gray-300">
+                              <span>Zerodha</span>
+                              <span>•</span>
+                              <span>Upstox</span>
+                              <span>•</span>
+                              <span>Angel One</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-6 bg-gray-800">
+                          <div className="mb-6 text-sm font-semibold text-gray-300 border-b border-gray-700 pb-2">
+                            FEATURES
+                          </div>
+                          <ul className="space-y-3 mb-8">
+                            {plan.features.map((feature, index) => (
+                              <li key={index} className="flex items-start text-sm">
+                                <svg
+                                  className="h-5 w-5 mr-3 flex-shrink-0 text-green-400"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                                <span className="text-gray-300">{feature}</span>
+                              </li>
+                            ))}
+                          </ul>
+
+                          {/* 🔗 Pass productKey=algo_simulator & variantKey=<plan.key> */}
+                          <Link
+                            to={toRegister(algo?.key || "algo_simulator", plan.key)}
+                            aria-label={`Get started with ${plan.name}`}
                           >
-                            {selectedAlgo === plan.id
-                              ? "Selected"
-                              : "Get Started"}
-                          </motion.button>
-                        </Link>
-                      </div>
-                    </motion.div>
-                  ))}
+                            <motion.button
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.97 }}
+                              className={`w-full py-4 rounded-lg font-semibold transition-all duration-300 ${
+                                plan.popular
+                                  ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 hover:from-yellow-300 hover:to-orange-400"
+                                  : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-500 hover:to-purple-500"
+                              } ${selectedAlgo === plan.id ? "ring-2 ring-blue-400" : ""}`}
+                            >
+                              {selectedAlgo === plan.id ? "Selected" : "Get Started"}
+                            </motion.button>
+                          </Link>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
 
                 <div className="text-center mt-10 text-sm text-gray-500">
@@ -765,9 +769,7 @@ const Price = () => {
                           </Link>
 
                           <Link
-                            to={toRegister(
-                              journaling?.key || "journaling_solo"
-                            )}
+                            to={toRegister(journaling?.key || "journaling_solo")}
                             aria-label="Get Journaling Only"
                           >
                             <motion.button
