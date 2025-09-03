@@ -12,7 +12,7 @@ import {
   FiTarget,
 } from "react-icons/fi";
 import stockImage from "../../../assets/analysis.jpg";   // analysis
-import stock1Image from "../../../assets/Summary.jpg";     // summary
+import stock1Image from "../../../assets/summary.jpg";     // summary
 import stock2Image from "../../../assets/cashflow.jpg";    // cash
 
 type Feature = {
