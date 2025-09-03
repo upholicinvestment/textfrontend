@@ -215,8 +215,6 @@ export default function DailyJournal() {
   const [tradeModal, setTradeModal] = useState<{ trade: any, isExtra?: boolean } | null>(null);
   const [modalType, setModalType] = useState<"matched" | "missed" | "extra" | null>(null);
 
-  // (Removed unused insights state)
-
   // NEW: available underlyings for OPTIDX depending on exchange
   const [underlyings, setUnderlyings] = useState<string[]>([]);
   // NEW: expiry options (only for OPTIDX)
@@ -224,6 +222,9 @@ export default function DailyJournal() {
 
   // NEW: only show one editable trade at a time in Edit mode
   const [activeEditIndex, setActiveEditIndex] = useState<number>(0);
+
+  // ✅ NEW: lock flag to hide all Remove buttons after plan exists/saves
+  const [planLocked, setPlanLocked] = useState(false);
 
   const todayKey = formatDateKey(new Date());
   const planDateKey = formatDateKey(selectedDate);
@@ -276,12 +277,15 @@ export default function DailyJournal() {
         } else {
           setExpiryOptions([]);
         }
+
+        setPlanLocked(true); // ✅ existing plan -> hide Remove buttons
       } else {
         setPlanNotes("");
         setPlannedTrades([{ ...defaultTrade }]);
         setPsych({ ...defaultPsych });
         setActiveEditIndex(0);
         setExpiryOptions([]);
+        setPlanLocked(false); // ✅ no plan yet -> allow Remove while composing
       }
     }).catch(() => {
       setPlanNotes("");
@@ -289,6 +293,7 @@ export default function DailyJournal() {
       setPsych({ ...defaultPsych });
       setActiveEditIndex(0);
       setExpiryOptions([]);
+      setPlanLocked(false); // ✅ treat as new plan on error
     });
 
     axios.get(`${API_BASE}/comparison?date=${key}`)
@@ -508,6 +513,7 @@ export default function DailyJournal() {
         plannedTrades: plannedTrades.filter(t => t.symbol),
         ...psych,
       });
+      setPlanLocked(true); // ✅ once saved, hide Remove everywhere
       setEditMode(false);
     } catch {
       alert("Failed to save plan.");
@@ -573,7 +579,7 @@ export default function DailyJournal() {
                 <BarChart3 className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white mb-1">TradeKhata</h1>
+                <h1 className="text-3xl font-bold text-white mb-1">Trading Journal</h1>
                 <p className="text-slate-400">Professional trade planning and execution tracking</p>
               </div>
             </div>
@@ -1001,13 +1007,15 @@ export default function DailyJournal() {
                                       >
                                         <Edit3 className="w-4 h-4" />
                                       </button>
-                                      <button
-                                        onClick={() => removeTradeRow(i)}
-                                        className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
-                                        title="Remove"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
+                                      {!planLocked && (
+                                        <button
+                                          onClick={() => removeTradeRow(i)}
+                                          className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                                          title="Remove"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -1327,15 +1335,17 @@ export default function DailyJournal() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => removeTradeRow(activeEditIndex)}
-                            disabled={plannedTrades.length === 1}
-                            className="flex items-center gap-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2 rounded-lg transition-all duration-200 disabled:opacity-50"
-                            title="Remove Trade"
-                          >
-                            <X className="w-4 h-4" />
-                            Remove
-                          </button>
+                          {!planLocked && (
+                            <button
+                              onClick={() => removeTradeRow(activeEditIndex)}
+                              disabled={plannedTrades.length === 1}
+                              className="flex items-center gap-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2 rounded-lg transition-all duration-200 disabled:opacity-50"
+                              title="Remove Trade"
+                            >
+                              <X className="w-4 h-4" />
+                              Remove
+                            </button>
+                          )}
                           <button
                             onClick={savePlan}
                             disabled={saving}
@@ -1444,27 +1454,21 @@ export default function DailyJournal() {
                                     </td>
                                     <td className="p-2 text-slate-400 text-xs text-center">{t.exchangeId}</td>
                                     <td className="p-2">
-                                      <div className="flex gap-2 justify-center">
-                                        <button
-                                          onClick={() => {
-                                            setActiveEditIndex(i);
-                                            setEditMode(true);
-                                          }}
-                                          className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-900/20 rounded-lg transition-colors"
-                                          title="Edit"
-                                        >
-                                          <Edit3 className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                          onClick={() => removeTradeRow(i)}
-                                          disabled={plannedTrades.length === 1}
-                                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
-                                          title="Remove"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    </td>
+  <div className="flex gap-2 justify-center">
+    {/* View mode: allow edit, but no deletion */}
+    <button
+      onClick={() => {
+        setActiveEditIndex(i);
+        setEditMode(true);
+      }}
+      className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-900/20 rounded-lg transition-colors"
+      title="Edit"
+    >
+      <Edit3 className="w-4 h-4" />
+    </button>
+  </div>
+</td>
+
                                   </tr>
                                 );
                               })}

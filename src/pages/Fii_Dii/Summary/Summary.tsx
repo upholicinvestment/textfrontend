@@ -108,7 +108,7 @@ const Summary = () => {
               fontWeight: 'bold', fontSize: '18px', boxShadow: 1, '&:hover': { bgcolor: indigo[50] }
             }}
           >&lt;</Button>
-          <TextField
+          {/* <TextField
             type="date"
             size="small"
             sx={{
@@ -125,7 +125,28 @@ const Summary = () => {
               const val = e.target.value;
               if (availableDates.includes(val)) setSelectedDate(val);
             }}
-          />
+          /> */}
+          <TextField
+  type="date"
+  size="small"
+  sx={{
+    width: 160,
+    bgcolor: "white",
+    borderRadius: 2,
+    boxShadow: 1,
+    input: { padding: '10px 12px', fontSize: '1rem', fontWeight: 500 }
+  }}
+  inputProps={{
+    min: availableDates[0],
+    max: availableDates[availableDates.length - 1],
+    // ⛔ remove `list`
+  }}
+  value={selectedDate}
+  onChange={(e) => {
+    const val = e.target.value;
+    if (availableDates.includes(val)) setSelectedDate(val);
+  }}
+/>
           <datalist id="available-dates">
             {availableDates.map((d) => <option key={d} value={d} />)}
           </datalist>

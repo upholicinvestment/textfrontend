@@ -72,7 +72,7 @@ const DisclaimerModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => 
               </Dialog.Title>
               <div className="mt-3">
                 <p className="text-xs text-gray-400 mb-2">
-                  The analytics and insights provided by this TradeKhata are for educational purposes only. Results may differ from your broker's official statements due to:
+                  The analytics and insights provided by this trading journal are for educational purposes only. Results may differ from your broker's official statements due to:
                 </p>
                 <ul className="list-disc pl-4 space-y-0.5 text-xs text-gray-500 mb-2">
                   <li>Missing or unmatched trades in provided data</li>
@@ -113,12 +113,13 @@ type Metric = {
   lossWidth?: number;
 };
 
+/** >>> ONLY THIS COMPONENT UPDATED FOR SPACING <<< */
 const MetricCard = ({ metric }: { metric: Metric }) => (
-  <div className="bg-[#17181c] rounded-lg shadow-md p-4 flex flex-col justify-between min-h-[80px]">
-    <div className="flex items-center justify-between mb-1">
+  <div className="bg-[#17181c] rounded-lg shadow-md p-4 md:p-5 lg:p-6 flex flex-col justify-between min-h-[96px]">
+    <div className="flex items-center justify-between mb-2.5">
       <span className="text-[11px] text-gray-400 font-semibold tracking-wide">{metric.label}</span>
       <svg
-        className="w-3.5 h-3.5 text-gray-400 cursor-pointer"
+        className="w-4 h-4 text-gray-400/90 cursor-pointer"
         fill="none"
         stroke="currentColor"
         strokeWidth={2}
@@ -133,19 +134,19 @@ const MetricCard = ({ metric }: { metric: Metric }) => (
     </div>
 
     {metric.gaugeValue !== undefined ? (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <span className="text-xl font-extrabold text-white">{metric.value}</span>
         <Gauge value={metric.gaugeValue} color={metric.gaugeColor} />
       </div>
     ) : metric.avgWin !== undefined && metric.avgLoss !== undefined ? (
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-1.5">
         <span className="text-xl font-extrabold text-white">{metric.value}</span>
-        <div className="flex items-end gap-1">
+        <div className="flex items-end gap-1.5">
           <span className="text-[11px] font-semibold text-green-400">{formatCurrency(metric.avgWin)}</span>
           <span className="text-[11px] font-semibold text-white">/</span>
           <span className="text-[11px] font-semibold text-red-400">{formatCurrency(metric.avgLoss)}</span>
         </div>
-        <div className="w-full h-2 mt-0.5 bg-gray-800 rounded flex overflow-hidden">
+        <div className="w-full h-2 mt-1.5 bg-gray-800 rounded flex overflow-hidden">
           <div className="bg-green-500" style={{ width: `${metric.winWidth}%` }} />
           <div className="bg-red-500" style={{ width: `${metric.lossWidth}%` }} />
         </div>
@@ -155,7 +156,6 @@ const MetricCard = ({ metric }: { metric: Metric }) => (
     )}
   </div>
 );
-
 
 const Journal_Dashboard = forwardRef((_props, ref) => {
   const [stats, setStats] = useState<any>(null);
@@ -217,23 +217,38 @@ const Journal_Dashboard = forwardRef((_props, ref) => {
         Loading...
       </div>
     );
-
-  if (!stats)
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[200px] text-gray-400">
-        <svg
-          className="w-8 h-8 text-indigo-400 mb-1"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <div className="text-lg mb-1 font-semibold">No stats yet</div>
-        <div className="text-sm mb-4">Upload your orderbook CSV to see dashboard stats.</div>
+if (!stats) {
+  return (
+    <>
+      {/* Parent (card/section) */}
+      <div className="relative min-h-[320px]">
+        {/* Centered placeholder */}
+        <div className="absolute inset-0 grid place-items-center text-gray-400">
+          <div className="text-center">
+            <svg
+              className="w-8 h-8 text-indigo-400 mx-auto mb-2"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M12 4v16m8-8H4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <div className="text-lg mb-1 font-semibold">No stats yet</div>
+            <div className="text-sm">
+              Upload your orderbook CSV to see dashboard stats.
+            </div>
+          </div>
+        </div>
       </div>
-    );
+    </>
+  );
+}
+
 
   const metrics: Metric[] = [
     {

@@ -6,7 +6,6 @@ import {
   TrendingUp,
   Bot,
   BookOpen,
-  Coins,
   Building2,
   Home as HomeIcon,
   Calendar,
@@ -86,25 +85,25 @@ interface Stat {
 }
 
 const componentLabelMap: Record<string, { label: string; icon: React.ReactNode }> = {
-  technical_scanner: { label: "Technical Scanner", icon: <BarChart3 className="h-4 w-4" /> },
-  fundamental_scanner: { label: "Fundamental Scanner", icon: <TrendingUp className="h-4 w-4" /> },
-  fno_khazana: { label: "F&O Khazana", icon: <Coins className="h-4 w-4" /> },
-  journaling: { label: "Smart Journaling", icon: <BookOpen className="h-4 w-4" /> },
+  // technical_scanner: { label: "Technical Scanner", icon: <BarChart3 className="h-4 w-4" /> },
+  // fundamental_scanner: { label: "Fundamental Scanner", icon: <TrendingUp className="h-4 w-4" /> },
+  // fno_khazana: { label: "F&O Khazana", icon: <Coins className="h-4 w-4" /> },
+  journaling: { label: "Journaling", icon: <BookOpen className="h-4 w-4" /> },
   fii_dii_data: { label: "FII/DII Data", icon: <Building2 className="h-4 w-4" /> },
 };
 
 const componentRouteMap: Record<string, string> = {
-  technical_scanner: "/technical",
-  fundamental_scanner: "/fundamental",
-  fno_khazana: "/fno",
+  // technical_scanner: "/technical",
+  // fundamental_scanner: "/fundamental",
+  // fno_khazana: "/fno",
   journaling: "/journal",
   fii_dii_data: "/fii-dii",
 };
 
 const bundleComponentKeys = [
-  "technical_scanner",
-  "fundamental_scanner",
-  "fno_khazana",
+  // "technical_scanner",
+  // "fundamental_scanner",
+  // "fno_khazana",
   "journaling",
   "fii_dii_data",
 ];
@@ -117,7 +116,7 @@ const Dashboard = () => {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [bundleOpen, setBundleOpen] = useState(false);
-  const [algoOpen, setAlgoOpen] = useState(false); // NEW: collapsible ALGO like bundle
+  const [algoOpen, setAlgoOpen] = useState(false); // collapsible ALGO like bundle
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [myProducts, setMyProducts] = useState<MyProduct[]>([]);
@@ -140,13 +139,19 @@ const Dashboard = () => {
   }, []);
 
   const ownedKeys = useMemo(() => new Set(myProducts.map(p => p.key)), [myProducts]);
+
+  // All bundle components owned?
   const hasAllBundle = useMemo(
     () => bundleComponentKeys.every(k => ownedKeys.has(k)),
     [ownedKeys]
   );
+
   const ownsAlgo = ownedKeys.has("algo_simulator");
-  const ownsJournalingSolo = ownedKeys.has("journaling_solo");
-  const ownsAnyJournaling = hasAllBundle || ownsJournalingSolo || ownedKeys.has("journaling");
+
+  // ---- FIX: Only show standalone Smart Journaling when user owns Solo and NOT bundle journaling
+  const hasBundleJournaling = ownedKeys.has("journaling");               // journaling via bundle
+  const ownsJournalingSolo = ownedKeys.has("journaling_solo");           // standalone
+  const showSmartJournalingStandalone = ownsJournalingSolo && !hasBundleJournaling;
 
   const algoEntitlements = useMemo(
     () => myProducts.filter(p => p.key === "algo_simulator"),
@@ -266,10 +271,10 @@ const Dashboard = () => {
   ];
 
   const stats: Stat[] = [
-    { title: "Trade Triggered", value: "2,101", icon: <Activity className="h-5 w-5" />, trend: "up", change: "12%", gradient: "from-blue-500 to-cyan-400", period: "Today", progress: 85 },
-    { title: "Portfolio Value", value: "₹8.4L", icon: <DollarSign className="h-5 w-5" />, trend: "up", change: "5.2%", gradient: "from-emerald-500 to-green-400", period: "Total", progress: 72 },
-    { title: "Live Positions", value: "24", icon: <TrendingUp className="h-5 w-5" />, trend: "up", change: "8", gradient: "from-purple-500 to-violet-400", period: "Open", progress: 91 },
-    { title: "Success Rate", value: "78%", icon: <Users className="h-5 w-5" />, trend: "up", change: "4.1%", gradient: "from-amber-500 to-orange-400", period: "This Month", progress: 78 },
+    { title: "Trade Triggered", value: "0", icon: <Activity className="h-5 w-5" />, trend: "up", change: "0%", gradient: "from-blue-500 to-cyan-400", period: "Today", progress: 85 },
+    { title: "Portfolio Value", value: "₹0.00L", icon: <DollarSign className="h-5 w-5" />, trend: "up", change: "0%", gradient: "from-emerald-500 to-green-400", period: "Total", progress: 72 },
+    { title: "Live Positions", value: "0", icon: <TrendingUp className="h-5 w-5" />, trend: "up", change: "0", gradient: "from-purple-500 to-violet-400", period: "Open", progress: 91 },
+    { title: "Success Rate", value: "0%", icon: <Users className="h-5 w-5" />, trend: "up", change: "0%", gradient: "from-amber-500 to-orange-400", period: "This Month", progress: 78 },
   ];
 
   const filteredActivities =
@@ -308,9 +313,10 @@ const Dashboard = () => {
   }));
 
   const algoLink = myProducts.find(p => p.key === "algo_simulator")?.route || "/comming-soon";
-  const journalingLink = (myProducts.find(p => p.key === "journaling")?.route)
-    || (myProducts.find(p => p.key === "journaling_solo")?.route)
-    || "/journal";
+  const journalingLink =
+    myProducts.find(p => p.key === "journaling")?.route ||
+    myProducts.find(p => p.key === "journaling_solo")?.route ||
+    "/journal";
 
   const algoVariantHref = (key: string) => `${algoLink}?plan=${encodeURIComponent(key)}`;
 
@@ -397,7 +403,7 @@ const Dashboard = () => {
                 </>
               )}
 
-              {/* ALGO Simulator — NOW LIKE BUNDLE (collapsible with submenu) */}
+              {/* ALGO Simulator — like bundle (collapsible with submenu) */}
               {ownsAlgo && (
                 <>
                   <button
@@ -454,8 +460,8 @@ const Dashboard = () => {
                 </>
               )}
 
-              {/* Journaling (only if owned in any form) */}
-              {ownsAnyJournaling && (
+              {/* Smart Journaling (standalone) — show ONLY when Solo is owned and bundle journaling is NOT */}
+              {showSmartJournalingStandalone && (
                 <a
                   href={journalingLink}
                   className="group flex items-center justify-between px-3 py-3 text-sm font-medium text-white rounded-xl hover:bg-white/10 transition-all duration-200"
@@ -540,7 +546,6 @@ const Dashboard = () => {
               </div>
 
               <div className="flex items-center space-x-3">
-                {/* NEW: Home button */}
                 <a
                   href="/"
                   className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium inline-flex items-center gap-2"
@@ -594,7 +599,6 @@ const Dashboard = () => {
                   </div>
 
                   <div className="flex items-center space-x-3">
-                    {/* You can keep or remove this export button */}
                     <button
                       className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium"
                       aria-label="Export data"

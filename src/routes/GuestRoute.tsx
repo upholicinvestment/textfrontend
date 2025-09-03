@@ -10,8 +10,11 @@ const GuestRoute = () => {
     return <div className="text-center mt-10">Checking authentication...</div>;
   }
 
-  if (token) {
-    // Respect the intended post-signup route if set
+  // Allow a logged-in user to access /signup as a checkout page
+  const qs = new URLSearchParams(location.search);
+  const isPurchaseFlow = !!qs.get('productKey') || qs.get('mode') === 'purchase';
+
+  if (token && !isPurchaseFlow) {
     const hinted = sessionStorage.getItem('postSignupPath');
     const target = hinted || '/dashboard';
     if (hinted) sessionStorage.removeItem('postSignupPath');

@@ -12,30 +12,28 @@ interface CardData {
 }
 
 type OrbProps = {
-  /** Set height in px (e.g., 600) or in vh (e.g., "80vh"). Default: 700px */
+  /** Set height in px (e.g., 600) or in vh (e.g., "80vh"). Default: 680px */
   height?: number | string;
+  /** Screen width (px) at/above which the mini-card rail is shown. Default: 1024 (Tailwind lg). */
+  railBreakpointPx?: number;
 };
 
-export default function Orb({ height = 680 }: OrbProps) {
+export default function Orb({ height = 610, railBreakpointPx = 1024 }: OrbProps) {
+  // ---- SSR-safe window refs ----
+  const WIN = typeof window !== "undefined" ? window : ({} as any);
+
   // ---- height handling ----
   const heightIsVh = typeof height === "string";
   const CONTAINER_HEIGHT_PX = heightIsVh
-    ? Math.max(
-        0,
-        Math.round(
-          (Number.parseFloat(height) / 100) * window.innerHeight || 700
-        )
-      )
+    ? Math.max(0, Math.round(((Number.parseFloat(height as string) || 70) / 100) * (WIN.innerHeight || 700)))
     : (height as number);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [offsetTop, setOffsetTop] = useState(200);
   const [offsetLeft, setOffsetLeft] = useState(700);
-  const [, setWindowSize] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
+  const [isLarge, setIsLarge] = useState((WIN.innerWidth || 1280) >= railBreakpointPx);
+  const isMobile = !isLarge;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -109,7 +107,17 @@ export default function Orb({ height = 680 }: OrbProps) {
     },
   ];
 
-  // card row sizes
+  // Preload images to avoid flash on mobile crossfade
+  useEffect(() => {
+    try {
+      data.forEach((d) => {
+        const img = new Image();
+        img.src = d.image;
+      });
+    } catch (_) {}
+  }, []);
+
+  // card row sizes (only used on large screens)
   const cardWidth = 220;
   const cardHeight = 320;
   const gap = 30;
@@ -132,31 +140,30 @@ export default function Orb({ height = 680 }: OrbProps) {
   useEffect(() => {
     const resolveContainerHeight = () => {
       if (heightIsVh) {
-        const vhVal = Number.parseFloat(height as string);
-        return Math.max(0, Math.round((vhVal / 100) * window.innerHeight));
+        const vhVal = Number.parseFloat(height as string) || 70;
+        return Math.max(0, Math.round((vhVal / 100) * (WIN.innerHeight || 700)));
       }
       return CONTAINER_HEIGHT_PX;
     };
 
     const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+      const w = WIN.innerWidth || railBreakpointPx;
+      setIsLarge(w >= railBreakpointPx);
 
-      const h =
-        containerRef.current?.clientHeight !== undefined
-          ? containerRef.current.clientHeight
-          : resolveContainerHeight();
-
-      // mini-cards rail sits near the bottom of the container (like original)
+      const h = containerRef.current?.clientHeight ?? resolveContainerHeight();
+      // mini-cards rail sits near the bottom of the container (desktop only)
       setOffsetTop(Math.max(0, h - 430));
-      // stick the rail toward right edge
-      setOffsetLeft(Math.max(0, window.innerWidth - 830));
+
+      // Dynamically size how many mini-cards are visible based on viewport width
+      // ≥1400px: 3.5 cards  | 1150–1399px: 2.5 cards | 1024–1149px: 1.5 cards
+      const desiredVisible = w >= 1480 ? 3.5 : w >= 1250 ? 2.5 : w >= railBreakpointPx ? 1.5 : 0;
+      const rightPad = 40; // breathing room at the right edge
+      const railWidth = desiredVisible * (cardWidth + gap);
+      setOffsetLeft(Math.max(0, (WIN.innerWidth || 1280) - railWidth - rightPad));
     };
 
     handleResize();
-    window.addEventListener("resize", handleResize);
+    WIN.addEventListener?.("resize", handleResize);
 
     // Initial cover animation
     const timer = setTimeout(() => {
@@ -168,13 +175,13 @@ export default function Orb({ height = 680 }: OrbProps) {
     startAutoScroll();
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      WIN.removeEventListener?.("resize", handleResize);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       if (autoScrollRef.current) clearInterval(autoScrollRef.current);
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [height, heightIsVh, CONTAINER_HEIGHT_PX]);
+  }, [height, heightIsVh, CONTAINER_HEIGHT_PX, railBreakpointPx]);
 
   const handleNext = () => {
     if (isAnimating) return;
@@ -195,8 +202,7 @@ export default function Orb({ height = 680 }: OrbProps) {
   };
 
   // container height style
-  const containerStyle =
-    typeof height === "string" ? { height } : { height: `${CONTAINER_HEIGHT_PX}px` };
+  const containerStyle = typeof height === "string" ? { height } : { height: `${CONTAINER_HEIGHT_PX}px` };
 
   return (
     <div
@@ -211,12 +217,34 @@ export default function Orb({ height = 680 }: OrbProps) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,_rgba(255,255,255,0.6)_1px,_transparent_0)] bg-[size:20px_20px]"></div>
       </div>
 
-      {/* Cards */}
+      {/* Legibility scrims (improve text contrast without muting right-side cards) */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-[25] w-[72vw] md:w-[60vw] lg:w-[48vw] bg-gradient-to-r from-black/90 via-black/60 to-transparent hidden lg:block"></div>
+      {/* Mobile/tablet centered scrim for readability */}
+      <div className="pointer-events-none absolute inset-0 z-[25] lg:hidden bg-gradient-to-b from-black/60 via-transparent to-black/40"></div>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[20] h-24 bg-gradient-to-b from-black/40 to-transparent"></div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[20] h-28 bg-gradient-to-t from-black/50 to-transparent"></div>
+
+      {/* Slides */}
       {data.map((item, index) => {
         const position = (index - currentIndex + data.length) % data.length;
         const isActive = position === 0;
 
-        const cardStyle: React.CSSProperties = isActive
+        // On tablet & mobile we keep all slides mounted and crossfade to avoid blank frames.
+
+        const cardStyle: React.CSSProperties = isMobile
+          ? {
+              // Mobile/tablet: same geometry for all, crossfade opacity
+              width: "100%",
+              height: "100%",
+              top: 0,
+              left: 0,
+              borderRadius: 0,
+              zIndex: isActive ? 20 : 10,
+              opacity: isActive ? 1 : 0,
+              display: "block", // force render even if a 'hidden' class remains
+              transition: "opacity 350ms ease",
+            }
+          : isActive
           ? {
               width: "100%",
               height: "100%",
@@ -226,6 +254,7 @@ export default function Orb({ height = 680 }: OrbProps) {
               borderRadius: 0,
             }
           : {
+              // Desktop mini-cards rail
               width: `${cardWidth}px`,
               height: `${cardHeight}px`,
               top: `${offsetTop}px`,
@@ -234,81 +263,72 @@ export default function Orb({ height = 680 }: OrbProps) {
               borderRadius: "12px",
             };
 
-        // Wrap card in Link so whole card is clickable
         return (
           <Link
             key={item.id}
             to={item.href}
-            className="absolute bg-cover bg-center shadow-xl transition-all duration-700 overflow-hidden group"
+            className={`absolute bg-cover bg-center shadow-xl transition-all duration-700 overflow-hidden group ${
+              isActive ? "" : "hidden lg:block" // safety: if CSS loads late
+            }`}
             style={cardStyle}
+            aria-hidden={!isActive && !isLarge}
           >
             {/* Image */}
             <div
-              className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+              className={`absolute inset-0 bg-cover bg-center transition-transform duration-700 ${
+                isActive ? "group-hover:scale-[1.02]" : "group-hover:scale-105"
+              }`}
               style={{ backgroundImage: `url(${item.image})` }}
             />
             {/* Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
-            {!isActive && (
+            {/* Desktop-only mini-card caption */}
+            {!isActive && isLarge && (
               <div
                 className="absolute text-white p-5 transition-all duration-700 z-10"
-                style={{
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  zIndex: 40,
-                }}
+                style={{ bottom: 0, left: 0, right: 0, zIndex: 40 }}
               >
                 <div className="w-7 h-1 text-amber-400 bg-amber-400 rounded-full mb-3"></div>
                 <div className="text-xs font-medium uppercase tracking-wider text-gray-300 mb-1">
                   {item.place}
                 </div>
-                <div className="font-oswald font-semibold text-lg leading-tight">
-                  {item.title}
-                </div>
-                <div className="font-oswald font-semibold text-lg leading-tight">
-                  {item.title2}
-                </div>
+                <div className="font-oswald font-semibold text-lg leading-tight">{item.title}</div>
+                <div className="font-oswald font-semibold text-lg leading-tight">{item.title2}</div>
               </div>
             )}
           </Link>
         );
       })}
 
-      {/* Details Panel */}
-      <div className="absolute left-8 md:left-16 z-30 transition-all duration-700 top-1/2 transform -translate-y-1/2 max-w-[90vw] md:max-w-xl">
+      {/* Details Panel (always on top of the active slide) */}
+      <div className="absolute z-30 transition-all duration-700 top-1/2 transform -translate-y-1/2 left-1/2 -translate-x-1/2 text-center max-w-[92vw] md:max-w-xl lg:text-left lg:left-12 lg:translate-x-0">
         <div className="h-12 overflow-hidden mb-2">
-          <div className="pt-4 text-lg md:text-xl relative text-amber-400 font-medium uppercase tracking-wider">
-            <div className="absolute top-0 left-0 w-7 h-1 bg-amber-400 rounded-full"></div>
+          <div className="pt-4 text-lg md:text-xl relative text-amber-400 font-medium uppercase tracking-wider" style={{ textShadow: isMobile ? "0 6px 20px rgba(0,0,0,0.85)" : "0 2px 10px rgba(0,0,0,0.6)" }}>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-7 h-1 bg-amber-400 rounded-full lg:left-0 lg:translate-x-0"></div>
             {data[currentIndex].place}
           </div>
         </div>
 
-        <div className="h-20 md:h-24 overflow-hidden">
-          <div className="font-oswald font-bold text-4xl md:text-6xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+        <div className="h-16 md:h-24 overflow-hidden">
+          <div className="font-oswald font-bold text-4xl md:text-6xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent" style={{ textShadow: isMobile ? "0 8px 28px rgba(0,0,0,0.9)" : "0 3px 16px rgba(0,0,0,0.6)" }}>
             {data[currentIndex].title}
           </div>
         </div>
 
-        <div className="h-20 md:h-24 overflow-hidden -mt-3">
-          <div className="font-oswald font-bold text-4xl md:text-6xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+        <div className="h-16 md:h-24 overflow-hidden -mt-2 md:-mt-3">
+          <div className="font-oswald font-bold text-4xl md:text-6xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent" style={{ textShadow: isMobile ? "0 8px 28px rgba(0,0,0,0.9)" : "0 3px 16px rgba(0,0,0,0.6)" }}>
             {data[currentIndex].title2}
           </div>
         </div>
 
-        <div className="w-[90vw] max-w-[500px] mt-4 text-sm md:text-base text-gray-200 leading-relaxed">
+        <div className="w-[92vw] max-w-[520px] mt-3 md:mt-4 text-sm md:text-base text-gray-200 leading-relaxed bg-black/35 backdrop-blur-sm rounded-xl ring-1 ring-white/10 px-4 py-3 md:px-5 md:py-4 mx-auto lg:mx-0">
           {data[currentIndex].description}
         </div>
 
-        <div className="w-[90vw] max-w-[500px] mt-8 flex items-center space-x-4">
+        <div className="w-[92vw] max-w-[520px] mt-6 md:mt-8 flex items-center space-x-4 mx-auto lg:mx-0 justify-center lg:justify-start">
           <button className="w-10 h-10 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-white transition-all duration-300 shadow-lg hover:shadow-amber-500/20">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-5 h-5"
-            >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
               <path
                 fillRule="evenodd"
                 d="M6.32 2.577a49.255 49.255 0 0111.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 01-1.085.67L12 18.089l-7.165 3.583A.75.75 0 013.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93z"
@@ -321,12 +341,7 @@ export default function Orb({ height = 680 }: OrbProps) {
           <Link to={data[currentIndex].href}>
             <button className="border border-amber-500 bg-amber-500/10 hover:bg-amber-500/20 h-10 rounded-full text-white px-6 text-sm uppercase font-medium transition-all duration-300 flex items-center group">
               Explore Feature
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform"
-              >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform">
                 <path
                   fillRule="evenodd"
                   d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z"
@@ -341,32 +356,18 @@ export default function Orb({ height = 680 }: OrbProps) {
       {/* Pagination */}
       <div
         className="absolute inline-flex z-[60] transition-all duration-700 items-center"
-        style={{
-          bottom: "60px",
-          left: "50%",
-          transform: "translateX(-50%)",
-        }}
+        style={{ bottom: "60px", left: "50%", transform: "translateX(-50%)" }}
       >
         <div
-          className="w-12 h-12 rounded-full border border-white/20 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:border-amber-500/60 hover:bg-amber-500/10 transition-all duration-300"
+          className="w-10 h-10 md:w-12 md:h-12 rounded-full border border-white/20 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:border-amber-500/60 hover:bg-amber-500/10 transition-all duration-300"
           onClick={handlePrev}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            className="w-6 h-6 stroke-2 text-white/80 hover:text-amber-400 transition-colors"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5 md:w-6 md:h-6 stroke-2 text-white/80 hover:text-amber-400 transition-colors">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </div>
 
-        <div className="mx-6 z-[60] w-[300px] md:w-[400px] flex items-center">
+        <div className="mx-4 md:mx-6 z-[60] w-[220px] md:w-[400px] flex items-center">
           <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-700 rounded-full"
@@ -376,28 +377,16 @@ export default function Orb({ height = 680 }: OrbProps) {
         </div>
 
         <div
-          className="w-12 h-12 rounded-full border border-white/20 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:border-amber-500/60 hover:bg-amber-500/10 transition-all duration-300"
+          className="w-10 h-10 md:w-12 md:h-12 rounded-full border border-white/20 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:border-amber-500/60 hover:bg-amber-500/10 transition-all duration-300"
           onClick={handleNext}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            className="w-6 h-6 stroke-2 text-white/80 hover:text-amber-400 transition-colors"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M8.25 4.5l7.5 7.5-7.5 7.5"
-            />
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5 md:w-6 md:h-6 stroke-2 text-white/80 hover:text-amber-400 transition-colors">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
           </svg>
         </div>
 
-        <div className="ml-6 flex items-center text-sm text-gray-300 font-medium">
-          <span className="text-amber-400 text-lg font-bold">
-            {currentIndex + 1}
-          </span>
+        <div className="ml-4 md:ml-6 flex items-center text-sm text-gray-300 font-medium">
+          <span className="text-amber-400 text-base md:text-lg font-bold">{currentIndex + 1}</span>
           <span className="mx-1">/</span>
           <span>{data.length}</span>
         </div>
@@ -418,10 +407,9 @@ export default function Orb({ height = 680 }: OrbProps) {
               }
             }}
             className={`w-2 h-2 rounded-full transition-all duration-300 ${
-              index === currentIndex
-                ? "w-6 bg-amber-500"
-                : "bg-white/30 hover:bg-white/50"
+              index === currentIndex ? "w-6 bg-amber-500" : "bg-white/30 hover:bg-white/50"
             }`}
+            aria-label={`Go to slide ${index + 1}`}
           />
         ))}
       </div>

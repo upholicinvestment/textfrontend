@@ -1,3 +1,4 @@
+// src/pages/Careers/CareersSection.tsx
 import React, { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -20,34 +21,45 @@ import {
   Share2,
   Phone,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 
-// ——————————————————————————————————————————————————————————
-// CareersSection — Modal version (no layout shift)
-// TailwindCSS + Framer Motion + lucide-react
-// Primary theme: gradient #1a237e → #4a56d2
-// ——————————————————————————————————————————————————————————
+const API_BASE = "https://api.upholictech.com/api/careers";
 
 const ALL = "All";
-
-// handy class snippets
 const GRAD = "bg-gradient-to-r from-[#1a237e] to-[#4a56d2]";
 const GRAD_HOVER = "hover:from-[#18206b] hover:to-[#4450cf]";
 const GRAD_TEXT = "bg-gradient-to-r from-[#1a237e] to-[#4a56d2] bg-clip-text text-transparent";
 
-/**
- * Departments collapsed to <= 5:
- * - Engineering (FE, BE, DevOps)
- * - Research (Quant)
- * - Design (UI/UX)
- * - Product (PM)
- * - Growth (Digital Marketing, Sales, Telecaller)
- */
-const JOBS = [
-  // ---------------- Engineering (Mumbai-only IT) ----------------
+type CareerJob = {
+  id: string;
+  iconKey?: keyof typeof ICON_MAP;
+  title: string;
+  department: string;
+  locations: string[];
+  experience: { min: number; max: number };
+  type: string;
+  posted: string;
+  description: string;
+  mustHave?: string[];
+  niceToHave?: string[];
+  responsibilities?: string[];
+};
+
+const ICON_MAP = {
+  code: Code,
+  backend: Database,
+  devops: Shield,
+  quant: TrendingUp,
+  design: Palette,
+  product: Users,
+  marketing: Sparkles,
+  sales: Briefcase,
+  tele: Phone,
+} as const;
+
+const SEED_JOBS: CareerJob[] = [
   {
     id: "fe",
-    icon: Code,
+    iconKey: "code",
     title: "Frontend Developer (React)",
     department: "Engineering",
     locations: ["Mumbai"],
@@ -55,7 +67,7 @@ const JOBS = [
     type: "Full-time",
     posted: "7 days ago",
     description:
-      "Build high-performance, real-time trading interfaces in React + Tailwind that feel instant and trustworthy. You will design and maintain a reusable component library, craft micro-interactions with smooth motion, and integrate live feeds (WebSockets) without frame drops. Accessibility, testing, DX, and observability matter to you as much as pixels do. Expect deep collaboration with quants and backend to evolve data contracts and state models.",
+      "Build high-performance, real-time trading interfaces in React + Tailwind that feel instant and trustworthy. You will design and maintain a reusable component library, craft micro-interactions with smooth motion, and integrate live feeds (WebSockets) without frame drops. Accessibility, testing, DX, and observability matter to you as much as pixels do.",
     mustHave: ["React", "JavaScript/TypeScript", "Tailwind", "REST/WebSockets"],
     niceToHave: ["Framer Motion", "Zustand/Redux", "Charting libs", "Vite"],
     responsibilities: [
@@ -64,11 +76,10 @@ const JOBS = [
       "Profile performance; target 60+ FPS interactions on mid-tier devices",
       "Own DX: storybook, tests, documentation, and CI checks",
     ],
-    apply: "#apply-fe",
   },
   {
     id: "be",
-    icon: Database,
+    iconKey: "backend",
     title: "Backend Developer (Node/Python)",
     department: "Engineering",
     locations: ["Mumbai"],
@@ -76,7 +87,7 @@ const JOBS = [
     type: "Full-time",
     posted: "3 days ago",
     description:
-      "Design and harden low-latency services that ingest market data, serve APIs, and run background jobs reliably. You’ll work with queues, caches, and idempotent processors, instrument everything with metrics/logs/traces, and own incident playbooks. The stack emphasizes correctness under load, clean boundaries, and simple rollbacks. Security, config hygiene, and predictable deployments are core to the job.",
+      "Design and harden low-latency services that ingest market data, serve APIs, and run background jobs reliably. You'll work with queues, caches, and idempotent processors, instrument everything with metrics/logs/traces, and own incident playbooks. The stack emphasizes correctness under load, clean boundaries, and simple rollbacks.",
     mustHave: ["Node.js", "TypeScript/Python", "MongoDB/Redis", "Queues/WebSockets"],
     niceToHave: ["gRPC", "Docker/K8s", "Timeseries DB", "CI/CD"],
     responsibilities: [
@@ -85,11 +96,10 @@ const JOBS = [
       "Add observability (metrics/logs/traces) and actionable alerts",
       "Enforce auth, rate-limits, and safe defaults across endpoints",
     ],
-    apply: "#apply-be",
   },
   {
     id: "devops",
-    icon: Shield,
+    iconKey: "devops",
     title: "DevOps Engineer",
     department: "Engineering",
     locations: ["Mumbai"],
@@ -97,7 +107,7 @@ const JOBS = [
     type: "Full-time",
     posted: "5 days ago",
     description:
-      "Keep the platform blazing with IaC, robust CI/CD, and great observability. You’ll define Kubernetes standards, automate blue/green and canary rollouts, bake in cost guardrails, and ensure SLOs are real (and met). You’ll also partner with engineering on performance budgets, capacity planning, and incident response to reduce MTTR and protect customer trust.",
+      "Keep the platform blazing with IaC, robust CI/CD, and great observability. You'll define Kubernetes standards, automate blue/green rollouts, bake in cost guardrails, and ensure SLOs are real (and met).",
     mustHave: ["AWS/GCP", "Docker/K8s", "Terraform", "Observability"],
     niceToHave: ["Service mesh", "Cost guardrails", "Incident playbooks"],
     responsibilities: [
@@ -106,13 +116,10 @@ const JOBS = [
       "Own SLOs/SLIs, on-call, and incident runbooks",
       "Harden security baselines and secrets management",
     ],
-    apply: "#apply-devops",
   },
-
-  // ---------------- Research ----------------
   {
     id: "quant",
-    icon: TrendingUp,
+    iconKey: "quant",
     title: "Quantitative Analyst",
     department: "Research",
     locations: ["Mumbai"],
@@ -120,7 +127,7 @@ const JOBS = [
     type: "Full-time",
     posted: "Today",
     description:
-      "Research and evaluate systematic strategies with clean data, robust statistics, and risk controls. You’ll build reproducible backtests, track risk-adjusted performance (not just PnL), and stress strategies across regimes. Expect to write crisp research notes, run controlled experiments, and convert insights into production-ready specifications in partnership with engineering.",
+      "Research and evaluate systematic strategies with clean data, robust statistics, and risk controls. Build reproducible backtests, stress strategies across regimes, and convert insights into production-ready specifications.",
     mustHave: ["Python", "Pandas/NumPy", "Stats/Prob", "Backtesting"],
     niceToHave: ["Options Greeks", "ML", "Microstructure", "Risk models"],
     responsibilities: [
@@ -129,13 +136,10 @@ const JOBS = [
       "Evaluate drawdowns, exposures, and regime sensitivity",
       "Hand off findings with clear specs and acceptance tests",
     ],
-    apply: "#apply-quant",
   },
-
-  // ---------------- Design ----------------
   {
     id: "design",
-    icon: Palette,
+    iconKey: "design",
     title: "UI/UX Designer",
     department: "Design",
     locations: ["Mumbai"],
@@ -143,7 +147,7 @@ const JOBS = [
     type: "Full-time / Contract",
     posted: "12 days ago",
     description:
-      "Translate complex financial data into intuitive, confident UI. You’ll define flows for dashboards, orders, and risk views; evolve tokens and components; prototype quickly; and validate with lightweight tests. Your work balances density and clarity—showing power users everything they need without overwhelming them.",
+      "Translate complex financial data into intuitive UI. Define flows for dashboards, orders, and risk views; evolve tokens and components; prototype quickly; and validate with lightweight tests.",
     mustHave: ["Product thinking", "Figma", "Design systems", "Prototyping"],
     niceToHave: ["Motion", "Data viz", "Accessibility", "Handoff docs"],
     responsibilities: [
@@ -152,13 +156,10 @@ const JOBS = [
       "Prototype ideas and iterate from quick usability feedback",
       "Deliver thorough specs covering edge states and errors",
     ],
-    apply: "#apply-design",
   },
-
-  // ---------------- Product ----------------
   {
     id: "pm",
-    icon: Users,
+    iconKey: "product",
     title: "Product Manager",
     department: "Product",
     locations: ["Mumbai"],
@@ -166,7 +167,7 @@ const JOBS = [
     type: "Full-time",
     posted: "9 days ago",
     description:
-      "Own outcomes and clarity. You’ll talk to traders, map problems, define KPIs/OKRs, and write crisp PRDs. You’ll align research, design, and engineering, ship experiments safely, and iterate from data and feedback. The north star: make complex trading workflows simple, fast, and reliable.",
+      "Own outcomes and clarity. Talk to traders, define KPIs/OKRs, and write crisp PRDs. Align research, design, and engineering; ship experiments safely, and iterate from data and feedback.",
     mustHave: ["PRDs", "Prioritization", "Stakeholder mgmt", "Metrics"],
     niceToHave: ["Fintech", "APIs", "Backtesting", "Risk/Compliance"],
     responsibilities: [
@@ -175,13 +176,10 @@ const JOBS = [
       "Facilitate fast decisions; keep feedback loops tight",
       "Launch, measure impact, and iterate deliberately",
     ],
-    apply: "#apply-pm",
   },
-
-  // ---------------- Growth ----------------
   {
     id: "dm",
-    icon: Sparkles,
+    iconKey: "marketing",
     title: "Digital Marketing Specialist",
     department: "Growth",
     locations: ["Bhopal"],
@@ -189,7 +187,7 @@ const JOBS = [
     type: "Full-time",
     posted: "2 days ago",
     description:
-      "Grow acquisition and activation for our trading product via performance and organic channels. You’ll own the campaign calendar, manage SEO/SEM, build landing pages with design/dev, and run experiments across the funnel. You’ll track CAC/LTV, improve conversion rates, and report insights that shape product and content strategy.",
+      "Grow acquisition and activation via performance and organic channels. Own campaign calendar, manage SEO/SEM, build landing pages, and run experiments across the funnel.",
     mustHave: ["SEO/SEM", "Google Ads", "GA/Search Console", "Social Media", "A/B Testing"],
     niceToHave: ["Fintech familiarity", "Basic HTML/CSS", "Figma/Canva", "Email automation"],
     responsibilities: [
@@ -199,11 +197,10 @@ const JOBS = [
       "Collaborate on landing pages; instrument for analytics",
       "Publish weekly reports; make clear recommendations",
     ],
-    apply: "#apply-dm",
   },
   {
     id: "sales",
-    icon: Briefcase,
+    iconKey: "sales",
     title: "Sales Executive (Trading Product)",
     department: "Growth",
     locations: ["Bhopal"],
@@ -211,7 +208,7 @@ const JOBS = [
     type: "Full-time",
     posted: "1 day ago",
     description:
-      "Drive sign-ups and paid conversions through crisp demos, objection handling, and structured follow-ups. You’ll manage a pipeline in CRM, coordinate with marketing and support, and develop partnerships that expand reach. Success looks like predictable targets met and customers who stay.",
+      "Drive sign-ups and paid conversions through crisp demos, objection handling, and structured follow-ups. Manage a pipeline in CRM and develop partnerships that expand reach.",
     mustHave: ["B2B/B2C Sales", "CRM hygiene", "Demo & Closing", "Communication"],
     niceToHave: ["Broking/Trading product sales", "Regional languages", "Channel partners"],
     responsibilities: [
@@ -221,11 +218,10 @@ const JOBS = [
       "Share market feedback to influence roadmap & messaging",
       "Coordinate with support to ensure smooth onboarding",
     ],
-    apply: "#apply-sales",
   },
   {
     id: "tele",
-    icon: Phone,
+    iconKey: "tele",
     title: "Telecaller (Lead Qualification)",
     department: "Growth",
     locations: ["Bhopal"],
@@ -233,7 +229,7 @@ const JOBS = [
     type: "Full-time / Contract",
     posted: "Today",
     description:
-      "Qualify leads via outbound calls, understand needs, and schedule demos for the sales team. You’ll follow scripts, log outcomes diligently in CRM, and ensure timely follow-ups while respecting DNC and compliance guidelines.",
+      "Qualify leads via outbound calls, understand needs, and schedule demos for the sales team. Follow scripts, log outcomes diligently in CRM, and ensure timely follow-ups.",
     mustHave: ["Hindi & English fluency", "Outbound Calling", "Listening Skills", "CRM updates"],
     niceToHave: ["Fintech awareness", "Script adaptation", "Target orientation"],
     responsibilities: [
@@ -243,24 +239,80 @@ const JOBS = [
       "Comply with DNC and privacy standards",
       "Report daily volumes, connects, and conversions",
     ],
-    apply: "#apply-tele",
   },
 ];
 
-const deptOptions = [ALL, ...Array.from(new Set(JOBS.map((j) => j.department)))];
-const locationOptions = [ALL, ...Array.from(new Set(JOBS.flatMap((j) => j.locations)))];
+function getOwnerId(): string {
+  try {
+    const key = "careersOwnerId";
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = `anon-${Math.random().toString(36).slice(2, 10)}`;
+      localStorage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    return "anonymous";
+  }
+}
 
 const statPulse =
   "after:absolute after:inset-0 after:rounded-2xl after:bg-[#4a56d2]/10 after:blur-2xl after:opacity-0 hover:after:opacity-100 after:transition";
 
 export default function CareersSection() {
+  const [jobs, setJobs] = useState<CareerJob[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
+
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState(ALL);
   const [loc, setLoc] = useState(ALL);
   const [expMax, setExpMax] = useState(10);
-  const [saved, setSaved] = useState(() => new Set<string>());
-  const [activeJob, setActiveJob] = useState<typeof JOBS[number] | null>(null);
+  const [saved, setSaved] = useState<Set<string>>(() => new Set());
+
+  const [activeJob, setActiveJob] = useState<CareerJob | null>(null);
+  const [applyJob, setApplyJob] = useState<CareerJob | null>(null);
+  const [resumeOpen, setResumeOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Load jobs; if backend empty, seed and refetch
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        let r = await fetch(`${API_BASE}/jobs`);
+        if (!r.ok) throw new Error("Failed to fetch jobs");
+        let data: CareerJob[] = await r.json();
+
+        if (!data || data.length === 0) {
+          await Promise.all(
+            SEED_JOBS.map((j) =>
+              fetch(`${API_BASE}/jobs`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(j),
+              }).catch(() => null)
+            )
+          );
+          r = await fetch(`${API_BASE}/jobs`);
+          data = (await r.json()) || [];
+        }
+        if (!ignore) setJobs(data);
+      } catch (e: any) {
+        if (!ignore) {
+          setError(e?.message || "Error loading jobs");
+          setJobs(SEED_JOBS); // fallback for UI only
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
@@ -268,44 +320,82 @@ export default function CareersSection() {
     return () => clearTimeout(t);
   }, [copiedId]);
 
+  const deptOptions = useMemo(
+    () => [ALL, ...Array.from(new Set(jobs.map((j) => j.department)))],
+    [jobs]
+  );
+  const locationOptions = useMemo(
+    () => [ALL, ...Array.from(new Set(jobs.flatMap((j) => j.locations || [])))],
+    [jobs]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return JOBS.filter((j) => {
+    return jobs.filter((j) => {
       const inDept = dept === ALL || j.department === dept;
-      const inLoc = loc === ALL || j.locations.includes(loc);
-      const inExp = j.experience.min <= expMax;
+      const inLoc = loc === ALL || (j.locations || []).includes(loc);
+      const inExp = (j.experience?.min ?? 0) <= expMax;
       const inQuery =
         !q ||
-        [j.title, j.department, j.description, ...j.mustHave, ...j.niceToHave, ...j.locations]
+        [j.title, j.department, j.description, ...(j.mustHave || []), ...(j.niceToHave || []), ...(j.locations || [])]
           .join(" ")
           .toLowerCase()
           .includes(q);
       return inDept && inLoc && inExp && inQuery;
     });
-  }, [dept, loc, expMax, query]);
+  }, [dept, loc, expMax, query, jobs]);
 
   const stats = useMemo(() => {
     const roles = filtered.length;
     const teams = new Set(filtered.map((j) => j.department)).size;
-    const cities = new Set(filtered.flatMap((j) => j.locations)).size;
+    const cities = new Set(filtered.flatMap((j) => j.locations || [])).size;
     return { roles, teams, cities };
   }, [filtered]);
 
-  const toggleSave = (id: string) => {
+  const toggleSave = async (id: string) => {
     setSaved((s) => {
       const n = new Set(s);
       n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
+    try {
+      await fetch(`${API_BASE}/jobs/${id}/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saved: !saved.has(id), userId: getOwnerId() }),
+      });
+    } catch {
+      // best-effort
+    }
   };
 
-  const copyLink = async (job: typeof JOBS[number]) => {
+  const copyLink = async (job: CareerJob) => {
     try {
-      await navigator.clipboard.writeText(window.location.origin + job.apply);
+      const origin =
+        (typeof window !== "undefined" && window.location && window.location.origin) || "";
+      await navigator.clipboard.writeText(origin + `#/careers/${job.id}`);
       setCopiedId(job.id);
     } catch {
       setCopiedId(job.id);
     }
+  };
+
+  const handleOpenApply = async (job: CareerJob) => {
+    try {
+      const r = await fetch(`${API_BASE}/jobs`);
+      const list: CareerJob[] = (await r.json()) || [];
+      const exists = list.some((j) => j.id === job.id);
+      if (!exists) {
+        await fetch(`${API_BASE}/jobs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(job),
+        }).catch(() => null);
+      }
+    } catch {
+      // ignore
+    }
+    setApplyJob(job);
   };
 
   return (
@@ -316,29 +406,32 @@ export default function CareersSection() {
           <div className="inline-flex items-center gap-2 bg-[#1a237e]/10 border border-[#4a56d2]/30 rounded-full px-4 py-2 mb-5">
             <Sparkles className="w-4 h-4 text-[#4a56d2]" />
             <span className="text-sm font-medium" style={{ color: "#4a56d2" }}>
-              We’re hiring across India
+              We're hiring across India
             </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-black tracking-tight">
             Build the future of <span className={GRAD_TEXT}>fintech</span>
           </h1>
           <p className="text-slate-300 max-w-3xl mx-auto mt-4 text-lg">
-            Join a team crafting real-time trading systems, beautiful UIs, and robust research pipelines used by professional traders.
+            Join a team crafting real-time trading systems, beautiful UIs, and robust research pipelines used by
+            professional traders.
           </p>
 
           {/* Quick stats */}
           <div className="mt-8 grid grid-cols-3 max-w-lg mx-auto gap-3">
-            {[{ k: "Open roles", v: stats.roles }, { k: "Teams", v: stats.teams }, { k: "Cities", v: stats.cities }].map(
-              (s, i) => (
-                <div
-                  key={i}
-                  className={`relative rounded-2xl border border-slate-800 bg-slate-900/40 p-4 ${statPulse}`}
-                >
-                  <div className="text-2xl font-bold">{s.v}</div>
-                  <div className="text-xs text-slate-400">{s.k}</div>
-                </div>
-              )
-            )}
+            {[
+              { k: "Open roles", v: loading ? "…" : stats.roles },
+              { k: "Teams", v: loading ? "…" : stats.teams },
+              { k: "Cities", v: loading ? "…" : stats.cities },
+            ].map((s, i) => (
+              <div
+                key={`stat-${i}`}
+                className={`relative rounded-2xl border border-slate-800 bg-slate-900/40 p-4 ${statPulse}`}
+              >
+                <div className="text-2xl font-bold">{s.v}</div>
+                <div className="text-xs text-slate-400">{s.k}</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -352,7 +445,7 @@ export default function CareersSection() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search role, skill, city…"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-10 pr-3 py-2.5 outline-none focus:border-[#4a56d2]/60 focus:ring-1 focus:ring-[#4a56d2]/40"
+                className="w-full bg-slate-900/80 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-slate-200 outline-none focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40 transition-colors"
               />
             </div>
 
@@ -360,7 +453,7 @@ export default function CareersSection() {
             <div className="flex flex-wrap gap-2">
               {deptOptions.map((d) => (
                 <button
-                  key={d}
+                  key={`dept-${d}`}
                   onClick={() => setDept(d)}
                   className={`px-3 py-2 rounded-xl border text-sm transition ${
                     dept === d
@@ -380,16 +473,18 @@ export default function CareersSection() {
                 <select
                   value={loc}
                   onChange={(e) => setLoc(e.target.value)}
-                  className="appearance-none pl-9 pr-8 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-sm focus:border-[#4a56d2]/60"
+                  className="appearance-none pl-9 pr-8 py-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-200 text-sm focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40 transition-colors"
                 >
                   {locationOptions.map((o) => (
-                    <option key={o}>{o}</option>
+                    <option key={`loc-${o}`} className="bg-slate-900 text-slate-200">
+                      {o}
+                    </option>
                   ))}
                 </select>
                 <span className="pointer-events-none absolute right-3 top-3 text-slate-400">▾</span>
               </div>
 
-              <div className="flex items-center gap-2 bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2.5 text-sm">
+              <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2.5 text-sm">
                 <Clock className="w-4 h-4 text-slate-400" />
                 <span className="text-slate-300">≤ {expMax}y</span>
                 <input
@@ -419,8 +514,14 @@ export default function CareersSection() {
           </div>
         </div>
 
+        {error && (
+          <div className="mb-4 text-sm text-red-300/80 bg-red-950/30 border border-red-900/40 p-3 rounded-xl">
+            {error}
+          </div>
+        )}
+
         {/* Job list */}
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           {filtered.length === 0 ? (
             <motion.div
               key="empty"
@@ -436,10 +537,7 @@ export default function CareersSection() {
               key="list"
               initial="hidden"
               animate="show"
-              variants={{
-                hidden: { opacity: 0 },
-                show: { opacity: 1, transition: { staggerChildren: 0.05 } },
-              }}
+              variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
               className="grid md:grid-cols-2 xl:grid-cols-3 gap-6"
             >
               {filtered.map((job) => (
@@ -449,81 +547,73 @@ export default function CareersSection() {
                   saved={saved.has(job.id)}
                   onSave={() => toggleSave(job.id)}
                   onOpenModal={() => setActiveJob(job)}
+                  onOpenApply={() => handleOpenApply(job)}
                   onCopy={() => copyLink(job)}
                   copied={copiedId === job.id}
+                  loading={loading}
                 />
               ))}
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Bottom CTA */}
+        {/* Bottom CTA — only Send Resume */}
         <div className="mt-14 relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-8">
           <div className="absolute -top-24 -right-24 h-64 w-64 bg-[#4a56d2]/10 blur-3xl rounded-full" />
           <div className="absolute -bottom-24 -left-24 h-64 w-64 bg-[#1a237e]/10 blur-3xl rounded-full" />
           <div className="relative grid lg:grid-cols-2 gap-8 items-center">
             <div>
-              <h2 className="text-3xl md:text-4xl font-extrabold">Don’t see the exact role?</h2>
-              <p className="text-slate-300 mt-2">Tell us how you’d like to contribute. We love proactive builders.</p>
+              <h2 className="text-3xl md:text-4xl font-extrabold">Don't see the exact role?</h2>
+              <p className="text-slate-300 mt-2">
+                Send us your profile and preferred team. We'll reach out when there's a fit.
+              </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 justify-end">
-              <Link
-                to="/comming-soon"
+            <div className="flex justify-end">
+              <button
+                onClick={() => setResumeOpen(true)}
                 className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 font-semibold text-white transition ${GRAD} ${GRAD_HOVER}`}
               >
                 Send Resume <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                to="/comming-soon"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-3 font-semibold border-slate-700 hover:border-[#4a56d2]/50 hover:text-[#cdd0ff] transition"
-              >
-                Learn More
-              </Link>
+              </button>
             </div>
-          </div>
-        </div>
-
-        {/* Job Alerts */}
-        <div className="mt-6 flex flex-col sm:flex-row gap-3 items-center justify-center">
-          <div className="text-sm text-slate-400">Get new roles by email</div>
-          <div className="flex items-stretch gap-2">
-            <input
-              placeholder="you@domain.com"
-              className="bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2.5 outline-none focus:border-[#4a56d2]/60"
-            />
-            <button
-              className={`rounded-xl px-4 font-medium transition text-white ${GRAD} ${GRAD_HOVER}`}
-            >
-              Create Alert
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Modal */}
-      <JobModal
-        job={activeJob}
-        saved={activeJob ? saved.has(activeJob.id) : false}
-        onSave={() => activeJob && toggleSave(activeJob.id)}
-        onClose={() => setActiveJob(null)}
-      />
+      {/* Detail Modal */}
+      <JobModal job={activeJob} onClose={() => setActiveJob(null)} onOpenApply={() => setApplyJob(activeJob)} />
+
+      {/* Apply Modal */}
+      <ApplyModal job={applyJob} onClose={() => setApplyJob(null)} onSuccess={() => setApplyJob(null)} />
+
+      {/* Send Resume Modal */}
+      <SendResumeModal open={resumeOpen} onClose={() => setResumeOpen(false)} />
     </section>
   );
 }
 
-type Job = typeof JOBS[number];
+/* —————————————————— Job Card —————————————————— */
 
-interface JobCardProps {
-  job: Job;
+function JobCard({
+  job,
+  saved,
+  onSave,
+  onOpenModal,
+  onOpenApply,
+  onCopy,
+  copied,
+  loading,
+}: {
+  job: CareerJob;
   saved: boolean;
   onSave: () => void;
   onOpenModal: () => void;
+  onOpenApply: () => void;
   onCopy: () => void;
   copied: boolean;
-}
-
-function JobCard({ job, saved, onSave, onOpenModal, onCopy, copied }: JobCardProps) {
-  const Icon = job.icon;
+  loading: boolean;
+}) {
+  const Icon = (job.iconKey && ICON_MAP[job.iconKey]) || Code;
 
   return (
     <motion.div
@@ -531,7 +621,6 @@ function JobCard({ job, saved, onSave, onOpenModal, onCopy, copied }: JobCardPro
       whileHover={{ y: -4 }}
       className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-900/70 to-slate-950 p-[1px] h-full"
     >
-      {/* Animated gradient ring */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition pointer-events-none">
         <div className="absolute -inset-40 bg-[conic-gradient(var(--tw-gradient-stops))] from-[#1a237e] via-[#3b44c8] to-[#4a56d2] animate-[spin_6s_linear_infinite] blur-3xl" />
       </div>
@@ -574,9 +663,9 @@ function JobCard({ job, saved, onSave, onOpenModal, onCopy, copied }: JobCardPro
 
         {/* Meta chips */}
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          {job.locations.map((l) => (
+          {(job.locations || []).map((l) => (
             <span
-              key={l}
+              key={`loc-chip-${job.id}-${l}`}
               className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/60 px-2.5 py-1"
             >
               <MapPin className="w-3 h-3 text-slate-400" />
@@ -584,7 +673,7 @@ function JobCard({ job, saved, onSave, onOpenModal, onCopy, copied }: JobCardPro
             </span>
           ))}
           <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/60 px-2.5 py-1">
-            <Clock className="w-3 h-3 text-slate-400" /> {job.experience.min}–{job.experience.max} yrs
+            <Clock className="w-3 h-3 text-slate-400" /> {job.experience?.min ?? 0}–{job.experience?.max ?? 0} yrs
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/60 px-2.5 py-1">
             <Shield className="w-3 h-3 text-slate-400" /> {job.type}
@@ -596,12 +685,14 @@ function JobCard({ job, saved, onSave, onOpenModal, onCopy, copied }: JobCardPro
 
         {/* Actions */}
         <div className="mt-auto flex items-center gap-2 pt-4">
-          <Link to="/comming-soon"
-            // href={job.apply}
-            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition ${GRAD} ${GRAD_HOVER}`}
+          <button
+            onClick={onOpenApply}
+            disabled={loading}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 disabled:cursor-not-allowed ${GRAD} ${GRAD_HOVER}`}
+            title={loading ? "Loading jobs from server…" : "Apply"}
           >
             Apply Now <ArrowRight className="w-4 h-4" />
-          </Link>
+          </button>
           <button
             onClick={onOpenModal}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-800 px-4 py-2 text-sm font-semibold hover:border-[#4a56d2]/50 hover:text-[#cdd0ff] transition"
@@ -616,10 +707,10 @@ function JobCard({ job, saved, onSave, onOpenModal, onCopy, copied }: JobCardPro
           </button>
         </div>
 
-        {/* Copied toast */}
         <AnimatePresence>
           {copied && (
             <motion.div
+              key="copied"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
@@ -634,16 +725,16 @@ function JobCard({ job, saved, onSave, onOpenModal, onCopy, copied }: JobCardPro
   );
 }
 
+/* —————————————————— Job Modal —————————————————— */
+
 function JobModal({
   job,
   onClose,
-  saved,
-  onSave,
+  onOpenApply,
 }: {
-  job: Job | null;
+  job: CareerJob | null;
   onClose: () => void;
-  saved: boolean;
-  onSave: () => void;
+  onOpenApply: () => void;
 }) {
   useEffect(() => {
     if (!job) return;
@@ -657,35 +748,48 @@ function JobModal({
     };
   }, [job, onClose]);
 
+  if (!job) return null;
+  const Icon = (job.iconKey && ICON_MAP[job.iconKey]) || Code;
+
   return (
     <AnimatePresence>
       {job && (
-        <>
+        <motion.div
+          key={`job-${job.id}`}
+          className="fixed inset-0 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
           />
-
-          {/* Dialog */}
+          {/* Wrapper: sheet on mobile, centered on >=sm */}
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            initial={{ opacity: 0, y: 20, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            className="absolute inset-0 flex items-start sm:items-center justify-center p-0 sm:p-4 overscroll-contain"
+            initial={{ y: 20, scale: 0.98 }}
+            animate={{ y: 0, scale: 1 }}
+            exit={{ y: 10, scale: 0.98 }}
           >
-            <div className="relative w-full max-w-4xl rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl overflow-hidden">
-              {/* Header */}
-              <div className="flex items-start gap-3 p-6 border-b border-slate-800">
+            <div
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-4xl sm:rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[100svh] sm:max-h-[90vh]"
+            >
+              {/* Header (sticky) */}
+              <div className="flex items-start gap-3 p-4 sm:p-6 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
                 <div className="h-11 w-11 rounded-xl border border-slate-700 bg-slate-800/60 flex items-center justify-center">
-                  {job.icon && React.createElement(job.icon, { className: "w-6 h-6", style: { color: "#4a56d2" } })}
+                  <Icon className="w-6 h-6" style={{ color: "#4a56d2" }} />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold leading-tight">{job.title}</h3>
-                  <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base sm:text-xl font-semibold leading-tight truncate">{job.title}</h3>
+                  <div className="mt-1 text-[11px] sm:text-xs text-slate-400 flex flex-wrap gap-2">
                     <span className="inline-flex items-center gap-1">
                       <Briefcase className="w-3 h-3" /> {job.department}
                     </span>
@@ -703,93 +807,544 @@ function JobModal({
                 </button>
               </div>
 
-              {/* Content */}
-              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Must-have</div>
-                  <div className="flex flex-wrap gap-2">
-                    {job.mustHave.map((s) => (
-                      <span key={s} className="rounded-lg bg-slate-800/70 border border-slate-700 px-2 py-1 text-xs">
-                        {s}
+              {/* Body (scrollable) */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Must-have</div>
+                    <div className="flex flex-wrap gap-2">
+                      {(job.mustHave || []).map((s) => (
+                        <span
+                          key={`must-${job.id}-${s}`}
+                          className="rounded-lg bg-slate-800/70 border border-slate-700 px-2 py-1 text-xs"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Nice to have</div>
+                    <div className="flex flex-wrap gap-2">
+                      {(job.niceToHave || []).map((s) => (
+                        <span
+                          key={`nice-${job.id}-${s}`}
+                          className="rounded-lg bg-slate-800/70 border border-slate-700 px-2 py-1 text-xs"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Responsibilities</div>
+                    <ul className="space-y-1 text-sm text-slate-200/90">
+                      {(job.responsibilities || []).map((r, i) => (
+                        <li key={`resp-${job.id}-${i}`} className="flex gap-2">
+                          <span className="mt-1 h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#4a56d2" }} />
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Role Overview</div>
+                    <p className="text-slate-300 leading-relaxed">{job.description}</p>
+                  </div>
+
+                  <div className="md:col-span-3 flex flex-wrap gap-2">
+                    {(job.locations || []).map((l) => (
+                      <span
+                        key={`loc-${job.id}-${l}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs"
+                      >
+                        <MapPin className="w-3 h-3 text-slate-400" /> {l}
                       </span>
                     ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Nice to have</div>
-                  <div className="flex flex-wrap gap-2">
-                    {job.niceToHave.map((s) => (
-                      <span key={s} className="rounded-lg bg-slate-800/70 border border-slate-700 px-2 py-1 text-xs">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Responsibilities</div>
-                  <ul className="space-y-1 text-sm text-slate-200/90">
-                    {job.responsibilities.map((r, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="mt-1 h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#4a56d2" }} />
-                        <span>{r}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="md:col-span-3">
-                  <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Role Overview</div>
-                  <p className="text-slate-300 leading-relaxed">{job.description}</p>
-                </div>
-
-                <div className="md:col-span-3 flex flex-wrap gap-2">
-                  {job.locations.map((l) => (
-                    <span
-                      key={l}
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs"
-                    >
-                      <MapPin className="w-3 h-3 text-slate-400" /> {l}
+                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs">
+                      <Clock className="w-3 h-3 text-slate-400" /> {job.experience?.min ?? 0}–{job.experience?.max ?? 0} yrs
                     </span>
-                  ))}
-                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs">
-                    <Clock className="w-3 h-3 text-slate-400" /> {job.experience.min}–{job.experience.max} yrs
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs">
-                    <Shield className="w-3 h-3 text-slate-400" /> {job.type}
-                  </span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs">
+                      <Shield className="w-3 h-3 text-slate-400" /> {job.type}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="p-6 border-t border-slate-800 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
+              {/* Footer (sticky) */}
+              <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-900 sticky bottom-0">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
                   <button
-                    onClick={onSave}
-                    className={`rounded-lg border px-3 py-2 text-sm transition ${
-                      saved
-                        ? "border-[#4a56d2]/50 text-[#cdd0ff] bg-[#1a237e]/20"
-                        : "border-slate-700 text-slate-300 hover:border-[#4a56d2]/50 hover:text-[#cdd0ff]"
-                    }`}
-                  >
-                    {saved ? "Saved" : "Save role"}
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 ml-auto">
-                  <a
-                    href={job.apply}
-                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white transition ${GRAD} ${GRAD_HOVER}`}
+                    onClick={onOpenApply}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white bg-gradient-to-r from-[#1a237e] to-[#4a56d2] hover:from-[#18206b] hover:to-[#4450cf] transition"
                   >
                     Apply Now <ArrowRight className="w-4 h-4" />
-                  </a>
-                  <button className="rounded-xl border border-slate-700 px-5 py-2.5 font-semibold hover:border-slate-500" onClick={onClose}>
+                  </button>
+                  <button
+                    className="rounded-xl border border-slate-700 px-5 py-2.5 font-semibold hover:border-slate-500"
+                    onClick={onClose}
+                  >
                     Close
                   </button>
                 </div>
               </div>
             </div>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+/* —————————————————— Apply Modal —————————————————— */
+
+function ApplyModal({
+  job,
+  onClose,
+  onSuccess,
+}: {
+  job: CareerJob | null;
+  onClose: () => void;
+  onSuccess?: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const empty = {
+    name: "",
+    email: "",
+    phone: "",
+    linkedin: "",
+    expYears: "",
+    currentLocation: "",
+    coverLetter: "",
+    resume: null as File | null,
+  };
+  const [form, setForm] = useState({ ...empty });
+
+  useEffect(() => {
+    if (job) {
+      setMsg("");
+      setSubmitting(false);
+      setForm({ ...empty });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.id]);
+
+  useEffect(() => {
+    if (!job) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [job, onClose]);
+
+  if (!job) return null;
+
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault?.();
+    setSubmitting(true);
+    setMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("name", form.name);
+      fd.append("email", form.email);
+      if (form.phone) fd.append("phone", form.phone);
+      if (form.linkedin) fd.append("linkedin", form.linkedin);
+      if (form.expYears) fd.append("expYears", String(form.expYears));
+      if (form.currentLocation) fd.append("currentLocation", form.currentLocation);
+      if (form.coverLetter) fd.append("coverLetter", form.coverLetter);
+      if (form.resume) fd.append("resume", form.resume);
+
+      const res = await fetch(`${API_BASE}/jobs/${job.id}/apply`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(t || "Failed to submit application");
+      }
+
+      setMsg("Application submitted. We'll get back to you soon!");
+      setTimeout(() => {
+        setForm({ ...empty });
+        setMsg("");
+        onSuccess?.();
+      }, 1400);
+    } catch (e: any) {
+      setMsg(e?.message || "Something went wrong");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {job && (
+        <motion.div
+          key={`apply-${job.id}`}
+          className="fixed inset-0 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          />
+          <motion.div
+            className="absolute inset-0 flex items-start sm:items-center justify-center p-0 sm:p-4 overscroll-contain"
+            initial={{ y: 20, scale: 0.98 }}
+            animate={{ y: 0, scale: 1 }}
+            exit={{ y: 10, scale: 0.98 }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="relative w-full max-w-2xl sm:rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[100svh] sm:max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between p-4 sm:p-5 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+                <div>
+                  <h3 className="text-base sm:text-lg font-semibold">Apply — {job.title}</h3>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {job.department} • {(job.locations || []).join(", ")}
+                  </p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="rounded-lg border border-slate-700 px-2 py-1 text-slate-300 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body (scrollable form) */}
+              <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+                <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Input label="Full Name" required value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+                  <Input
+                    label="Email"
+                    type="email"
+                    required
+                    value={form.email}
+                    onChange={(v) => setForm({ ...form, email: v })}
+                  />
+                  <Input label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+                  <Input
+                    label="LinkedIn"
+                    placeholder="https://"
+                    value={form.linkedin}
+                    onChange={(v) => setForm({ ...form, linkedin: v })}
+                  />
+                  <Input
+                    label="Experience (yrs)"
+                    type="number"
+                    value={form.expYears}
+                    onChange={(v) => setForm({ ...form, expYears: v })}
+                  />
+                  <Input
+                    label="Current Location"
+                    value={form.currentLocation}
+                    onChange={(v) => setForm({ ...form, currentLocation: v })}
+                  />
+
+                  <div className="md:col-span-2">
+                    <Label>Resume (PDF/DOC)</Label>
+                    <input
+                      id="apply-resume"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#1a237e] file:text-white file:px-3 file:py-1.5 file:hover:bg-[#18206b] bg-slate-900/80 border border-slate-700 rounded-xl p-1.5"
+                      onChange={(e) => setForm({ ...form, resume: e.target.files?.[0] || null })}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label>Cover Letter</Label>
+                    <textarea
+                      rows={3}
+                      className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40 transition-colors"
+                      value={form.coverLetter}
+                      onChange={(e) => setForm({ ...form, coverLetter: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Footer spacer for mobile */}
+                  <div className="md:col-span-2 h-1" />
+                </form>
+              </div>
+
+              {/* Footer (sticky) */}
+              <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-900 sticky bottom-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={submitting}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold text-white bg-gradient-to-r from-[#1a237e] to-[#4a56d2] hover:from-[#18206b] hover:to-[#4450cf] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => submit()}
+                  >
+                    {submitting ? "Submitting…" : "Submit"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="rounded-xl border border-slate-700 px-4 py-2.5 font-semibold hover:border-slate-500"
+                  >
+                    Cancel
+                  </button>
+                  {msg && <span className="text-[11px] sm:text-xs text-slate-300 ml-auto">{msg}</span>}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* —————————————————— Send Resume Modal —————————————————— */
+
+function SendResumeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const empty = {
+    name: "",
+    email: "",
+    phone: "",
+    targetDepartment: "",
+    roleTitle: "",
+    linkedin: "",
+    coverLetter: "",
+    resume: null as File | null,
+  };
+  const [form, setForm] = useState({ ...empty });
+
+  useEffect(() => {
+    if (open) {
+      setMsg("");
+      setSubmitting(false);
+      setForm({ ...empty });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault?.();
+    setSubmitting(true);
+    setMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("name", form.name);
+      fd.append("email", form.email);
+      if (form.phone) fd.append("phone", form.phone);
+      if (form.targetDepartment) fd.append("targetDepartment", form.targetDepartment);
+      if (form.roleTitle) fd.append("roleTitle", form.roleTitle);
+      if (form.linkedin) fd.append("linkedin", form.linkedin);
+      if (form.coverLetter) fd.append("coverLetter", form.coverLetter);
+      if (form.resume) fd.append("resume", form.resume);
+
+      const res = await fetch(`${API_BASE}/resume`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(t || "Failed to send resume");
+      }
+
+      setMsg("Thanks! Your resume has been received.");
+      setTimeout(() => {
+        setForm({ ...empty });
+        setMsg("");
+        onClose();
+      }, 1400);
+    } catch (e: any) {
+      setMsg(e?.message || "Something went wrong");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="send-resume"
+          className="fixed inset-0 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          />
+          <motion.div
+            className="absolute inset-0 flex items-start sm:items-center justify-center p-0 sm:p-4 overscroll-contain"
+            initial={{ y: 20, scale: 0.98 }}
+            animate={{ y: 0, scale: 1 }}
+            exit={{ y: 10, scale: 0.98 }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="relative w-full max-w-2xl sm:rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[100svh] sm:max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between p-4 sm:p-5 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+                <div>
+                  <h3 className="text-base sm:text-lg font-semibold">Send Resume</h3>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    No matching role? Share your profile for future openings.
+                  </p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="rounded-lg border border-slate-700 px-2 py-1 text-slate-300 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body (scrollable form) */}
+              <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+                <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Input label="Full Name" required value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+                  <Input
+                    label="Email"
+                    type="email"
+                    required
+                    value={form.email}
+                    onChange={(v) => setForm({ ...form, email: v })}
+                  />
+                  <Input label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+                  <Input
+                    label="Preferred Department"
+                    placeholder="Engineering / Product / Design / Growth / Research"
+                    value={form.targetDepartment}
+                    onChange={(v) => setForm({ ...form, targetDepartment: v })}
+                  />
+                  <Input
+                    label="Desired Role Title"
+                    placeholder="e.g., React Engineer, DevOps, PM"
+                    value={form.roleTitle}
+                    onChange={(v) => setForm({ ...form, roleTitle: v })}
+                  />
+                  <Input
+                    label="LinkedIn"
+                    placeholder="https://"
+                    value={form.linkedin}
+                    onChange={(v) => setForm({ ...form, linkedin: v })}
+                  />
+
+                  <div className="md:col-span-2">
+                    <Label>Resume (PDF/DOC)</Label>
+                    <input
+                      id="general-resume"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#1a237e] file:text-white file:px-3 file:py-1.5 file:hover:bg-[#18206b] bg-slate-900/80 border border-slate-700 rounded-xl p-1.5"
+                      onChange={(e) => setForm({ ...form, resume: e.target.files?.[0] || null })}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label>Cover Letter</Label>
+                    <textarea
+                      rows={3}
+                      className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40 transition-colors"
+                      value={form.coverLetter}
+                      onChange={(e) => setForm({ ...form, coverLetter: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 h-1" />
+                </form>
+              </div>
+
+              {/* Footer (sticky) */}
+              <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-900 sticky bottom-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={submitting}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold text-white bg-gradient-to-r from-[#1a237e] to-[#4a56d2] hover:from-[#18206b] hover:to-[#4450cf] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => submit()}
+                  >
+                    {submitting ? "Submitting…" : "Send"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="rounded-xl border border-slate-700 px-4 py-2.5 font-semibold hover:border-slate-500"
+                  >
+                    Cancel
+                  </button>
+                  {msg && <span className="text-[11px] sm:text-xs text-slate-300 ml-auto">{msg}</span>}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* —————————————————— Small UI helpers —————————————————— */
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <div className="text-xs uppercase tracking-wider text-slate-400 mb-1.5">{children}</div>;
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required,
+  placeholder,
+}: {
+  label: string;
+  value: string | number;
+  onChange: (v: string) => void;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <div className="flex flex-col">
+      <Label>{label}</Label>
+      <input
+        required={required}
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40 transition-colors"
+      />
+    </div>
   );
 }

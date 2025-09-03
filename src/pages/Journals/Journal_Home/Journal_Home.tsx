@@ -22,7 +22,8 @@ const Journal_Home = () => {
       <StatsSection />
       <FAQSection />
       <TestimonialSection />
-      <Footer/>
+      <Footer />
+      
     </div>
   );
 };

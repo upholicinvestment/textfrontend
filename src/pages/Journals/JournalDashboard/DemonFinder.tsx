@@ -118,7 +118,6 @@ export default function DemonFinder({ trades = [] }: Props) {
     return best;
   }, [filtered]);
 
-
   const topDemon = useMemo(() => {
     const sorted = [...badMetrics].sort((a, b) => b.cost - a.cost || b.count - a.count);
     return sorted[0];
@@ -159,9 +158,7 @@ export default function DemonFinder({ trades = [] }: Props) {
   }, [filtered]);
 
   // Layout
-  const panelHeight = 250;
-  const leftWidth = "w-6/12";
-  const rightWidth = "w-6/12";
+  const panelHeight = 320; // ⬅️ increased height
 
   // Small presentational pieces
   const StatRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -170,8 +167,6 @@ export default function DemonFinder({ trades = [] }: Props) {
       <span className="text-[11px] font-semibold text-gray-200">{value}</span>
     </div>
   );
-
-
 
   return (
     <>
@@ -202,14 +197,75 @@ export default function DemonFinder({ trades = [] }: Props) {
           .gradient-green { background: linear-gradient(135deg, #22c55e 0%, #14532d 100%);}
           .gradient-blue { background: linear-gradient(135deg, #6366f1 0%, #312e81 100%);}
           .gradient-purple { background: linear-gradient(135deg, #a78bfa 0%, #6d28d9 100%);}
+          
+          /* Responsive additions */
+          @media (max-width: 768px) {
+            .daily-trend-section {
+              flex-direction: column;
+            }
+            
+            .daily-trend-left, .daily-trend-right {
+              width: 100% !important;
+            }
+            
+            .daily-trend-grid {
+              grid-template-columns: 1fr;
+              gap: 1rem;
+            }
+            
+            .impact-summary {
+              flex-direction: column;
+            }
+            
+            .impact-item {
+              margin-bottom: 0.5rem;
+            }
+            
+            .metrics-panels {
+              grid-template-columns: 1fr;
+            }
+          }
+          
+          @media (max-width: 640px) {
+            .modal-grid-header, .modal-grid-row {
+              grid-template-columns: 1fr 1fr;
+            }
+            
+            .modal-grid-header div:nth-child(2),
+            .modal-grid-header div:nth-child(3),
+            .modal-grid-row div:nth-child(2),
+            .modal-grid-row div:nth-child(3) {
+              display: none;
+            }
+            
+            .daily-trend-grid {
+              grid-template-columns: 1fr 1fr;
+              gap: 0.75rem;
+            }
+            
+            .daily-trend-grid > div {
+              min-height: 140px;
+            }
+          }
+          
+          @media (max-width: 480px) {
+            .chart-container {
+              height: 250px !important;
+            }
+            
+            .daily-trend-grid {
+              grid-template-columns: 1fr;
+              gap: 0.75rem;
+            }
+          }
         `}
       </style>
 
       <div className="max-w-full bg-[#0a0d13] min-h-screen text-gray-100 text-[0.85rem]">
         {/* Metrics Panels */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mb-5">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mb-5 metrics-panels">
           {/* Bad Trades Panel */}
-          <div className="metric-card rounded-md p-3 classic-transition classic-hover">
+          <div className="metric-card rounded-md p-4 classic-transition classic-hover">
             <div className="flex items-center space-x-1 mb-3">
               <div className="w-6 h-6 gradient-red rounded-sm flex items-center justify-center">
                 <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,11 +277,11 @@ export default function DemonFinder({ trades = [] }: Props) {
                 <p className="text-gray-400 font-medium text-[10px]">Problematic Trade Patterns</p>
               </div>
             </div>
-            <div className="thin-scrollbar overflow-y-auto max-h-40 space-y-1">
+            <div className="thin-scrollbar overflow-y-auto max-h-56 space-y-3">
               {badMetrics.map((m) => (
                 <div
                   key={m.name}
-                  className="group p-2 bg-[#191e27] border border-[#23283d] hover:border-red-400 hover:bg-[#2c2027] rounded-sm cursor-pointer classic-transition"
+                  className="group p-4 bg-[#191e27] border border-[#23283d] hover:border-red-400 hover:bg-[#2c2027] rounded-sm cursor-pointer classic-transition"
                   onClick={() => setModal({ title: m.name, list: m.trades })}
                 >
                   <div className="flex justify-between items-center">
@@ -249,7 +305,7 @@ export default function DemonFinder({ trades = [] }: Props) {
           </div>
 
           {/* Good Trades Panel */}
-          <div className="metric-card rounded-md p-3 classic-transition classic-hover">
+          <div className="metric-card rounded-md p-4 classic-transition classic-hover">
             <div className="flex items-center space-x-1 mb-3">
               <div className="w-6 h-6 gradient-green rounded-sm flex items-center justify-center">
                 <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -261,11 +317,11 @@ export default function DemonFinder({ trades = [] }: Props) {
                 <p className="text-gray-400 font-medium text-[10px]">Profitable Trade Patterns</p>
               </div>
             </div>
-            <div className="thin-scrollbar overflow-y-auto max-h-40 space-y-1">
+            <div className="thin-scrollbar overflow-y-auto max-h-56 space-y-3">
               {goodMetrics.map((m) => (
                 <div
                   key={m.name}
-                  className="group p-2 bg-[#191e27] border border-[#23283d] hover:border-green-400 hover:bg-[#1a2c20] rounded-sm cursor-pointer classic-transition"
+                  className="group p-4 bg-[#191e27] border border-[#23283d] hover:border-green-400 hover:bg-[#1a2c20] rounded-sm cursor-pointer classic-transition"
                   onClick={() => setModal({ title: m.name, list: m.trades })}
                 >
                   <div className="flex justify-between items-center">
@@ -291,32 +347,32 @@ export default function DemonFinder({ trades = [] }: Props) {
 
         {/* HORIZONTAL IMPACT SUMMARY */}
         <div className="w-full my-4">
-          <div className="elegant-card p-3 rounded-md classic-shadow-lg">
+          <div className="elegant-card p-4 rounded-md classic-shadow-lg">
             <h2 className="text-base font-bold text-gray-100 text-center mb-2">Performance Impact Summary</h2>
-            <div className="flex flex-col md:flex-row justify-between items-stretch gap-3">
+            <div className="flex flex-col md:flex-row justify-between items-stretch gap-3 impact-summary">
               {/* Actual Net P&L */}
-              <div className="flex-1 flex flex-col items-center p-2 bg-[#161a22] rounded-sm border border-[#23283d]">
+              <div className="flex-1 flex flex-col items-center p-4 bg-[#161a22] rounded-sm border border-[#23283d] impact-item">
                 <div className="uppercase text-[10px] font-bold text-gray-400 mb-1 tracking-wider">Actual Net P&L</div>
                 <div className={`text-base font-bold ${actualNetPnL >= 0 ? "text-green-400" : "text-red-400"}`}>
                   ₹{actualNetPnL.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </div>
               </div>
               {/* Cost from Poor Decisions */}
-              <div className="flex-1 flex flex-col items-center p-2 bg-[#161a22] rounded-sm border border-[#23283d]">
+              <div className="flex-1 flex flex-col items-center p-4 bg-[#161a22] rounded-sm border border-[#23283d] impact-item">
                 <div className="uppercase text-[10px] font-bold text-gray-400 mb-1 tracking-wider">Cost from Poor Decisions</div>
                 <div className="text-base font-bold text-red-400">
                   ₹{badCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </div>
               </div>
               {/* Potential P&L */}
-              <div className="flex-1 flex flex-col items-center p-2 bg-[#161a22] rounded-sm border border-[#23283d]">
+              <div className="flex-1 flex flex-col items-center p-4 bg-[#161a22] rounded-sm border border-[#23283d] impact-item">
                 <div className="uppercase text-[10px] font-bold text-gray-400 mb-1 tracking-wider">Potential P&L (Optimized)</div>
                 <div className={`text-base font-bold ${potentialPnL >= 0 ? "text-green-400" : "text-red-400"}`}>
                   ₹{potentialPnL.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
-            <div className="mt-2 text-center bg-[#23283d] p-1 rounded-sm border border-indigo-800">
+            <div className="mt-2 text-center bg-[#23283d] p-3 rounded-sm border border-indigo-800">
               <p className="text-indigo-300 text-xs font-semibold">
                 By eliminating poor trading decisions, your P&L could have been <span className="font-bold text-indigo-200">₹{potentialPnL.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
               </p>
@@ -325,7 +381,7 @@ export default function DemonFinder({ trades = [] }: Props) {
         </div>
 
         {/* INSIGHTS LEFT (updated single-day) + NARROW LINE CHART RIGHT */}
-        <div className="elegant-card rounded-md p-3 mb-3 classic-shadow-lg">
+        <div className="elegant-card rounded-md p-4 mb-3 classic-shadow-lg daily-trend-section">
           <div className="flex items-center space-x-1 mb-2">
             <div className="w-6 h-6 gradient-purple rounded-sm flex items-center justify-center">
               <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -338,12 +394,12 @@ export default function DemonFinder({ trades = [] }: Props) {
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-col md:flex-row">
             {/* LEFT: Updated, realistic single-day insights */}
-            <div className={`${leftWidth} min-w-[260px]`}>
-              <div className="grid grid-cols-2 gap-2" style={{ height: panelHeight }}>
+            <div className="daily-trend-left min-w-[260px] w-full md:w-6/12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 daily-trend-grid" style={{ minHeight: panelHeight }}>
                 {/* Top Drag */}
-                <div className="h-full bg-[#191e27] rounded-sm border border-[#23283d] p-2 flex flex-col justify-between">
+                <div className="h-full bg-[#191e27] rounded-sm border border-[#23283d] p-4 flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1">
                       <div className="w-5 h-5 rounded-sm flex items-center justify-center bg-[#10141d] border border-[#23283d]">
@@ -372,7 +428,7 @@ export default function DemonFinder({ trades = [] }: Props) {
                 </div>
 
                 {/* Top Edge */}
-                <div className="h-full bg-[#191e27] rounded-sm border border-[#23283d] p-2 flex flex-col justify-between">
+                <div className="h-full bg-[#191e27] rounded-sm border border-[#23283d] p-4 flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1">
                       <div className="w-5 h-5 rounded-sm flex items-center justify-center bg-[#10141d] border border-[#23283d]">
@@ -401,7 +457,7 @@ export default function DemonFinder({ trades = [] }: Props) {
                 </div>
 
                 {/* Best Trade */}
-                <div className="h-full bg-[#191e27] rounded-sm border border-[#23283d] p-2 flex flex-col justify-between">
+                <div className="h-full bg-[#191e27] rounded-sm border border-[#23283d] p-4 flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1">
                       <div className="w-5 h-5 rounded-sm flex items-center justify-center bg-[#10141d] border border-[#23283d]">
@@ -424,8 +480,8 @@ export default function DemonFinder({ trades = [] }: Props) {
                   </div>
                 </div>
 
-                {/* Session Quality (hit rate, PF, max DD + quick drill) */}
-                <div className="h-full bg-[#191e27] rounded-sm border border-[#23283d] p-2 flex flex-col justify-between">
+                {/* Session Quality */}
+                <div className="h-full bg-[#191e27] rounded-sm border border-[#23283d] p-4 flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1">
                       <div className="w-5 h-5 rounded-sm flex items-center justify-center bg-[#10141d] border border-[#23283d]">
@@ -450,7 +506,7 @@ export default function DemonFinder({ trades = [] }: Props) {
                       }
                     />
                     <StatRow label="Max drawdown" value={<span className="text-red-300">₹{maxDD.toFixed(2)}</span>} />
-                    <div className="mt-1 flex gap-1">
+                    <div className="mt-1 flex gap-1 flex-wrap">
                       <button
                         className="text-[10px] px-2 py-1 rounded border border-green-400/40 text-green-200 hover:bg-green-500/10 transition"
                         onClick={() => setModal({ title: "Winning trades", list: wins })}
@@ -470,9 +526,9 @@ export default function DemonFinder({ trades = [] }: Props) {
             </div>
 
             {/* RIGHT: Narrow Line Chart */}
-            <div className={`${rightWidth} flex-1 bg-[#191e27] rounded-sm  border border-[#23283d]`}>
+            <div className="daily-trend-right w-full md:w-6/12 flex-1 bg-[#191e27] rounded-sm border border-[#23283d] chart-container">
               <ResponsiveContainer width="100%" height={panelHeight}>
-                <LineChart data={dateStats} margin={{ top: 7, right: 8, left: 7, bottom: 20 }}>
+                <LineChart data={dateStats} margin={{ top: 10, right: 12, left: -12, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#23283d" strokeWidth={1} />
                   <XAxis
                     dataKey="date"
@@ -480,7 +536,7 @@ export default function DemonFinder({ trades = [] }: Props) {
                     axisLine={{ stroke: "#21263b", strokeWidth: 1 }}
                     tickLine={{ stroke: "#21263b", strokeWidth: 1 }}
                     interval={0}
-                    height={30}
+                    height={40}
                     angle={-40}
                     textAnchor="end"
                     tickFormatter={date => {
@@ -535,20 +591,20 @@ export default function DemonFinder({ trades = [] }: Props) {
 
         {/* Modal for details */}
         {modal && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-1">
-            <div className="bg-[#161a22] w-full max-w-xl rounded-sm classic-shadow-lg border border-[#23283d] max-h-[70vh] flex flex-col overflow-hidden">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-1 sm:p-4">
+            <div className="bg-[#161a22] w-full max-w-xl rounded-sm classic-shadow-lg border border-[#23283d] max-h-[80vh] flex flex-col overflow-hidden mx-2 sm:mx-0">
               {/* Header */}
-              <div className="flex justify-between items-center p-2 border-b border-[#23283d] flex-shrink-0 bg-[#1a1e29]">
+              <div className="flex justify-between items-center p-4 border-b border-[#23283d] flex-shrink-0 bg-[#1a1e29]">
                 <div className="flex items-center space-x-1">
                   <div className="w-5 h-5 gradient-blue rounded-sm flex items-center justify-center">
                     <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                   </div>
-                  <h3 className="text-base font-bold text-gray-100">{modal.title} Details</h3>
+                  <h3 className="text-base font-bold text-gray-100 truncate max-w-[200px] sm:max-w-none">{modal.title} Details</h3>
                 </div>
                 <button
-                  className="text-gray-400 hover:text-gray-100 text-lg p-1 hover:bg-[#23283d] rounded-sm classic-transition font-bold"
+                  className="text-gray-400 hover:text-gray-100 text-lg p-1 hover:bg-[#23283d] rounded-sm classic-transition font-bold flex-shrink-0"
                   onClick={() => setModal(null)}
                 >
                   ×
@@ -556,26 +612,26 @@ export default function DemonFinder({ trades = [] }: Props) {
               </div>
               {/* Scrollable content */}
               <div className="flex-1 overflow-y-auto thin-scrollbar">
-                <div className="p-2">
-                  <div className="grid grid-cols-4 gap-2 mb-1 pb-1 border-b border-[#23283d] text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                    <div>Symbol</div>
-                    <div>Entry Date</div>
-                    <div>Exit Date</div>
-                    <div className="text-right">P&L Amount</div>
+                <div className="p-4">
+                  <div className="grid grid-cols-4 gap-2 mb-3 pb-3 border-b border-[#23283d] text-[10px] font-bold text-gray-400 uppercase tracking-wider modal-grid-header">
+                    <div className="truncate">Symbol</div>
+                    <div className="truncate">Entry Date</div>
+                    <div className="truncate">Exit Date</div>
+                    <div className="text-right truncate">P&L Amount</div>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {modal.list.map((t, i) => (
-                      <div key={i} className="grid grid-cols-4 gap-2 py-1 px-1 bg-[#191e27] hover:bg-[#23283d] rounded-sm classic-transition border border-[#23283d]">
+                      <div key={i} className="grid grid-cols-4 gap-2 py-3 px-3 bg-[#191e27] hover:bg-[#23283d] rounded-sm classic-transition border border-[#23283d] modal-grid-row">
                         <div className="font-bold text-indigo-300 text-xs truncate">{t.symbol}</div>
-                        <div className="text-gray-200 font-medium text-[10px]">
+                        <div className="text-gray-200 font-medium text-[10px] truncate">
                           {t.entry.Date}
-                          {t.entry.Time && <div className="text-[9px] text-gray-400 font-normal">{t.entry.Time}</div>}
+                          {t.entry.Time && <div className="text-[9px] text-gray-400 font-normal truncate">{t.entry.Time}</div>}
                         </div>
-                        <div className="text-gray-200 font-medium text-[10px]">
+                        <div className="text-gray-200 font-medium text-[10px] truncate">
                           {t.exit.Date}
-                          {t.exit.Time && <div className="text-[9px] text-gray-400 font-normal">{t.exit.Time}</div>}
+                          {t.exit.Time && <div className="text-[9px] text-gray-400 font-normal truncate">{t.exit.Time}</div>}
                         </div>
-                        <div className={`text-right font-bold text-xs ${t.PnL >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        <div className={`text-right font-bold text-xs ${t.PnL >= 0 ? "text-green-400" : "text-red-400"} truncate`}>
                           {t.PnL >= 0 ? "+" : ""}₹{t.PnL.toFixed(2)}
                         </div>
                       </div>

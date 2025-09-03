@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { Rocket, Globe2, HandHeart,} from "lucide-react";
+import { Rocket, Globe2, HandHeart } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import CountUp from "react-countup";
 import { useInView } from "react-intersection-observer";
-import { Link } from "react-router-dom";
 
 /** Brand gradient */
 const GRAD = "from-[#1a237e] to-[#4a56d2]";
@@ -20,7 +19,7 @@ const tabs = [
       "All trading tools integrated in single platform",
       "Stock market knowledge powerhouse for traders",
       "Top-class algorithmic trading platform",
-      "Solving the biggest problems in trading fraternity"
+      "Solving the biggest problems in trading fraternity",
     ],
     content: "One platform for all trading needs - from beginners to professionals.",
   },
@@ -33,7 +32,7 @@ const tabs = [
       "1M+ active traders across multiple countries",
       "Handling thousands of crores in daily trading volume",
       "Best operating system for modern trading",
-      "Global standard for trading platforms"
+      "Global standard for trading platforms",
     ],
     content: "Redefining how traders interact with financial markets worldwide.",
   },
@@ -42,48 +41,25 @@ const tabs = [
     title: "Our Values",
     icon: HandHeart,
     description: "Principles that guide every product decision.",
-   bullets: [
-    "Integrity, speed, and reliability first",
-    "Empathy and craft in every detail",
-    "Openness, fairness, and accountability",
-    "Continuous innovation driving trader success",
-  ],
+    bullets: [
+      "Integrity, speed, and reliability first",
+      "Empathy and craft in every detail",
+      "Openness, fairness, and accountability",
+      "Continuous innovation driving trader success",
+    ],
     content: "We ship fast, measure honestly, and protect capital before all else.",
   },
 ] as const;
 
 /** Stats tiles */
 const stats = [
-  { 
-    value: 3, 
-    label: "Models Created", 
-    color: "text-blue-400", 
-    circleColor: "border-blue-500" 
-  },
-  { 
-    value: 1.5, 
-    label: "Trigger to Slippages", 
-    color: "text-emerald-400", 
-    circleColor: "border-emerald-500",
-    suffix: "t" 
-  },
-  { 
-    value: 10, 
-    label: "Click to Trade", 
-    color: "text-amber-400", 
-    circleColor: "border-amber-500",
-    suffix: "ms" 
-  },
-  { 
-    value: 1, 
-    label: "Daily Volume Handled", 
-    color: "text-purple-400", 
-    circleColor: "border-purple-500",
-    suffix: "Cr+" 
-  },
+  { value: 3, label: "Models Created", color: "text-blue-400", circleColor: "border-blue-500" },
+  { value: 1.5, label: "Trigger to Sleepages", color: "text-emerald-400", circleColor: "border-emerald-500", suffix: "t" },
+  { value: 10, label: "Click to Trade", color: "text-amber-400", circleColor: "border-amber-500", suffix: "ms" },
+  { value: 1, label: "Daily Volume Handled", color: "text-purple-400", circleColor: "border-purple-500", suffix: "Cr+" },
 ];
 
-/* ---------- Inline SVG icons for the Values infographic ---------- */
+/* Inline icons for values */
 const HourglassIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
     <path d="M6 2h12M6 22h12" />
@@ -121,67 +97,68 @@ const FlagIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-/** Enhanced Values items with more detailed descriptions */
 const valueItems = [
-  { 
-    title: "INTEGRITY",   
-    desc: "Security-first architecture with transparent operations and strict compliance. We prioritize your capital protection above all else.",
-    Icon: HourglassIcon, 
-    colors: ["300 85% 60%","200 90% 60%","60 95% 55%"] 
+  {
+    title: "INTEGRITY",
+    desc:
+      "Security-first architecture with transparent operations and strict compliance. We prioritize your capital protection above all else.",
+    Icon: HourglassIcon,
+    colors: ["300 85% 60%", "200 90% 60%", "60 95% 55%"],
   },
-  { 
-    title: "GOALS",       
-    desc: "Clear objectives and key results aligned to trader profitability. Every feature is measured by its impact on your P&L.",
-    Icon: TargetIcon,    
-    colors: ["30 95% 58%","200 90% 60%","320 85% 60%"] 
+  {
+    title: "GOALS",
+    desc:
+      "Clear objectives and key results aligned to trader profitability. Every feature is measured by its impact on your P&L.",
+    Icon: TargetIcon,
+    colors: ["30 95% 58%", "200 90% 60%", "320 85% 60%"],
   },
-  { 
-    title: "INNOVATION",  
-    desc: "AI-driven market insights with continuous experimentation. We push boundaries to give you the trading edge you deserve.",
-    Icon: BulbIcon, 
-    colors: ["60 95% 55%","190 90% 60%","300 85% 60%"] 
+  {
+    title: "INNOVATION",
+    desc:
+      "AI-driven market insights with continuous experimentation. We push boundaries to give you the trading edge you deserve.",
+    Icon: BulbIcon,
+    colors: ["60 95% 55%", "190 90% 60%", "300 85% 60%"],
   },
-  { 
-    title: "QUALITY",     
-    desc: "Measured releases with deep observability and 99.99% uptime. Your trades execute flawlessly when it matters most.",
-    Icon: TrophyIcon, 
-    colors: ["200 90% 60%","90 90% 55%","320 85% 60%"] 
+  {
+    title: "QUALITY",
+    desc:
+      "Measured releases with deep observability and 99.99% uptime. Your trades execute flawlessly when it matters most.",
+    Icon: TrophyIcon,
+    colors: ["200 90% 60%", "90 90% 55%", "320 85% 60%"],
   },
-  { 
-    title: "EXCELLENCE",  
-    desc: "Meticulous craftsmanship with institutional-grade performance. Every pixel and microsecond is optimized for your success.",
-    Icon: FlagIcon,    
-    colors: ["320 85% 60%","200 90% 60%","60 95% 55%"] 
+  {
+    title: "EXCELLENCE",
+    desc:
+      "Meticulous craftsmanship with institutional-grade performance. Every pixel and microsecond is optimized for your success.",
+    Icon: FlagIcon,
+    colors: ["320 85% 60%", "200 90% 60%", "60 95% 55%"],
   },
 ] as const;
 
-const StatItem = ({ stat }: { stat: typeof stats[0] }) => {
+const StatItem = ({ stat }: { stat: typeof stats[number] }) => {
   const { ref, inView } = useInView({ triggerOnce: true, threshold: 0.3 });
 
   return (
     <div className="flex flex-col items-center" ref={ref}>
       <div className="relative w-32 h-32 mb-6">
-        {/* Outer animated circle */}
         <motion.div
           animate={inView ? { rotate: 360 } : { rotate: 0 }}
           transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
           className={`absolute inset-0 rounded-full border-t-2 ${stat.circleColor} border-opacity-30`}
         />
-        {/* Inner animated circle */}
         <motion.div
           animate={inView ? { rotate: -360 } : { rotate: 0 }}
           transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
           className={`absolute inset-4 rounded-full border-b-2 ${stat.circleColor} border-opacity-30`}
         />
-        {/* Value display */}
         <div className="absolute inset-0 flex items-center justify-center">
           <h3 className={`text-3xl font-bold ${stat.color}`}>
             {inView ? (
-              <CountUp 
-                end={stat.value as number} 
-                duration={2.5} 
-                decimals={Number.isInteger(stat.value) ? 0 : 1} 
-                suffix={stat.suffix ?? ""} 
+              <CountUp
+                end={stat.value as number}
+                duration={2.5}
+                decimals={Number.isInteger(stat.value) ? 0 : 1}
+                suffix={stat.suffix ?? ""}
               />
             ) : (
               "0"
@@ -189,9 +166,7 @@ const StatItem = ({ stat }: { stat: typeof stats[0] }) => {
           </h3>
         </div>
       </div>
-      <p className="text-gray-300 text-sm uppercase tracking-wider font-medium text-center">
-        {stat.label}
-      </p>
+      <p className="text-gray-300 text-sm uppercase tracking-wider font-medium text-center">{stat.label}</p>
     </div>
   );
 };
@@ -202,16 +177,15 @@ export default function AboutSection() {
 
   const variants = {
     hidden: { opacity: 0, y: prefersReduced ? 0 : 24 },
-    show:   { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
   } as const;
 
   const container = {
     hidden: { opacity: 0 },
-    show:   { opacity: 1, transition: { staggerChildren: prefersReduced ? 0 : 0.08 } },
+    show: { opacity: 1, transition: { staggerChildren: prefersReduced ? 0 : 0.08 } },
   } as const;
 
   return (
-    <>
     <section id="about" className="relative bg-slate-950 text-slate-100 py-24 overflow-hidden">
       <div className="relative z-10 max-w-7xl mx-auto px-6">
         {/* Header */}
@@ -255,10 +229,10 @@ export default function AboutSection() {
                   : "border-slate-800 hover:border-[#4a56d2]/40"
               }`}
             >
-              <div className={`absolute inset-0 bg-gradient-to-br ${GRAD} opacity-10`} />
+              <div className={`absolute inset-0 bg-gradient-to-br from-[#1a237e] to-[#4a56d2] opacity-10`} />
               <div className="relative z-10 p-7">
                 <div className="flex items-center gap-4 mb-3">
-                  <div className={`p-3 rounded-lg text-white bg-gradient-to-br ${GRAD}`}>
+                  <div className={`p-3 rounded-lg text-white bg-gradient-to-br from-[#1a237e] to-[#4a56d2]`}>
                     <tab.icon className="w-6 h-6" />
                   </div>
                   <h3 className="text-xl font-bold text-white">{tab.title}</h3>
@@ -266,14 +240,13 @@ export default function AboutSection() {
                 <p className="text-slate-300">{tab.description}</p>
                 <ul className="mt-4 space-y-2 text-sm text-slate-300/90 list-disc pl-5">
                   {tab.bullets.map((b, i) => (
-                    <li key={i}>{b}</li>
+                    <li key={`${tab.id}-b-${i}`}>{b}</li>
                   ))}
                 </ul>
                 {activeTab === tab.id && (
                   <motion.p
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
                     className="mt-4 text-sm text-[#cdd0ff]"
                   >
                     {tab.content}
@@ -293,11 +266,11 @@ export default function AboutSection() {
           className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"
         >
           {stats.map((stat, i) => (
-            <StatItem key={i} stat={stat} />
+            <StatItem key={`stat-${i}`} stat={stat} />
           ))}
         </motion.div>
 
-        {/* Enhanced Core Values — infographic */}
+        {/* Core Values */}
         <motion.div
           variants={variants}
           initial="hidden"
@@ -305,14 +278,11 @@ export default function AboutSection() {
           viewport={{ once: true, amount: 0.4 }}
           className="relative mb-24"
         >
-          <h3 className="text-center text-4xl font-extrabold tracking-wide text-slate-100 mb-2">
-            Our Core Values
-          </h3>
+          <h3 className="text-center text-4xl font-extrabold tracking-wide text-slate-100 mb-2">Our Core Values</h3>
           <p className="text-center text-slate-400 max-w-2xl mx-auto mb-8">
             The principles that drive every decision we make and every feature we build
           </p>
 
-          {/* dashed connector baseline below heading */}
           <div className="relative mt-6 mb-10 h-10">
             <motion.div
               initial={{ scaleX: 0, opacity: 0.4 }}
@@ -336,7 +306,6 @@ export default function AboutSection() {
                 tabIndex={0}
                 aria-label={title}
               >
-                {/* circular neon gradient ring */}
                 <div
                   className="relative p-[3px] rounded-full shadow-[0_0_0_1px_rgba(148,163,184,0.15)]"
                   style={{ ["--c1" as any]: colors[0], ["--c2" as any]: colors[1], ["--c3" as any]: colors[2] }}
@@ -348,11 +317,9 @@ export default function AboutSection() {
                       </div>
                     </div>
                   </div>
-                  {/* focus ring */}
                   <span className="pointer-events-none absolute -inset-2 rounded-full opacity-0 group-focus-visible:opacity-100 ring-2 ring-[#4a56d2]/70 transition" />
                 </div>
 
-                {/* pointer + colored dot */}
                 <div className="mt-4">
                   <div className="w-0 h-0 mx-auto border-l-[6px] border-r-[6px] border-l-transparent border-r-transparent border-t-[8px] border-t-slate-600 group-hover:border-t-slate-300 transition-colors" />
                   <div
@@ -361,7 +328,6 @@ export default function AboutSection() {
                   />
                 </div>
 
-                {/* label & description */}
                 <h4 className="mt-5 text-sm font-bold tracking-[0.2em] text-slate-200 group-hover:text-white transition-colors">
                   {title}
                 </h4>
@@ -371,7 +337,7 @@ export default function AboutSection() {
           </div>
         </motion.div>
 
-        {/* Enhanced CTA */}
+        {/* CTA */}
         <motion.div
           variants={variants}
           initial="hidden"
@@ -379,29 +345,26 @@ export default function AboutSection() {
           viewport={{ once: true, amount: 0.5 }}
           className="relative overflow-hidden rounded-3xl border border-slate-800"
         >
-          <div className={`absolute inset-0 opacity-90 bg-gradient-to-r ${GRAD}`} />
+          <div className={`absolute inset-0 opacity-90 bg-gradient-to-r from-[#1a237e] to-[#4a56d2]`} />
           <div className="relative z-10 p-12 text-center">
-            <h3 className="text-3xl font-bold text-white mb-3">
-              Ready to Transform Your Trading?
-            </h3>
+            <h3 className="text-3xl font-bold text-white mb-3">Ready to Transform Your Trading?</h3>
             <p className="text-white/90 mb-8 max-w-2xl mx-auto">
               Join thousands of algorithmic traders who trust our platform for speed, reliability and performance.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button className="group relative px-8 py-4 text-white font-bold rounded-xl overflow-hidden transition-all duration-300 bg-gradient-to-r from-[#2a36a8] to-[#5a66e0] hover:from-[#25309a] hover:to-[#505cdc]">
                 <div className="flex items-center gap-2">
-                  <Link to='/signup'> Start Algo Trading Now</Link>
+                  <span>Start Algo Trading Now</span>
                   <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">→</span>
                 </div>
               </button>
-              <Link to='/comming-soon' className="px-8 py-4 bg-transparent text-white font-bold rounded-xl border-2 border-white/30 hover:border-white/50 transition-all duration-300">
+              <button className="px-8 py-4 bg-transparent text-white font-bold rounded-xl border-2 border-white/30 hover:border-white/50 transition-all duration-300">
                 See Platform Demo
-              </Link>
+              </button>
             </div>
           </div>
         </motion.div>
       </div>
     </section>
-    </>
   );
 }

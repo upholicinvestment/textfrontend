@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useContext } from "react";
 import {
   FiChevronDown,
   FiMenu,
@@ -6,10 +6,20 @@ import {
   FiLogIn,
   FiUserPlus,
   FiSearch,
+  FiUser,
+  FiHome,
+  FiLogOut,
+  FiBarChart2,
+  FiBook,
+  FiCpu,
+  FiDollarSign,
+  FiBookOpen,
+  FiDatabase
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import upholictech from "../../../assets/Upholictech.png";
 import { Link, useNavigate } from "react-router-dom";
+import { AuthContext } from "../../../context/AuthContext";
 
 type SearchItem = {
   label: string;
@@ -32,6 +42,32 @@ const Navbar = () => {
   const servicesRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // ▼ Auth (context + localStorage fallback)
+  const auth = useContext(AuthContext) as any;
+  const authUser = auth?.user || null;
+  const storedUser =
+    typeof window !== "undefined"
+      ? (() => {
+          try {
+            return JSON.parse(localStorage.getItem("user") || "null");
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+  const currentUser = authUser || storedUser;
+  const isLoggedIn = !!currentUser;
+
+  const displayLetter = (
+    (currentUser?.name && currentUser.name[0]) ||
+    (currentUser?.email && currentUser.email[0]) ||
+    "U"
+  ).toUpperCase();
+
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Scroll shadow / bg state
   useEffect(() => {
@@ -52,18 +88,58 @@ const Navbar = () => {
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
       }
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const services = [
-    { name: "Technical Scanner", icon: "📊", color: "bg-gradient-to-br from-purple-500 to-blue-500", path: "/comming-soon" },
-    { name: "Fundamental Scanner", icon: "📚", color: "bg-gradient-to-br from-blue-500 to-cyan-500", path: "/comming-soon" },
-    { name: "ALGO Simulator", icon: "🤖", color: "bg-gradient-to-br from-pink-500 to-purple-500", path: "/algo-simulator" },
-    { name: "FNO Khazana", icon: "💰", color: "bg-gradient-to-br from-green-500 to-teal-500", path: "/fno-khazana" },
-    { name: "Journaling", icon: "📓", color: "bg-gradient-to-br from-indigo-500 to-violet-500", path: "/Journaling" },
-    { name: "FIIs/DIIs Data", icon: "📈", color: "bg-gradient-to-br from-cyan-500 to-blue-500", path: "/main-fii-dii" },
+    { 
+      name: "Technical Scanner", 
+      icon: <FiBarChart2 className="text-lg" />, 
+      color: "bg-gradient-to-br from-purple-500 to-blue-500", 
+      path: "/comming-soon",
+      description: "Advanced technical analysis tools for market insights"
+    },
+    { 
+      name: "Fundamental Scanner", 
+      icon: <FiBook className="text-lg" />, 
+      color: "bg-gradient-to-br from-blue-500 to-cyan-500", 
+      path: "/comming-soon",
+      description: "Deep dive into company fundamentals and valuations"
+    },
+    { 
+      name: "ALGO Simulator", 
+      icon: <FiCpu className="text-lg" />, 
+      color: "bg-gradient-to-br from-pink-500 to-purple-500", 
+      path: "/algo-simulator",
+      description: "Test and optimize your trading strategies",
+      badge: "Popular"
+    },
+    { 
+      name: "FNO Khazana", 
+      icon: <FiDollarSign className="text-lg" />, 
+      color: "bg-gradient-to-br from-green-500 to-teal-500", 
+      path: "/fno-khazana",
+      description: "Futures & Options market analysis and insights"
+    },
+    { 
+      name: "TradeKhata", 
+      icon: <FiBookOpen className="text-lg" />, 
+      color: "bg-gradient-to-br from-indigo-500 to-violet-500", 
+      path: "/Journaling",
+      description: "Track and analyze your trading performance"
+    },
+    { 
+      name: "FIIs/DIIs Data", 
+      icon: <FiDatabase className="text-lg" />, 
+      color: "bg-gradient-to-br from-cyan-500 to-blue-500", 
+      path: "/fii-dii-fno-home",
+      description: "Institutional investment data and trends"
+    },
   ];
 
   const navLinks = [
@@ -82,7 +158,7 @@ const Navbar = () => {
     const pages: SearchItem[] = navLinks.map((l) => ({ label: l.name, path: l.path, group: "Pages" }));
     const svc: SearchItem[] = services.map((s) => ({ label: s.name, path: s.path, group: "Services" }));
     return [...pages, ...svc];
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const results = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -154,13 +230,26 @@ const Navbar = () => {
     );
   };
 
+  const handleLogout = () => {
+    try {
+      if (auth?.logout) {
+        auth.logout();
+      } else {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      }
+    } finally {
+      setIsProfileOpen(false);
+      setIsMenuOpen(false);
+      navigate("/");
+    }
+  };
+
   return (
     <motion.nav
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-
-      // Sticky keeps navbar in normal flow + pins at top
       className={`sticky top-0 z-50 w-full ${
         isScrolled ? "bg-[#0a0b2a]/95 backdrop-blur-md" : "bg-[#0a0b2a]/80"
       }`}
@@ -189,86 +278,136 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex flex-1 justify-center items-center mx-4 lg:mx-8">
             <div className="flex space-x-1">
-              {navLinks.map((link, index) => (
-                <motion.a
-                  key={link.name}
-                  href={link.path}
-                  onHoverStart={() => setHoveredNavItem(index)}
-                  onHoverEnd={() => setHoveredNavItem(null)}
-                  className="relative px-4 lg:px-6 py-2.5 text-gray-300 hover:text-white text-sm font-medium transition-colors duration-300"
-                >
-                  {link.name}
-                  {hoveredNavItem === index && (
-                    <motion.span
-                      layoutId="navHover"
-                      className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-purple-500 to-blue-500"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ type: "spring", stiffness: 300 }}
-                    />
-                  )}
-                </motion.a>
-              ))}
+              {navLinks.map((link, index) => {
+                // Insert Services after About
+                if (link.name === "About") {
+                  return (
+                    <div key={link.name} className="flex items-center">
+                      {/* About Link */}
+                      <motion.a
+                        href={link.path}
+                        onHoverStart={() => setHoveredNavItem(index)}
+                        onHoverEnd={() => setHoveredNavItem(null)}
+                        className="relative px-4 lg:px-6 py-2.5 text-gray-300 hover:text-white text-sm font-medium transition-colors duration-300"
+                      >
+                        {link.name}
+                        {hoveredNavItem === index && (
+                          <motion.span
+                            layoutId="navHover"
+                            className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-purple-500 to-blue-500"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ type: "spring", stiffness: 300 }}
+                          />
+                        )}
+                      </motion.a>
 
-              {/* Services */}
-              <div className="relative" ref={servicesRef}>
-                <motion.button
-                  onHoverStart={() => setHoveredNavItem(navLinks.length)}
-                  onHoverEnd={() => setHoveredNavItem(null)}
-                  onClick={() => setIsServicesOpen(!isServicesOpen)}
-                  className="flex items-center px-4 lg:px-6 py-2.5 text-gray-300 hover:text-white text-sm font-medium transition-colors duration-300"
-                >
-                  <span className="relative">Services</span>
-                  <motion.span
-                    animate={{ rotate: isServicesOpen ? 180 : 0 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                    className="ml-1.5"
-                  >
-                    <FiChevronDown />
-                  </motion.span>
-                  {hoveredNavItem === navLinks.length && (
-                    <motion.span
-                      layoutId="navHover"
-                      className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-purple-500 to-blue-500"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ type: "spring", stiffness: 300 }}
-                    />
-                  )}
-                </motion.button>
-
-                <AnimatePresence>
-                  {isServicesOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -15, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -15, scale: 0.95 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                      className="absolute left-1/2 transform -translate-x-1/2 mt-3 w-72 rounded-xl shadow-2xl bg-[#0e102b] border border-purple-500/20 overflow-hidden z-50 backdrop-blur-lg"
-                      style={{ boxShadow: "0 10px 30px -10px rgba(98, 70, 234, 0.3)" }}
-                    >
-                      <div className="py-2">
-                        {services.map((service) => (
-                          <Link
-                            key={service.name}
-                            to={service.path}
-                            className="flex items-center px-4 py-3 text-sm text-gray-300 hover:text-white transition-all duration-200 border-b border-purple-500/10 last:border-0 group"
-                            onClick={() => setIsServicesOpen(false)}
+                      {/* Services (moved here between About and Pricing) */}
+                      <div className="relative" ref={servicesRef}>
+                        <motion.button
+                          onHoverStart={() => setHoveredNavItem(navLinks.length)}
+                          onHoverEnd={() => setHoveredNavItem(null)}
+                          onClick={() => setIsServicesOpen(!isServicesOpen)}
+                          onMouseEnter={() => setIsServicesOpen(true)}
+                          className="flex items-center px-4 lg:px-6 py-2.5 text-gray-300 hover:text-white text-sm font-medium transition-colors duration-300"
+                        >
+                          <span className="relative">Services</span>
+                          <motion.span
+                            animate={{ rotate: isServicesOpen ? 180 : 0 }}
+                            transition={{ type: "spring", stiffness: 300 }}
+                            className="ml-1.5 mt-1.5"
                           >
-                            <span className={`mr-3 text-lg ${service.color} rounded-full w-8 h-8 flex items-center justify-center text-white`}>
-                              {service.icon}
-                            </span>
-                            <span>{service.name}</span>
-                            <span className="ml-auto text-xs bg-purple-500/10 text-purple-300 px-2 py-1 rounded-full">
-                              New
-                            </span>
-                          </Link>
-                        ))}
+                            <FiChevronDown/>
+                          </motion.span>
+                          {hoveredNavItem === navLinks.length && (
+                            <motion.span
+                              layoutId="navHover"
+                              className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-purple-500 to-blue-500"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ type: "spring", stiffness: 300 }}
+                            />
+                          )}
+                        </motion.button>
+
+                        <AnimatePresence>
+                          {isServicesOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -15, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -15, scale: 0.95 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                              className="absolute left-1/2 transform -translate-x-1/2 mt-3 w-[900px] rounded-xl shadow-2xl bg-[#0e102b] border border-purple-500/20 overflow-hidden z-50 backdrop-blur-lg"
+                              style={{ boxShadow: "0 25px 50px -12px rgba(98, 70, 234, 0.4)" }}
+                              onMouseLeave={() => setIsServicesOpen(false)}
+                            >
+                              <div className="p-6">
+                                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                                  <span className="bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+                                    Our Premium Services
+                                  </span>
+                                </h3>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  {services.map((service) => (
+                                    <Link
+                                      key={service.name}
+                                      to={service.path}
+                                      className="group flex items-start p-3 rounded-lg transition-all duration-300 hover:bg-purple-500/10 border border-transparent hover:border-purple-500/30"
+                                      onClick={() => setIsServicesOpen(false)}
+                                    >
+                                      <span className={`mr-4 ${service.color} rounded-lg w-12 h-12 flex items-center justify-center text-white text-xl shadow-lg`}>
+                                        {service.icon}
+                                      </span>
+                                      <div className="flex-1">
+                                        <div className="flex items-center">
+                                          <h4 className="font-semibold text-white group-hover:text-purple-300 transition-colors">
+                                            {service.name}
+                                          </h4>
+                                          {service.badge && (
+                                            <span className="ml-2 text-xs bg-purple-500/10 text-purple-300 px-2 py-0.5 rounded-full">
+                                              {service.badge}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-sm text-left text-gray-400 mt-1 group-hover:text-gray-300">
+                                          {service.description}
+                                        </p>
+                                      </div>
+                                    </Link>
+                                  ))}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                    </div>
+                  );
+                }
+
+                // Render other links normally (Home, Pricing, Contact)
+                return (
+                  <motion.a
+                    key={link.name}
+                    href={link.path}
+                    onHoverStart={() => setHoveredNavItem(index)}
+                    onHoverEnd={() => setHoveredNavItem(null)}
+                    className="relative px-4 lg:px-6 py-2.5 text-gray-300 hover:text-white text-sm font-medium transition-colors duration-300"
+                  >
+                    {link.name}
+                    {hoveredNavItem === index && (
+                      <motion.span
+                        layoutId="navHover"
+                        className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-purple-500 to-blue-500"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ type: "spring", stiffness: 300 }}
+                      />
+                    )}
+                  </motion.a>
+                );
+              })}
             </div>
           </div>
 
@@ -343,25 +482,71 @@ const Navbar = () => {
               </AnimatePresence>
             </motion.div>
 
-            {/* Auth Buttons */}
-            <div className="hidden sm:flex items-center space-x-2 lg:space-x-3">
-              <Link
-                to="/login"
-                className="px-3 py-2 lg:px-4 lg:py-2.5 rounded-lg text-white text-sm font-medium transition-all duration-300 border border-purple-500/30 hover:bg-purple-500/10 flex items-center backdrop-blur-sm"
-                style={{ boxShadow: "0 0 15px rgba(98, 70, 234, 0.1)" }}
-              >
-                <FiLogIn className="mr-1 lg:mr-2" />
-                <span className="hidden lg:inline">Login</span>
-              </Link>
-              <Link
-                to="/signup"
-                className="px-3 py-2 lg:px-4 lg:py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm font-medium transition-all duration-300 shadow-lg flex items-center"
-                style={{ boxShadow: "0 4px 15px rgba(98, 70, 234, 0.3)" }}
-              >
-                <FiUserPlus className="mr-1 lg:mr-2" />
-                <span className="hidden lg:inline">Sign Up</span>
-              </Link>
-            </div>
+            {/* Auth / Avatar (Desktop) */}
+            {!isLoggedIn ? (
+              <div className="hidden sm:flex items-center space-x-2 lg:space-x-3">
+                <Link
+                  to="/login"
+                  className="px-3 py-2 lg:px-4 lg:py-2.5 rounded-lg text-white text-sm font-medium transition-all duration-300 border border-purple-500/30 hover:bg-purple-500/10 flex items-center backdrop-blur-sm"
+                  style={{ boxShadow: "0 0 15px rgba(98, 70, 234, 0.1)" }}
+                >
+                  <FiLogIn className="mr-1 lg:mr-2" />
+                  <span className="hidden lg:inline">Login</span>
+                </Link>
+                <Link
+                  to="/signup"
+                  className="px-3 py-2 lg:px-4 lg:py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm font-medium transition-all duration-300 shadow-lg flex items-center"
+                  style={{ boxShadow: "0 4px 15px rgba(98, 70, 234, 0.3)" }}
+                >
+                  <FiUserPlus className="mr-1 lg:mr-2" />
+                  <span className="hidden lg:inline">Sign Up</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center" ref={profileRef}>
+                <button
+                  onClick={() => setIsProfileOpen((v) => !v)}
+                  className="w-9 h-9 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold shadow-md flex items-center justify-center focus:outline-none"
+                  aria-label="Open profile menu"
+                >
+                  {displayLetter}
+                </button>
+
+                <AnimatePresence>
+                  {isProfileOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 6 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-1 top-16 w-48 rounded-xl bg-[#0e102b] border border-purple-500/20 shadow-2xl overflow-hidden z-50"
+                      style={{ boxShadow: "0 10px 30px -10px rgba(98, 70, 234, 0.3)" }}
+                    >
+                      <Link
+                        to="/profile"
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-purple-500/10"
+                        onClick={() => setIsProfileOpen(false)}
+                      >
+                        <FiUser /> Profile
+                      </Link>
+                      <Link
+                        to="/dashboard"
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-purple-500/10"
+                        onClick={() => setIsProfileOpen(false)}
+                      >
+                        <FiHome /> Dashboard
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-red-300 hover:text-red-200 hover:bg-red-500/10"
+                      >
+                        <FiLogOut /> Logout
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             {/* Mobile menu button */}
             <div className="sm:hidden flex-shrink-0 flex items-center">
@@ -458,7 +643,7 @@ const Navbar = () => {
                 </Link>
               ))}
 
-              {/* Services - Mobile */}
+              {/* Services - Mobile (unchanged) */}
               <div className="relative" ref={servicesRef}>
                 <button
                   onClick={() => setIsServicesOpen(!isServicesOpen)}
@@ -503,27 +688,66 @@ const Navbar = () => {
                 </AnimatePresence>
               </div>
 
-              {/* Auth Buttons - Mobile */}
+              {/* Auth / User actions - Mobile */}
               <div className="pt-4 border-t border-purple-500/20 mt-4">
-                <div className="space-y-3">
-                  <Link
-                    to="/login"
-                    className="flex items-center justify-center w-full px-4 py-3 rounded-lg text-base font-medium text-gray-300 border border-purple-500/30 hover:text-white transition-all duration-300 backdrop-blur-sm"
-                    onClick={() => setIsMenuOpen(false)}
-                    style={{ boxShadow: "0 0 15px rgba(98, 70, 234, 0.1)" }}
-                  >
-                    <FiLogIn className="mr-2" /> Login
-                  </Link>
+                {!isLoggedIn ? (
+                  <div className="space-y-3">
+                    <Link
+                      to="/login"
+                      className="flex items-center justify-center w-full px-4 py-3 rounded-lg text-base font-medium text-gray-300 border border-purple-500/30 hover:text-white transition-all duration-300 backdrop-blur-sm"
+                      onClick={() => setIsMenuOpen(false)}
+                      style={{ boxShadow: "0 0 15px rgba(98, 70, 234, 0.1)" }}
+                    >
+                      <FiLogIn className="mr-2" /> Login
+                    </Link>
 
-                  <Link
-                    to="/signup"
-                    className="flex items-center justify-center w-full px-4 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white text-base font-medium shadow-lg transition-all duration-300"
-                    onClick={() => setIsMenuOpen(false)}
-                    style={{ boxShadow: "0 4px 15px rgba(98, 70, 234, 0.4)" }}
-                  >
-                    <FiUserPlus className="mr-2" /> Sign Up
-                  </Link>
-                </div>
+                    <Link
+                      to="/signup"
+                      className="flex items-center justify-center w-full px-4 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white text-base font-medium shadow-lg transition-all duration-300"
+                      onClick={() => setIsMenuOpen(false)}
+                      style={{ boxShadow: "0 4px 15px rgba(98, 70, 234, 0.4)" }}
+                    >
+                      <FiUserPlus className="mr-2" /> Sign Up
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 px-4 py-2 text-gray-200">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold flex items-center justify-center">
+                        {displayLetter}
+                      </div>
+                      <div className="text-sm">
+                        <div className="font-medium">
+                          {currentUser?.name || currentUser?.email || "User"}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {currentUser?.email || ""}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Link
+                      to="/profile"
+                      className="flex items-center gap-2 px-4 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-purple-500/10 transition"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <FiUser /> Profile
+                    </Link>
+                    <Link
+                      to="/dashboard"
+                      className="flex items-center gap-2 px-4 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-purple-500/10 transition"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <FiHome /> Dashboard
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left flex items-center gap-2 px-4 py-3 rounded-lg text-red-300 hover:text-red-200 hover:bg-red-500/10 transition"
+                    >
+                      <FiLogOut /> Logout
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>

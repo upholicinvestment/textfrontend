@@ -111,7 +111,7 @@ const PriceScroll = () => {
       setIsLoading(true);
       setError(null);
       
-      console.log(`[FETCH] Calling: ${API_URL}?t=${Date.now()}`);
+      // console.log(`[FETCH] Calling: ${API_URL}?t=${Date.now()}`);
 
       const response = await fetch(`${API_URL}?t=${Date.now()}`, {
         headers: {
@@ -121,20 +121,20 @@ const PriceScroll = () => {
         }
       });
 
-      console.log(`[FETCH] Response status: ${response.status}`);
+      // console.log(`[FETCH] Response status: ${response.status}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const rawData: RawStockData[] = await response.json();
-      console.log(`[FETCH] Raw Data:`, rawData);
+      // console.log(`[FETCH] Raw Data:`, rawData);
 
       const now = new Date();
       setLastUpdateTime(now.toLocaleTimeString());
       
       const processedData = processStockData(rawData);
-      console.log(`[PROCESS] Processed Data:`, processedData);
+      // console.log(`[PROCESS] Processed Data:`, processedData);
       setStocks(processedData);
       setConnectionStatus('connected');
       retryCountRef.current = 0;

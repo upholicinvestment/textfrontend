@@ -37,7 +37,7 @@ const Login = () => {
     setIsLoading(true);
     try {
       const res = await api.post('/auth/login', formData);
-      console.log('[Login] Received token:', res.data.token);
+      // console.log('[Login] Received token:', res.data.token);
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       login(res.data.token, res.data.user);

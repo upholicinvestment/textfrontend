@@ -1,23 +1,21 @@
 import { useRef, useState } from "react";
 
-
 import JournalDashboard from "../JournalDashboard/Journal_Dashboard";
 import { SidebarLayout } from "../JournalDashboard/SidebarLayout";
 import DailyJournal from "../JournalDashboard/DailyJournal";
 import TradesTable from "../JournalDashboard/TradesTable";
 import UploadButton from "../JournalDashboard/UploadButton";
-import { FiChevronLeft, FiChevronRight, } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 const SIDEBAR_WIDTH = 265;
 const COLLAPSED_WIDTH = 80;
-const TOP_OFFSET = 20;
-
+const TOP_OFFSET = 34; // height of your fixed navbar (sidebar stays at top; content is pushed down)
 const DRAWER_W = 280;
 
 const Journal_Layout = () => {
   const [active, setActive] = useState("dashboard");
   const [showUpload, setShowUpload] = useState(false);
-  
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const dashboardRef = useRef<any>(null);
@@ -25,7 +23,7 @@ const Journal_Layout = () => {
   const handleUploadSuccess = () => {
     setShowUpload(false);
     setActive("dashboard");
-    
+
     if (dashboardRef.current) dashboardRef.current.refreshStats();
   };
 
@@ -68,14 +66,13 @@ const Journal_Layout = () => {
       `}</style>
 
       {/* Fixed Navbar + PriceScroll */}
-     
 
-      {/* Desktop/Tablet Sidebar */}
+      {/* Desktop/Tablet Sidebar (stays flush to top) */}
       <div
         className={`fixed top-0 left-0 h-screen bg-[#161a2b] border-r transition-all duration-300 hidden sm:block`}
         style={{ width: sidebarCollapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH, height: "100vh" }}
       >
-        <div className="h-full flex flex-col" >
+        <div className="h-full flex flex-col">
           <SidebarLayout
             active={active}
             setActive={setActive}
@@ -107,7 +104,10 @@ const Journal_Layout = () => {
         {sidebarMobileOpen ? <FiChevronLeft /> : <FiChevronRight />}
       </button>
 
-      <div className={`sm:hidden mobile-drawer-panel ${sidebarMobileOpen ? "open" : ""}`} style={{ paddingTop: 32 }}>
+      <div
+        className={`sm:hidden mobile-drawer-panel ${sidebarMobileOpen ? "open" : ""}`}
+        style={{ paddingTop: 32 }}
+      >
         <SidebarLayout
           active={active}
           setActive={(s) => {
@@ -128,9 +128,11 @@ const Journal_Layout = () => {
         <div className="sm:hidden fixed inset-0 bg-black/40 z-50" onClick={() => setSidebarMobileOpen(false)} />
       )}
 
-      {/* Main content */}
+      {/* Main content (pushed down by TOP_OFFSET; sidebar remains at top) */}
       <div
-        className={`transition-all duration-300 min-h-screen bg-[#0d0d14] ${sidebarCollapsed ? "sm:ml-[80px]" : "sm:ml-[265px]"} ml-0`}
+        className={`transition-all duration-300 min-h-screen bg-[#0d0d14] ${
+          sidebarCollapsed ? "sm:ml-[80px]" : "sm:ml-[265px]"
+        } ml-0`}
         style={{ paddingTop: TOP_OFFSET }}
       >
         <div className="max-w-[1400px] mx-auto px-2 sm:px-4 md:px-8 pb-10">
@@ -156,8 +158,6 @@ const Journal_Layout = () => {
           {active === "trades" && <TradesTable />}
         </div>
       </div>
-
-   
     </div>
   );
 };

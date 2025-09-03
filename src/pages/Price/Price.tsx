@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { JSX, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiX } from "react-icons/fi";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../../api";
+import {
+  CheckCircle2,
+  ChevronRight,
+  BadgeCheck,
+  Shield,
+  TrendingUp,
+  Gem,
+} from "lucide-react";
 
 type Variant = {
   _id: string;
@@ -19,6 +27,65 @@ type Product = {
   route: string;
   priceMonthly?: number;
   variants?: Variant[];
+};
+
+const normalizeVariantKey = (k: string) => {
+  const s = (k || "").toLowerCase();
+  if (["starter", "starter_scalping"].includes(s)) return "starter";
+  if (["pro", "option_scalper_pro"].includes(s)) return "pro";
+  if (["swing", "sniper_algo", "swing_trader_master"].includes(s)) return "swing";
+  return s;
+};
+
+const variantDescription = (k: string) => {
+  if (k === "starter") return "Perfect for beginners starting with algorithmic trading";
+  if (k === "pro") return "Advanced scalping with real-time execution";
+  if (k === "swing") return "Comprehensive swing trading with advanced analytics";
+  return "Premium trading solution";
+};
+
+const variantFeatures = (k: string) => {
+  if (k === "starter") {
+    return [
+      "Instrument: NIFTY (NSE)",
+      "Win Rate: 38%",
+      "R:R ≈ 1.30 : 1",
+      "Return of Investment: 18%",
+      "Max DD: 27%",
+      "Trades Tested: 1300",
+      "Backtest: 18 months",
+    ];
+  }
+  if (k === "pro") {
+    return [
+      "Instrument: NIFTY (NSE)",
+      "Win Rate: 48%",
+      "R:R ≈ 1.50 : 1",
+      "Return of Investment: 36%",
+      "Max DD: 23%",
+      "Trades Tested: 1100",
+      "Backtest: 72 months",
+    ];
+  }
+  if (k === "swing") {
+    return [
+      "Instrument: NIFTY (NSE)",
+      "Win Rate: 60%",
+      "R:R ≈ 2.40 : 1",
+      "Return of Investment: 44%",
+      "Max DD: 11%",
+      "Trades Tested: 100",
+      "Backtest: 18 months",
+    ];
+  }
+  return ["Core features", "Email support"];
+};
+
+const variantIcon = (k: string): JSX.Element => {
+  if (k === "starter") return <Shield className="w-6 h-6 text-amber-600" />;
+  if (k === "pro") return <Gem className="w-6 h-6 text-yellow-400" />;
+  if (k === "swing") return <TrendingUp className="w-6 h-6 text-gray-400" />;
+  return <Shield className="w-6 h-6 text-amber-600" />;
 };
 
 const Price = () => {
@@ -68,55 +135,28 @@ const Price = () => {
 
   const bundlePrice = bundle?.priceMonthly
     ? `₹${bundle.priceMonthly.toLocaleString("en-IN")}`
-    : "₹4999";
+    : "₹499";
   const bundlePeriod = "month";
 
   const algoPlans = useMemo(() => {
-    const vs = (algo?.variants || []).map((v) => ({
-      id: v.key === "starter" ? 1 : v.key === "pro" ? 2 : 3,
-      key: v.key, // <-- used in URL and for ordering
-      name: v.name,
-      price: v.priceMonthly
-        ? `₹${v.priceMonthly.toLocaleString("en-IN")}`
-        : "₹",
-      period: "month",
-      description:
-        v.key === "starter"
-          ? "Perfect for beginners starting with algorithmic trading"
-          : v.key === "pro"
-          ? "Advanced scalping with real-time execution"
-          : "Comprehensive swing trading with advanced analytics",
-      features:
-        v.key === "starter"
-          ? [
-              "Basic backtesting",
-              "1 strategy slot",
-              "Limited indicators",
-              "Email support",
-              "Market hours only",
-            ]
-          : v.key === "pro"
-          ? [
-              "Real-time execution",
-              "5 strategy slots",
-              "All indicators",
-              "Priority support",
-              "Broker integration",
-              "Multi-asset",
-            ]
-          : [
-              "Multi-timeframe analysis",
-              "Unlimited strategies",
-              "All indicators",
-              "24/7 dedicated support",
-              "Custom indicators",
-              "Portfolio optimization",
-            ],
-      popular: v.key === "pro",
-      variantId: v._id,
-    }));
+    const vs = (algo?.variants || []).map((v) => {
+      const normKey = normalizeVariantKey(v.key);
+      return {
+        id: v.key === "starter" ? 5999 : v.key === "pro" ? 2 : 3,
+        key: normKey,
+        name: v.name,
+        price: v.priceMonthly
+          ? `₹${v.priceMonthly.toLocaleString("en-IN")}`
+          : "₹5999",
+        period: "month",
+        description: variantDescription(normKey),
+        features: variantFeatures(normKey),
+        popular: normKey === "pro",
+        variantId: v._id,
+      };
+    });
 
-    // ✅ Force the desired visual order: STARTER (left), PRO (middle), SWING (right)
+    // Desired visual order
     const rank = (k: string) => ({ starter: 1, pro: 2, swing: 3 } as const)[k] ?? 99;
     vs.sort((a, b) => rank(a.key) - rank(b.key));
 
@@ -132,6 +172,20 @@ const Price = () => {
       : "₹299";
   const journalingPeriod = "month";
 
+  // ── ★ Added static plan info (display only; no logic changes) ──
+  const BUNDLE_MONTHLY = 499;
+  const BUNDLE_ANNUAL = 4999;
+  const bundleSavePct = Math.round(
+    (1 - BUNDLE_ANNUAL / (BUNDLE_MONTHLY * 12)) * 100
+  );
+
+  const JOURNAL_MONTHLY = 299;
+  const JOURNAL_ANNUAL = 2499;
+  const journalingSavePct = Math.round(
+    (1 - JOURNAL_ANNUAL / (JOURNAL_MONTHLY * 12)) * 100
+  );
+  // ── ★ /Added ──
+
   const journalingFeatures = [
     "Trade tracking & performance analytics",
     "Psychology markers & emotional tracking",
@@ -146,44 +200,6 @@ const Price = () => {
   const bundleTools = [
     {
       id: 1,
-      name: "Technical Scanner",
-      description:
-        "Advanced chart pattern recognition and technical indicator scanning",
-      icon: "📊",
-      features: [
-        "Real-time alerts",
-        "100+ indicators",
-        "Custom patterns",
-        "Multi-timeframe",
-      ],
-    },
-    {
-      id: 2,
-      name: "Fundamental Scanner",
-      description:
-        "Comprehensive fundamental analysis and financial ratio screening",
-      icon: "📈",
-      features: [
-        "Financial statements",
-        "Valuation metrics",
-        "Sector comparison",
-        "Earnings analysis",
-      ],
-    },
-    {
-      id: 3,
-      name: "F&O Khazana",
-      description: "Derivatives analytics with options chain and futures data",
-      icon: "💰",
-      features: [
-        "Options OI analysis",
-        "Futures rollover",
-        "Strategy builder",
-        "Risk management",
-      ],
-    },
-    {
-      id: 4,
       name: "Journaling",
       description: "Trade journal with performance analytics and insights",
       icon: "📝",
@@ -195,7 +211,7 @@ const Price = () => {
       ],
     },
     {
-      id: 5,
+      id: 2,
       name: "FII/DII Data",
       description: "Institutional flow tracking with advanced analytics",
       icon: "🏛️",
@@ -294,85 +310,176 @@ const Price = () => {
                 transition={{ duration: 0.3 }}
                 className="mb-20"
               >
-                <div className="rounded-2xl overflow-hidden shadow-xl bg-gray-800 border border-gray-700">
-                  <div className="relative">
-                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-10 md:px-12 text-white">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-                        <div className="mb-6 md:mb-0">
-                          <h2 className="text-2xl font-bold mb-2">
+                {/* ======= COMPACT BUNDLE SECTION ======= */}
+                <div className="max-w-4xl mx-auto relative rounded-3xl overflow-hidden border border-gray-700 bg-[#0b0f1a] shadow-2xl">
+                  {/* soft gradient border glow */}
+                  <div className="pointer-events-none absolute -inset-px rounded-3xl bg-gradient-to-r from-blue-600/20 via-indigo-500/20 to-purple-600/20 blur opacity-60" />
+
+                  {/* Hero (slightly tighter paddings) */}
+                  <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700">
+                    <div className="px-6 py-8 md:px-10">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                        <div>
+                          <div className="inline-flex items-center gap-2 bg-white/15 border border-white/25 text-white text-xs font-semibold px-3 py-1 rounded-full mb-2">
+                            <BadgeCheck className="w-4 h-4 text-yellow-300" />
+                            BEST VALUE
+                          </div>
+                          <h2 className="text-2xl md:text-3xl font-bold">
                             Trader's Essential Bundle
                           </h2>
-                          <p className="text-blue-100">
-                            All 5 premium tools for the price of one
+                          <p className="text-blue-100 mt-1">
+                            All 2 premium tools for the price of one
                           </p>
                         </div>
+
                         <div className="text-right">
-                          <div className="text-3xl font-bold">
+                          <div className="text-sm text-blue-200">Starts at</div>
+                          <div className="text-3xl md:text-4xl font-bold leading-none">
                             {bundlePrice}
-                            <span className="text-lg font-normal">
-                              /{bundlePeriod}
-                            </span>
+                            <span className="text-lg font-normal">/{bundlePeriod}</span>
                           </div>
+                          <div className="text-xs md:text-sm text-blue-100 mt-1">
+                            No hidden fees • Cancel anytime
+                          </div>
+
+                          {/* ★ Added display-only pricing info */}
+                          <div className="text-xs md:text-sm text-emerald-200 mt-2">
+                            Special: <strong>₹{BUNDLE_MONTHLY.toLocaleString("en-IN")}</strong>/month •{" "}
+                            <strong>₹{BUNDLE_ANNUAL.toLocaleString("en-IN")}</strong>/year{" "}
+                            <span className="text-emerald-300 font-semibold">(Save {bundleSavePct}%)</span>
+                          </div>
+                          {/* ★ /Added */}
                         </div>
                       </div>
-                    </div>
 
-                    <div className="p-8">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-                        {bundleTools.map((tool) => (
-                          <motion.div
-                            key={tool.id}
-                            whileHover={{ y: -5 }}
-                            className={`rounded-lg p-4 border transition-all cursor-pointer ${
-                              selectedBundle === tool.id
-                                ? "border-blue-500 bg-blue-900/20"
-                                : "border-gray-700 bg-gray-700/30 hover:border-gray-600"
-                            }`}
-                            onClick={() => setSelectedBundle(tool.id)}
-                          >
-                            <div className="text-2xl mb-2">{tool.icon}</div>
-                            <h3 className="font-semibold mb-2 text-sm">
-                              {tool.name}
-                            </h3>
-                            <p className="text-xs text-gray-400 mb-3">
-                              {tool.description}
-                            </p>
-                            <ul className="text-xs text-gray-400 space-y-1">
-                              {tool.features.map((f, i) => (
-                                <li key={i} className="flex items-start">
-                                  <span className="mr-1">•</span> {f}
-                                </li>
-                              ))}
-                            </ul>
-                          </motion.div>
-                        ))}
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-gray-700">
-                        <div className="mb-4 sm:mb-0 text-gray-400 text-sm">
-                          Selected:{" "}
-                          <strong className="text-white">
-                            {selectedBundleTool.name}
-                          </strong>
-                        </div>
-
-                        {/* 🔗 Pass productKey=essentials_bundle */}
-                        <Link
-                          to={toRegister(bundle?.key || "essentials_bundle")}
-                          aria-label="Get Complete Bundle"
-                        >
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-md"
-                          >
-                            Get Complete Bundle - {bundlePrice}/{bundlePeriod}
-                          </motion.button>
-                        </Link>
+                      {/* Quick highlights */}
+                      <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {["2 tools included", "Save up to 60%", "Priority support"].map(
+                          (h) => (
+                            <div
+                              key={h}
+                              className="flex items-center gap-2 bg-black/15 border border-white/15 rounded-xl px-3 py-2"
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                              <span className="text-sm text-blue-50">{h}</span>
+                            </div>
+                          )
+                        )}
                       </div>
                     </div>
                   </div>
+
+                  {/* Body */}
+                  <div className="relative p-6 md:p-8">
+                    {/* What's inside */}
+                    <div className="mb-5">
+                      <div className="text-xs tracking-wider text-blue-300/80 mb-2">
+                        WHAT'S INSIDE
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {bundleTools.map((t) => (
+                          <div
+                            key={t.id}
+                            className="inline-flex items-center gap-2 rounded-full border border-gray-700 bg-gray-800/50 px-3 py-1.5"
+                          >
+                            <span className="text-lg">{t.icon}</span>
+                            <span className="text-sm text-gray-200">{t.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Tool cards — 2-up grid on large screens */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                      {bundleTools.map((tool) => {
+                        const selected = selectedBundle === tool.id;
+                        return (
+                          <motion.button
+                            key={tool.id}
+                            whileHover={{ y: -4 }}
+                            onClick={() => setSelectedBundle(tool.id)}
+                            className={`relative text-left rounded-2xl p-4 transition-all border ${
+                              selected
+                                ? "border-blue-500/70 bg-gradient-to-b from-blue-500/10 to-transparent ring-1 ring-blue-500/40"
+                                : "border-gray-700 bg-gray-800/30 hover:border-gray-600"
+                            }`}
+                          >
+                            {/* glow */}
+                            {selected && (
+                              <div className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-600/10 blur" />
+                            )}
+                            <div className="relative">
+                              <div className="text-3xl mb-2">{tool.icon}</div>
+                              <h3 className="font-semibold mb-1 text-sm text-white">
+                                {tool.name}
+                              </h3>
+                              <p className="text-xs text-gray-400 mb-3">
+                                {tool.description}
+                              </p>
+                              <ul className="space-y-1.5">
+                                {tool.features.map((f, i) => (
+                                  <li key={i} className="flex items-start gap-2">
+                                    <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-blue-400" />
+                                    <span className="text-[12px] text-gray-300">{f}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Value row */}
+                    <div className="mb-6 rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                        <div className="text-sm text-blue-200">
+                          Selected tool:{" "}
+                          <strong className="text-white">
+                            {selectedBundleTool.name}
+                          </strong>
+                          <span className="hidden md:inline"> • </span>
+                          <span className="block md:inline text-blue-200/90">
+                            Included with the bundle along with{" "}
+                            <span className="text-white">
+                              {bundleTools
+                                .filter((t) => t.id !== selectedBundleTool.id)
+                                .map((t) => t.name)
+                                .join(", ")}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-blue-100">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                          Save big compared to buying individually
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CTA row */}
+                    <div className="flex flex-col sm:flex-row justify-between items-center pt-5 border-t border-gray-700">
+                      <div className="mb-4 sm:mb-0 text-gray-300 text-sm">
+                        Unlock all tools + future updates
+                      </div>
+
+                      {/* 🔗 Pass productKey=essentials_bundle */}
+                      <Link
+                        to={toRegister(bundle?.key || "essentials_bundle")}
+                        aria-label="Get Complete Bundle"
+                      >
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="group inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg"
+                        >
+                          Get Complete Bundle - {bundlePrice}/{bundlePeriod}
+                          <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                        </motion.button>
+                      </Link>
+                    </div>
+                  </div>
                 </div>
+                {/* ======= /COMPACT BUNDLE SECTION ======= */}
               </motion.div>
             )}
 
@@ -395,115 +502,106 @@ const Price = () => {
                   </p>
                 </div>
 
-                <div className="flex flex-col lg:flex-row gap-8 items-stretch justify-center">
+                {/* New ALGO UI (cards from About/PricingSection) */}
+                <div className="grid md:grid-cols-3 gap-8 items-start">
                   {algoPlans.map((plan) => {
-                    // ✅ Ensure PRO is visually centered on desktop
-                    const orderClass =
-                      plan.key === "starter"
-                        ? "lg:order-1"
-                        : plan.key === "pro"
-                        ? "lg:order-2"
-                        : "lg:order-3";
-
+                    const isSelected = selectedAlgo === plan.id;
+                    const popular = plan.popular;
                     return (
-                      <motion.div
-                        key={plan.id}
-                        whileHover={{ y: -5 }}
-                        className={`flex-1 rounded-2xl overflow-hidden shadow-xl max-w-md mx-auto lg:max-w-none ${
-                          plan.popular
-                            ? "border-2 border-yellow-400 transform scale-105"
-                            : "border border-gray-700"
-                        } bg-gray-800 relative transition-all duration-300 ${orderClass}`}
+                      <div
+                        key={plan.key}
+                        className={`relative w-full max-w-[360px] rounded-2xl border ${
+                          popular ? "border-yellow-400" : "border-purple-600/50"
+                        } bg-[#101223] px-6 py-10 ${
+                          popular ? "shadow-yellow-500/20" : "shadow-purple-500/20"
+                        } shadow-2xl group h-full mx-auto flex flex-col justify-between transition-all duration-300 ${
+                          isSelected ? "transform scale-105" : ""
+                        } ${popular ? "md:-translate-y-5" : ""}`}
                         onClick={() => setSelectedAlgo(plan.id)}
                       >
+                        {/* Ribbon */}
+                        {popular && (
+                          <div className="pointer-events-none absolute top-0 right-0 bg-yellow-400 text-black text-xs font-bold px-4 py-1 rounded-bl-lg rounded-tr-lg">
+                            MOST POPULAR
+                          </div>
+                        )}
+
+                        {/* Glow layer */}
                         <div
-                          className={`${
-                            plan.popular
-                              ? "bg-gradient-to-b from-blue-700 to-indigo-800 pt-10"
-                              : "bg-gray-700 pt-8"
-                          } p-8 text-white relative`}
-                        >
-                          <div className="flex justify-between items-start mb-6">
-                            <h3 className="text-xl font-bold">{plan.name}</h3>
-                            <div className="text-right">
-                              <div className="text-3xl font-bold">
-                                {plan.price}
-                              </div>
-                              <div className="text-sm text-gray-300">
-                                per {plan.period}
-                              </div>
-                            </div>
+                          className={`pointer-events-none absolute -inset-0.5 bg-gradient-to-r ${
+                            popular
+                              ? "from-yellow-400 to-amber-500"
+                              : "from-purple-600 to-indigo-500"
+                          } rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300`}
+                        />
+
+                        {/* Content */}
+                        <div className="relative z-10">
+                          <div className="flex items-center gap-3 mb-4">
+                            {variantIcon(plan.key)}
+                            <h3 className="text-xl font-bold">
+                              {plan.name}
+                              {popular && (
+                                <span className="ml-2 text-yellow-400">
+                                  <BadgeCheck className="inline w-5 h-5" />
+                                </span>
+                              )}
+                            </h3>
                           </div>
 
-                          <p className="text-blue-100 mb-6 text-sm">
+                          <p className="text-gray-400 text-sm mb-4">
                             {plan.description}
                           </p>
 
-                          <div className="bg-black/20 rounded-lg p-4 mb-6">
-                            <div className="text-center text-sm font-semibold mb-2">
-                              BROKER INTEGRATION
+                          <div className="mb-6">
+                            <div className="text-4xl font-bold mb-1">
+                              {plan.price}
                             </div>
-                            <div className="flex justify-center gap-3 text-xs text-gray-300">
-                              <span>Zerodha</span>
-                              <span>•</span>
-                              <span>Upstox</span>
-                              <span>•</span>
-                              <span>Angel One</span>
+                            <div className="text-gray-400 text-sm">
+                              per month
                             </div>
                           </div>
-                        </div>
 
-                        <div className="p-6 bg-gray-800">
-                          <div className="mb-6 text-sm font-semibold text-gray-300 border-b border-gray-700 pb-2">
-                            FEATURES
-                          </div>
-                          <ul className="space-y-3 mb-8">
-                            {plan.features.map((feature, index) => (
-                              <li key={index} className="flex items-start text-sm">
-                                <svg
-                                  className="h-5 w-5 mr-3 flex-shrink-0 text-green-400"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                                <span className="text-gray-300">{feature}</span>
+                          <ul className="space-y-3 text-sm text-gray-300 text-left mb-8">
+                            {plan.features.map((f) => (
+                              <li key={f} className="flex items-start gap-2">
+                                <CheckCircle2
+                                  className={`flex-shrink-0 ${
+                                    popular
+                                      ? "text-yellow-400"
+                                      : "text-purple-400"
+                                  } w-4 h-4 mt-0.5`}
+                                />
+                                <span>{f}</span>
                               </li>
                             ))}
                           </ul>
-
-                          {/* 🔗 Pass productKey=algo_simulator & variantKey=<plan.key> */}
-                          <Link
-                            to={toRegister(algo?.key || "algo_simulator", plan.key)}
-                            aria-label={`Get started with ${plan.name}`}
-                          >
-                            <motion.button
-                              whileHover={{ scale: 1.03 }}
-                              whileTap={{ scale: 0.97 }}
-                              className={`w-full py-4 rounded-lg font-semibold transition-all duration-300 ${
-                                plan.popular
-                                  ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 hover:from-yellow-300 hover:to-orange-400"
-                                  : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-500 hover:to-purple-500"
-                              } ${selectedAlgo === plan.id ? "ring-2 ring-blue-400" : ""}`}
-                            >
-                              {selectedAlgo === plan.id ? "Selected" : "Get Started"}
-                            </motion.button>
-                          </Link>
                         </div>
-                      </motion.div>
+
+                        {/* Button */}
+                        <Link
+                          to={toRegister(algo?.key || "algo_simulator", plan.key)}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`relative z-10 w-full mt-auto py-3 rounded-xl font-semibold transition-all duration-300 text-center ${
+                            popular
+                              ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-black hover:shadow-lg hover:shadow-yellow-500/30"
+                              : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg hover:shadow-purple-500/30"
+                          } flex items-center justify-center gap-2`}
+                          aria-label={`Pay now for ${plan.name}`}
+                        >
+                          Pay Now
+                          <ChevronRight className="w-4 h-4" />
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>
 
-                <div className="text-center mt-10 text-sm text-gray-500">
-                  Broker integration supported: AngelOne, Zerodha, Upstox, Dhan
-                  (more coming soon)
+                <div className="mt-10 text-gray-400 text-sm flex flex-col md:flex-row items-center justify-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                    <span>Secure payment processing</span>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -550,6 +648,14 @@ const Price = () => {
                           <div className="text-sm text-blue-200 mt-1">
                             No hidden fees • Cancel anytime
                           </div>
+
+                          {/* ★ Added display-only pricing info */}
+                          <div className="text-xs md:text-sm text-emerald-200 mt-2">
+                            Special: <strong>₹{JOURNAL_MONTHLY.toLocaleString("en-IN")}</strong>/month •{" "}
+                            <strong>₹{JOURNAL_ANNUAL.toLocaleString("en-IN")}</strong>/year{" "}
+                            <span className="text-emerald-300 font-semibold">(Save {journalingSavePct}%)</span>
+                          </div>
+                          {/* ★ /Added */}
                         </div>
                       </div>
                     </div>
@@ -569,7 +675,7 @@ const Price = () => {
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   strokeWidth={2}
-                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2z"
                                 />
                               </svg>
                             </div>
@@ -786,6 +892,7 @@ const Price = () => {
                     </div>
                   </div>
                 </div>
+                {/* ======= /COMPACT BUNDLE SECTION ======= */}
               </motion.div>
             )}
           </AnimatePresence>

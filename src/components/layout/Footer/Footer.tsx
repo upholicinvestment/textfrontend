@@ -1,8 +1,6 @@
-import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  FiArrowRight,
-  FiMail,
+  
   // FiTwitter,
   // FiYoutube,
   // FiGithub,
@@ -14,7 +12,7 @@ import upholictech from '../../../assets/Upholictech.png'; // adjust if needed
 const Footer: React.FC = () => {
   // Navbar links for consistency
   const navLinks = [
-    { name: 'Home', path: '/Home' },
+    { name: 'Home', path: '/' },
     { name: 'About', path: '/about' },
     { name: 'Pricing', path: '/pricing' },
   ];
@@ -51,14 +49,7 @@ const Footer: React.FC = () => {
     { name: 'Refund Policy', path: '/refund' },
   ];
 
-  const [email, setEmail] = useState('');
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    // TODO: connect to your backend/newsletter provider
-    console.log('Subscribe:', email);
-    setEmail('');
-  };
+ 
 
   // Function to smoothly scroll to top
   const scrollToTop = () => {
@@ -121,7 +112,7 @@ const Footer: React.FC = () => {
             <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl" />
             <div className="absolute -left-24 -bottom-24 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
 
-            <div className="relative z-10 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+            <div className="relative flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
               <div>
                 <h3 className="text-white text-2xl md:text-3xl font-bold tracking-tight">
                   Build your trading stack with Upholic
@@ -216,39 +207,7 @@ const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* Newsletter */}
-        <div className="mt-12 rounded-2xl border border-gray-800 p-6 md:p-8 bg-gray-900">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div>
-              <h5 className="text-white text-xl font-semibold">Get weekly trading insights</h5>
-              <p className="text-gray-400 mt-1">
-                Short, actionable emails on journaling, risk, and consistency.
-              </p>
-            </div>
-
-            <form onSubmit={handleSubscribe} className="w-full md:w-auto flex items-center gap-3">
-              <div className="relative flex-1 md:flex-none">
-                <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@trader.com"
-                  className="w-full md:w-80 pl-10 pr-4 py-3 rounded-xl bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
-                />
-              </div>
-              <motion.button
-                whileHover={{ x: 2 }}
-                type="submit"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold shadow-md shadow-purple-500/20 transition"
-              >
-                Subscribe
-                <FiArrowRight />
-              </motion.button>
-            </form>
-          </div>
-        </div>
+        
 
         {/* Bottom bar */}
         <div className="mt-10 pt-6 border-t border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4 text-sm">

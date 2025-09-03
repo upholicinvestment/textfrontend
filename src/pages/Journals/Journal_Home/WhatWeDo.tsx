@@ -1,5 +1,5 @@
 // src/pages/About/WhatWeDo.tsx
-import { useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FiTrendingUp,
@@ -16,8 +16,65 @@ import {
 import stockImage from "../../../assets/tradejournal.jpg";   // dashboard
 import stock1Image from "../../../assets/tradedetails.jpg";  // details
 import stock2Image from "../../../assets/dailyjournal.jpg";  // daily
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../../../context/AuthContext";
+import api from "../../../api";
 
+/* -------------------- Entitlement keys (ONLY keys; no fuzzy tokens) -------------------- */
+const JOURNAL_KEYS = new Set([
+  "journaling_solo",
+  "smart_journaling",
+  "journaling",
+  "trade_journal",
+]);
+
+// Any of these bundle keys should also unlock /journal
+const BUNDLE_KEYS = new Set([
+  "essentials_bundle",
+  "essentials",
+  "trader_essentials",
+  "bundle",
+]);
+
+/* -------------------- Helpers for entitlement parsing -------------------- */
+function extractKeys(anyObj: any): string[] {
+  const out: string[] = [];
+  const push = (x: any) => {
+    if (!x) return;
+    if (typeof x === "string") out.push(x);
+    else if (typeof x === "object")
+      out.push(
+        x.key || x.productKey || x.slug || x.route || x.code || x.id || x.name?.toLowerCase?.()
+      );
+  };
+
+  if (!anyObj) return out;
+
+  const pools = [
+    anyObj.products,
+    anyObj.activeProducts,
+    anyObj.entitlements,
+    anyObj.purchases,
+    anyObj.subscriptions,
+    anyObj.bundles,
+    anyObj.modules,
+    anyObj.features,
+    anyObj.items,
+  ].filter(Boolean);
+
+  for (const p of pools) {
+    if (Array.isArray(p)) p.forEach(push);
+    else push(p);
+  }
+
+  return out.filter(Boolean).map((s) => String(s).toLowerCase());
+}
+
+function keysGrantJournal(keys: string[]): boolean {
+  return keys.some((k) => JOURNAL_KEYS.has(k)) || keys.some((k) => BUNDLE_KEYS.has(k));
+}
+
+/* -------------------- Types -------------------- */
 type Feature = {
   icon: React.ReactNode;
   title: string;
@@ -44,12 +101,12 @@ const TABS: TabDef[] = [
   {
     key: "dashboard",
     label: "Journal Dashboard",
-    badge: "Trade Journal Suite",
+    badge: "TradeKhata Suite",
     heading: "Institutional-Grade",
     subheading:
       "Upload your orderbook to get instant stats: win-rate, PnL, R:R, best/worst days, streaks, and an equity/PNL line graph with good vs bad trades.",
     imageAlt: "Journal Dashboard",
-    imageSrc: stockImage, // tradejournal.png
+    imageSrc: stockImage,
     statBL: { title: "WIN RATE", value: "62%", delta: "+2%", tint: "blue" },
     statTR: { title: "AVG R:R", value: "1.8", delta: "+0.2", tint: "purple" },
     features: [
@@ -96,7 +153,7 @@ const TABS: TabDef[] = [
     subheading:
       "Plan trades with bias, setup, entry/SL/TP, and risk. After upload, we auto-match fills to plans and surface insights and improvements.",
     imageAlt: "Daily Journal",
-    imageSrc: stock2Image, // dailyjournal.png
+    imageSrc: stock2Image,
     statBL: { title: "MATCHED TRADES", value: "100%", delta: "+5%", tint: "emerald" },
     statTR: { title: "COMPLIANCE", value: "88%", delta: "+7%", tint: "purple" },
     features: [
@@ -143,7 +200,7 @@ const TABS: TabDef[] = [
     subheading:
       "Tabular deep-dive—entries, exits, size, fees, MFE/MAE, tags, screenshots—plus per-trade stats and performance for fast review.",
     imageAlt: "Trade Details",
-    imageSrc: stock1Image, // tradedetails.png
+    imageSrc: stock1Image,
     statBL: { title: "AVG HOLD", value: "12m", tint: "blue" },
     statTR: { title: "MFE / MAE", value: "+0.9R / -0.5R", tint: "purple" },
     features: [
@@ -193,6 +250,88 @@ const tintMap: Record<"blue" | "purple" | "emerald", string> = {
 export default function WhatWeDo() {
   const [active, setActive] = useState<TabDef["key"]>("dashboard");
   const tab = TABS.find((t) => t.key === active)!;
+
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
+  const [hasJournalAccess, setHasJournalAccess] = useState<boolean | null>(null);
+  const checkingRef = useRef(false);
+
+  // Fast local check: look for product keys on the user object / cached user
+  useEffect(() => {
+    let decided = false;
+
+    const tryLocal = (payload: any) => {
+      if (decided || !payload) return;
+      const keys = extractKeys(payload);
+      if (keysGrantJournal(keys)) {
+        setHasJournalAccess(true);
+        sessionStorage.setItem("hasJournalAccess", "true"); // cache positive only
+        decided = true;
+      }
+    };
+
+    tryLocal(user);
+    try {
+      const cached = JSON.parse(localStorage.getItem("user") || "null");
+      tryLocal(cached);
+    } catch {
+      /* ignore */
+    }
+
+    if (!decided) setHasJournalAccess(null);
+  }, [user]);
+
+  // Live check only against entitlement endpoints to avoid false positives
+  const doLiveCheck = async (): Promise<boolean> => {
+    if (checkingRef.current) return hasJournalAccess === true;
+    checkingRef.current = true;
+
+    const endpoints = [
+      "/me/products",
+      "/me/subscriptions",
+      "/users/me",
+      "/account",
+      "/billing/active-products",
+    ];
+
+    for (const url of endpoints) {
+      try {
+        const r = await api.get(url);
+        const keys = extractKeys(r.data);
+        if (keysGrantJournal(keys)) {
+          setHasJournalAccess(true);
+          sessionStorage.setItem("hasJournalAccess", "true");
+          checkingRef.current = false;
+          return true;
+        }
+      } catch {
+        // continue
+      }
+    }
+    setHasJournalAccess(false);
+    checkingRef.current = false;
+    return false;
+  };
+
+  const handleCTA = async () => {
+    // If not logged in, straight to signup
+    const hasToken = !!localStorage.getItem("token");
+    if (!user && !hasToken) {
+      navigate("/signup?productKey=journaling_solo");
+      return;
+    }
+
+    // Known access
+    if (hasJournalAccess === true) {
+      navigate("/journal");
+      return;
+    }
+
+    // Live verify if unknown or false
+    const ok = await doLiveCheck();
+    if (ok) navigate("/journal");
+    else navigate("/signup?productKey=journaling_solo");
+  };
 
   return (
     <section className="bg-gradient-to-br from-gray-900 to-gray-800 py-24 px-6 text-white relative overflow-hidden">
@@ -272,7 +411,7 @@ export default function WhatWeDo() {
             transition={{ duration: 0.35 }}
             className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center"
           >
-            {/* Image with responsive floating elements */}
+            {/* Image */}
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -286,7 +425,6 @@ export default function WhatWeDo() {
                   alt={tab.imageAlt}
                   className="w-full h-auto object-cover"
                 />
-                {/* Animated overlay */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   whileInView={{ opacity: 1 }}
@@ -295,7 +433,7 @@ export default function WhatWeDo() {
                 />
               </div>
 
-              {/* Floating data points (bottom-left) */}
+              {/* Floating stats */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -315,7 +453,6 @@ export default function WhatWeDo() {
                 </div>
               </motion.div>
 
-              {/* Floating data points (top-right) */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -336,7 +473,7 @@ export default function WhatWeDo() {
               </motion.div>
             </motion.div>
 
-            {/* Features list */}
+            {/* Features + CTA */}
             <motion.div
               initial={{ opacity: 0, x: 50 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -378,9 +515,13 @@ export default function WhatWeDo() {
                 viewport={{ once: true }}
                 className="pt-6 text-left"
               >
-                <Link to="/signup" className="px-8 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:opacity-90 transition-opacity shadow-lg">
+                <button
+                  onClick={handleCTA}
+                  className="px-8 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:opacity-90 transition-opacity shadow-lg"
+                  aria-label="Open Journal"
+                >
                   {tab.cta}
-                </Link>
+                </button>
               </motion.div>
             </motion.div>
           </motion.div>

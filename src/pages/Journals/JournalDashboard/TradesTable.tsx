@@ -256,8 +256,6 @@ const TradesTable = () => {
   
   const totalProfit = profitableTrades.reduce((sum, t) => sum + (t.PnL || 0), 0);
   const totalLoss = lossTrades.reduce((sum, t) => sum + (t.PnL || 0), 0);
-  
-  
     
   const avgWin = avgWinLoss?.avgWin || 0;
   const avgLoss = avgWinLoss?.avgLoss || 0;
@@ -283,6 +281,137 @@ const TradesTable = () => {
     
     return matchesSearch && matchesFilter;
   });
+
+  // =========================
+  // Export helpers (CSV / Print-to-PDF)
+  // =========================
+  const escapeCSV = (val: any) => {
+    const s = val === null || val === undefined ? "" : String(val);
+    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+    // Note: numbers/empty handled naturally
+  };
+
+  const timestamp = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
+  };
+
+  const exportCSV = (rows: Trade[]) => {
+    const headers = [
+      "Entry Date",
+      "Exit Date",
+      "Symbol",
+      "Entry Direction",
+      "Exit Direction",
+      "Quantity",
+      "Entry Price",
+      "Exit Price",
+      "PnL",
+      "Issues",
+      "Insights"
+    ];
+
+    const data = rows.map(t => ([
+      t.entry?.Date || "",
+      t.exit?.Date || "",
+      t.symbol || "",
+      t.entry?.Direction || "",
+      t.exit?.Direction || "",
+      t.entry?.Quantity ?? "",
+      t.entry?.Price ?? "",
+      t.exit?.Price ?? "",
+      t.PnL ?? "",
+      t.Demon || "",
+      t.GoodPractice || ""
+    ]));
+
+    const csv = [
+      headers.map(escapeCSV).join(","),
+      ...data.map(row => row.map(escapeCSV).join(","))
+    ].join("\n");
+
+    // Add BOM for Excel compatibility
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `trades_export_${timestamp()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Lightweight print-to-PDF (opens printable window; user can choose "Save as PDF")
+  const exportPrintPDF = (rows: Trade[]) => {
+    const printHtml = `
+      <html>
+        <head>
+          <title>Trades Export</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <style>
+            body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }
+            h1 { font-size: 20px; margin: 0 0 12px 0; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; text-align: left; }
+            th { background: #f1f5f9; }
+            .meta { color: #64748b; margin-bottom: 12px; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>Trades Export</h1>
+          <div class="meta">Exported: ${new Date().toLocaleString()}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Entry Date</th>
+                <th>Exit Date</th>
+                <th>Symbol</th>
+                <th>Entry Direction</th>
+                <th>Exit Direction</th>
+                <th>Quantity</th>
+                <th>Entry Price</th>
+                <th>Exit Price</th>
+                <th>PnL</th>
+                <th>Issues</th>
+                <th>Insights</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(t => `
+                <tr>
+                  <td>${t.entry?.Date ?? ""}</td>
+                  <td>${t.exit?.Date ?? ""}</td>
+                  <td>${t.symbol ?? ""}</td>
+                  <td>${t.entry?.Direction ?? ""}</td>
+                  <td>${t.exit?.Direction ?? ""}</td>
+                  <td>${t.entry?.Quantity ?? ""}</td>
+                  <td>${t.entry?.Price ?? ""}</td>
+                  <td>${t.exit?.Price ?? ""}</td>
+                  <td>${t.PnL ?? ""}</td>
+                  <td>${t.Demon ?? ""}</td>
+                  <td>${t.GoodPractice ?? ""}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+          <script>
+            window.onload = function() {
+              setTimeout(function(){ window.print(); }, 100);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    const win = window.open("", "_blank", "noopener,noreferrer");
+    if (!win) return; // popup blocked
+    win.document.open();
+    win.document.write(printHtml);
+    win.document.close();
+  };
 
   return (
     <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
@@ -315,13 +444,27 @@ const TradesTable = () => {
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               
-              <button className={`
-                flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm
-                ${darkMode ? 
-                  "bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300" : 
-                  "bg-white border-gray-300 hover:bg-gray-100 text-gray-700"}
-                border
-              `}>
+              {/* Export button (click = CSV, Shift+Click = print-to-PDF) */}
+              <button
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  if (filteredTrades.length === 0) return;
+                  if (e.shiftKey) {
+                    // Hold SHIFT to open a print dialog (user can "Save as PDF")
+                    exportPrintPDF(filteredTrades);
+                  } else {
+                    // Default: export CSV
+                    exportCSV(filteredTrades);
+                  }
+                }}
+                className={`
+                  flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm
+                  ${darkMode ? 
+                    "bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300" : 
+                    "bg-white border-gray-300 hover:bg-gray-100 text-gray-700"}
+                  border
+                `}
+                title="Click to export CSV • Shift+Click to print to PDF"
+              >
                 <Download className="w-4 h-4" />
                 <span>Export</span>
               </button>
@@ -345,22 +488,22 @@ const TradesTable = () => {
             />
             
             <StatCard
-  icon={<Target className={`w-5 h-5 ${
-    darkMode ? "text-green-400" : "text-green-600"
-  }`} />}
-  label="Win Rate"
-  value={
-    <span className={
-      winRate >= 60 ? "text-green-600" : 
-      winRate >= 50 ? "text-green-400" : 
-      "text-red-500"
-    }>
-      {winRate}%
-    </span>
-  }
-  subtext={`${profitableTrades.length} wins • ${lossTrades.length} losses`}
-  trend={winRate - 50}
-/>
+              icon={<Target className={`w-5 h-5 ${
+                darkMode ? "text-green-400" : "text-green-600"
+              }`} />}
+              label="Win Rate"
+              value={
+                <span className={
+                  winRate >= 60 ? "text-green-600" : 
+                  winRate >= 50 ? "text-green-400" : 
+                  "text-red-500"
+                }>
+                  {winRate}%
+                </span>
+              }
+              subtext={`${profitableTrades.length} wins • ${lossTrades.length} losses`}
+              trend={winRate - 50}
+            />
             
             <StatCard
               icon={<Trophy className={`w-5 h-5 ${
@@ -383,54 +526,54 @@ const TradesTable = () => {
 
           {/* Performance Indicators */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-  <PerformanceIndicator 
-    value={
-      winRate >= 60 ? 45 : 
-      winRate >= 50 ? 25 : 
-      -25
-    } 
-    label={
-      winRate >= 60 ? 'Excellent Win Rate' : 
-      winRate >= 50 ? 'Average Win Rate' : 
-      'Poor Win Rate'
-    } 
-  />
-  <PerformanceIndicator 
-    value={
-      profitFactor >= 2 ? 50 : 
-      profitFactor >= 1.5 ? 30 : 
-      -30
-    } 
-    label={
-      profitFactor >= 2 ? 'Excellent Profit Factor' : 
-      profitFactor >= 1.5 ? 'Good Profit Factor' : 
-      'Poor Profit Factor'
-    } 
-  />
-  <PerformanceIndicator 
-    value={
-      riskRewardRatio >= 2 ? 40 : 
-      riskRewardRatio >= 1.5 ? 20 : 
-      -20
-    } 
-    label={
-      riskRewardRatio >= 2 ? 'Great Risk/Reward' : 
-      riskRewardRatio >= 1.5 ? 'Decent Risk/Reward' : 
-      'Poor Risk/Reward'
-    } 
-  />
-  <PerformanceIndicator 
-    value={netPnl && netPnl > 0 ? 
-      (netPnl > totalProfit * 0.3 ? 50 : 30) : 
-      -40
-    } 
-    label={
-      netPnl && netPnl > 0 ? 
-        (netPnl > totalProfit * 0.3 ? 'Highly Profitable' : 'Moderately Profitable') : 
-        'Overall Loss'
-    } 
-  />
-</div>
+            <PerformanceIndicator 
+              value={
+                winRate >= 60 ? 45 : 
+                winRate >= 50 ? 25 : 
+                -25
+              } 
+              label={
+                winRate >= 60 ? 'Excellent Win Rate' : 
+                winRate >= 50 ? 'Average Win Rate' : 
+                'Poor Win Rate'
+              } 
+            />
+            <PerformanceIndicator 
+              value={
+                profitFactor >= 2 ? 50 : 
+                profitFactor >= 1.5 ? 30 : 
+                -30
+              } 
+              label={
+                profitFactor >= 2 ? 'Excellent Profit Factor' : 
+                profitFactor >= 1.5 ? 'Good Profit Factor' : 
+                'Poor Profit Factor'
+              } 
+            />
+            <PerformanceIndicator 
+              value={
+                riskRewardRatio >= 2 ? 40 : 
+                riskRewardRatio >= 1.5 ? 20 : 
+                -20
+              } 
+              label={
+                riskRewardRatio >= 2 ? 'Great Risk/Reward' : 
+                riskRewardRatio >= 1.5 ? 'Decent Risk/Reward' : 
+                'Poor Risk/Reward'
+              } 
+            />
+            <PerformanceIndicator 
+              value={netPnl && netPnl > 0 ? 
+                (netPnl > totalProfit * 0.3 ? 50 : 30) : 
+                -40
+              } 
+              label={
+                netPnl && netPnl > 0 ? 
+                  (netPnl > totalProfit * 0.3 ? 'Highly Profitable' : 'Moderately Profitable') : 
+                  'Overall Loss'
+              } 
+            />
+          </div>
 
           {/* Controls */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">

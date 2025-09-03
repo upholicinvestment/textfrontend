@@ -241,17 +241,18 @@ const PricingSection = () => {
         <div className="grid md:grid-cols-3 gap-8 items-start">
           {plans.map((plan, index) => (
             <div
-              key={plan.key}
-              className={`relative rounded-2xl border ${
-                plan.popular ? "border-yellow-400" : "border-purple-600/50"
-              } bg-[#101223] px-6 py-10 ${
-                plan.popular ? "shadow-yellow-500/20" : "shadow-purple-500/20"
-              } shadow-2xl group h-full max-w-[360px] mx-auto flex flex-col justify-between transition-all duration-300 ${
-                hoveredCard === index ? "transform scale-105" : ""
-              } ${plan.popular ? "md:-translate-y-5" : ""}`}
-              onMouseEnter={() => setHoveredCard(index)}
-              onMouseLeave={() => setHoveredCard(null)}
-            >
+  key={plan.key}
+  className={`relative w-full max-w-[360px] rounded-2xl border ${
+    plan.popular ? "border-yellow-400" : "border-purple-600/50"
+  } bg-[#101223] px-6 py-10 ${
+    plan.popular ? "shadow-yellow-500/20" : "shadow-purple-500/20"
+  } shadow-2xl group h-full mx-auto flex flex-col justify-between transition-all duration-300 ${
+    hoveredCard === index ? "transform scale-105" : ""
+  } ${plan.popular ? "md:-translate-y-5" : ""}`}
+  onMouseEnter={() => setHoveredCard(index)}
+  onMouseLeave={() => setHoveredCard(null)}
+>
+
               {/* ribbon should not block clicks */}
               {plan.popular && (
                 <div className="pointer-events-none absolute top-0 right-0 bg-yellow-400 text-black text-xs font-bold px-4 py-1 rounded-bl-lg rounded-tr-lg">

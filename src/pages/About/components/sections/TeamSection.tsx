@@ -24,7 +24,7 @@ const TeamSection = () => {
         name: "Anil Kesi",
         role: "Founder & CEO",
         img: anil,
-        bio: "Founder and Business head with 12 years of proven expertise in insurance sales, driving growth and building high-performing teams.",
+        bio: "Founder & CEO of UpholicTech, a fintech platform for algorithmic trading, analytics, and journaling. With 16+ years in insurance sales, he blends risk discipline with product execution.",
         // skills: ["Deep Learning", "Latency", "Infra"],
         // achievements: ["MIT PhD", "50+ AI Patents"],
         links: {
@@ -35,7 +35,7 @@ const TeamSection = () => {
       {
         id: 2,
         name: "Shehla Khan",
-        role: "Founder",
+        role: "Founder & CBO",
         img: shehla,
         bio: "Founder and Business head with 12 years of proven expertise in insurance sales, driving growth and building high-performing teams.",
         // skills: ["Strategy", "Markets", "Risk"],

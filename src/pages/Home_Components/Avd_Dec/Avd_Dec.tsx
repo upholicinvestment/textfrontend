@@ -122,7 +122,7 @@ const Avd_Dec: React.FC = () => {
   }
 
   if (error) {
-    console.log("Rendering error state:", error);
+    // console.log("Rendering error state:", error);
     return (
       <Wrapper>
         <h2 className="text-2xl font-bold text-center text-white mb-4">

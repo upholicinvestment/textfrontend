@@ -67,7 +67,7 @@ export default function OIChartTabs() {
           );
           const json = await res.json();
           setATMData(json.atmStrikes || []);
-          console.log(res);
+          // console.log(res);
         } else {
           let endpoint =
             tab === "NEAR5"
