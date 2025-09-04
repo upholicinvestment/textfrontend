@@ -32,19 +32,18 @@ api.interceptors.request.use((cfg) => {
     cfg.headers = cfg.headers ?? {};
     cfg.headers.Authorization = `Bearer ${token}`;
   }
-  const url = `${cfg.baseURL || ""}${cfg.url || ""}`;
-  console.log("[API REQ]", (cfg.method || "GET").toUpperCase(), url, cfg.data ?? "");
+  // console.log("[API REQ]", (cfg.method || "GET").toUpperCase(), url, cfg.data ?? "");
   return cfg;
 });
 
 api.interceptors.response.use(
   (res) => {
-    console.log("[API RES]", res.status, res.config?.url, res.data ?? "");
+    // console.log("[API RES]", res.status, res.config?.url, res.data ?? "");
     return res;
   },
   (err) => {
-    const { status, message, details } = extractServerError(err);
-    console.warn("[API ERR]", status, err.config?.url, message, details ?? "");
+    extractServerError(err);
+    // console.warn("[API ERR]", status, err.config?.url, message, details ?? "");
     return Promise.reject(err);
   }
 );

@@ -171,7 +171,7 @@ const Dashboard = () => {
         return "bg-yellow-100 text-yellow-800";
       case "starter":
         return "bg-indigo-100 text-indigo-700";
-      case "swing":
+      case "Sniper":
         return "bg-emerald-100 text-emerald-700";
       default:
         return "bg-white text-[#1a237e]";
@@ -190,10 +190,10 @@ const Dashboard = () => {
 
       ui.push({
         id: "bundle-owned",
-        name: "Trader's Essential Bundle (5-in-1)",
-        description: "All 5 premium tools for the price of one",
+        name: "Trader's Essential Bundle (2-in-1)",
+        description: "All 2 premium tools for the price of one",
         icon: <PackageOpen className="h-6 w-6" />,
-        stats: "5 tools included",
+        stats: "2 tools included",
         change: "+12.4%",
         link: "/bundle",
         gradient: "from-blue-500 to-cyan-400",
