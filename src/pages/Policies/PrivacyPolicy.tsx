@@ -1,5 +1,10 @@
+import Footer from "../../components/layout/Footer/Footer";
+import Navbar from "../../components/layout/Navbar/Navbar";
+
 const PrivacyPolicy = () => {
   return (
+    <>
+    <Navbar/>
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8">
         
@@ -265,6 +270,8 @@ const PrivacyPolicy = () => {
         </div>
       </div>
     </div>
+    <Footer/>
+    </>
   );
 };
 

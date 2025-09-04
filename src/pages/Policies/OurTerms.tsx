@@ -1,6 +1,8 @@
 // OurTerms.tsx
 import { Helmet } from 'react-helmet';
 import { useState, useEffect } from 'react';
+import Navbar from '../../components/layout/Navbar/Navbar';
+import Footer from '../../components/layout/Footer/Footer';
 
 const OurTerms = () => {
   const [activeSection, setActiveSection] = useState<string | null>(null);
@@ -32,6 +34,8 @@ const OurTerms = () => {
   };
 
   return (
+    <>
+    <Navbar/>
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <Helmet>
         <title>Terms & Conditions | UPHOLIC TECH PRIVATE LIMITED</title>
@@ -271,6 +275,8 @@ const OurTerms = () => {
         </div>
       </div>
     </div>
+    <Footer/>
+    </>
   );
 };
 

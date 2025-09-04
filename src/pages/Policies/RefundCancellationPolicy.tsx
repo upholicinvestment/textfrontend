@@ -1,5 +1,10 @@
+import Footer from "../../components/layout/Footer/Footer";
+import Navbar from "../../components/layout/Navbar/Navbar";
+
 const RefundCancellationPolicy = () => {
   return (
+    <>
+    <Navbar/>
     <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
       <div className="bg-white shadow-xl rounded-2xl overflow-hidden">
         {/* Header Section */}
@@ -115,6 +120,8 @@ const RefundCancellationPolicy = () => {
         </div>
       </div>
     </div>
+    <Footer/>
+    </>
   );
 };
 

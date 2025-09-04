@@ -140,15 +140,11 @@ async function getUserSnapshot(authUser: any): Promise<any> {
   try {
     const cached = JSON.parse(localStorage.getItem("user") || "null");
     if (cached) return cached;
-  } catch {
-    /* ignore */
-  }
+  } catch {/* ignore */}
   try {
     const r = await api.get("/users/me");
     if (r?.data) return r.data;
-  } catch {
-    /* ignore */
-  }
+  } catch {/* ignore */}
   return null;
 }
 
@@ -210,8 +206,11 @@ const Register = () => {
   const [initialProductId, setInitialProductId] = useState("");
   const [initialVariantId, setInitialVariantId] = useState("");
 
-  // Billing interval
-  const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
+  // Billing interval (initialized from query param)
+  const qpInterval = (searchParams.get("interval") || "").toLowerCase();
+  const initialInterval = qpInterval === "yearly" ? "yearly" : "monthly";
+  const [billingInterval, setBillingInterval] =
+    useState<"monthly" | "yearly">(initialInterval);
 
   // Broker state (optional)
   const [brokerName, setBrokerName] = useState("");
@@ -282,10 +281,23 @@ const Register = () => {
     }
   }, [products, searchParams]);
 
-  // Reset billing interval when product changes
+  // Keep interval in sync with URL if it changes via back/forward
+  useEffect(() => {
+    const q = (searchParams.get("interval") || "").toLowerCase();
+    if (q === "monthly" || q === "yearly") {
+      setBillingInterval(q as "monthly" | "yearly");
+    }
+  }, [searchParams]);
+
+  // When product changes:
+  // - If it doesn't support yearly OR has variants → force monthly
+  // - Otherwise keep whatever interval is already selected (incl. the one from URL)
   useEffect(() => {
     if (!selectedProduct) return;
-    setBillingInterval("monthly");
+    if (!YEARLY_ELIGIBLE.has(selectedProduct.key) || selectedProduct.hasVariants) {
+      setBillingInterval("monthly");
+      return;
+    }
   }, [selectedProduct?.key, selectedProduct?.hasVariants]);
 
   /* ---------- Ownership redirects for LOGGED-IN users ---------- */
@@ -736,25 +748,6 @@ const Register = () => {
           <FiX className="w-6 h-6" />
         </Link>
 
-        {/* Left */}
-        {/* <div className="hidden md:flex flex-1 bg-indigo-600 p-12 items-center justify-center">
-          <div className="text-white text-center">
-            <img
-              src="https://illustrations.popsy.co/amber/digital-nomad.svg"
-              alt="Trading Illustration"
-              className="w-full h-auto max-w-md mx-auto mb-8"
-            />
-            <h2 className="text-3xl font-bold mb-4">
-              {isLoggedIn ? "Upgrade Your Toolkit" : "Start Your Trading Journey"}
-            </h2>
-            <p className="text-indigo-100">
-              {isLoggedIn
-                ? "Choose a product and activate instantly"
-                : "Join thousands of traders using our platform to maximize their profits"}
-            </p>
-          </div>
-        </div> */}
-
         {/* Right */}
         <div className="flex-1 p-8 md:p-12">
           <div className="max-w-md mx-auto">
@@ -981,8 +974,6 @@ const Register = () => {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                     
-
                       {billingInterval === "yearly"
                         ? "Billed once per year."
                         : "Billed every month."}

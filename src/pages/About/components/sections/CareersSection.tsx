@@ -28,6 +28,16 @@ const ALL = "All";
 const GRAD = "bg-gradient-to-r from-[#1a237e] to-[#4a56d2]";
 const GRAD_HOVER = "hover:from-[#18206b] hover:to-[#4450cf]";
 const GRAD_TEXT = "bg-gradient-to-r from-[#1a237e] to-[#4a56d2] bg-clip-text text-transparent";
+const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+const MAX_FILE_MB = 10;
+function fileError(file: File | null) {
+  if (!file) return "This file is required";
+  const okExt = /\.(pdf|doc|docx)$/i.test(file.name);
+  if (!okExt) return "Upload PDF/DOC/DOCX only";
+  const tooBig = file.size > MAX_FILE_MB * 1024 * 1024;
+  if (tooBig) return `Max size ${MAX_FILE_MB}MB`;
+  return "";
+}
 
 type CareerJob = {
   id: string;
@@ -399,10 +409,10 @@ export default function CareersSection() {
   };
 
   return (
-    <section className="min-h-screen bg-slate-950 text-white py-16">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="min-h-screen bg-slate-950 text-white">
+      <div className="max-w-7xl py-10 mx-auto px-6 ">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center  mb-12">
           <div className="inline-flex items-center gap-2 bg-[#1a237e]/10 border border-[#4a56d2]/30 rounded-full px-4 py-2 mb-5">
             <Sparkles className="w-4 h-4 text-[#4a56d2]" />
             <span className="text-sm font-medium" style={{ color: "#4a56d2" }}>
@@ -898,7 +908,6 @@ function JobModal({
 }
 
 /* —————————————————— Apply Modal —————————————————— */
-
 function ApplyModal({
   job,
   onClose,
@@ -922,14 +931,15 @@ function ApplyModal({
     resume: null as File | null,
   };
   const [form, setForm] = useState({ ...empty });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (job) {
       setMsg("");
       setSubmitting(false);
       setForm({ ...empty });
+      setErrors({});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id]);
 
   useEffect(() => {
@@ -946,33 +956,68 @@ function ApplyModal({
 
   if (!job) return null;
 
+  function validate() {
+    const e: Record<string, string> = {};
+    if (!form.name.trim()) e.name = "Full name is required";
+    if (!form.email.trim()) e.email = "Email is required";
+    else if (!EMAIL_RX.test(form.email)) e.email = "Enter a valid email";
+    if (!form.phone.trim()) e.phone = "Phone is required";
+    if (!form.linkedin.trim()) e.linkedin = "LinkedIn is required";
+    if (form.expYears === "") e.expYears = "Experience is required";
+    else if (isNaN(Number(form.expYears)) || Number(form.expYears) < 0)
+      e.expYears = "Enter a valid number (0+)";
+    if (!form.currentLocation.trim()) e.currentLocation = "Current location is required";
+    const fileErr = fileError(form.resume);
+    if (fileErr) e.resume = fileErr;
+    if (!form.coverLetter.trim()) e.coverLetter = "Cover letter is required";
+    return e;
+  }
+
+  function scrollFirstError(errs: Record<string, string>) {
+    const first = Object.keys(errs)[0];
+    if (first) {
+      const el = document.getElementById(`apply-${first}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
   const submit = async (e?: React.FormEvent) => {
-    e?.preventDefault?.();
+    e?.preventDefault?.(); // guard against Enter key
     setSubmitting(true);
     setMsg("");
+
+    const errs = validate();
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      scrollFirstError(errs);
+      setMsg("Please fix the highlighted fields.");
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const fd = new FormData();
-      fd.append("name", form.name);
-      fd.append("email", form.email);
-      if (form.phone) fd.append("phone", form.phone);
-      if (form.linkedin) fd.append("linkedin", form.linkedin);
-      if (form.expYears) fd.append("expYears", String(form.expYears));
-      if (form.currentLocation) fd.append("currentLocation", form.currentLocation);
-      if (form.coverLetter) fd.append("coverLetter", form.coverLetter);
+      fd.append("name", form.name.trim());
+      fd.append("email", form.email.trim());
+      fd.append("phone", form.phone.trim());
+      fd.append("linkedin", form.linkedin.trim());
+      fd.append("expYears", String(form.expYears));
+      fd.append("currentLocation", form.currentLocation.trim());
+      fd.append("coverLetter", form.coverLetter.trim());
       if (form.resume) fd.append("resume", form.resume);
 
       const res = await fetch(`${API_BASE}/jobs/${job.id}/apply`, { method: "POST", body: fd });
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw new Error(t || "Failed to submit application");
-      }
+      let payload: any = null;
+      try { payload = await res.json(); } catch {}
+      if (!res.ok) throw new Error(payload?.error || "Failed to submit application");
 
       setMsg("Application submitted. We'll get back to you soon!");
       setTimeout(() => {
         setForm({ ...empty });
+        setErrors({});
         setMsg("");
         onSuccess?.();
-      }, 1400);
+      }, 1200);
     } catch (e: any) {
       setMsg(e?.message || "Something went wrong");
     } finally {
@@ -983,131 +1028,158 @@ function ApplyModal({
   return (
     <AnimatePresence>
       {job && (
-        <motion.div
-          key={`apply-${job.id}`}
-          className="fixed inset-0 z-50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
+        <>
+          {/* Scoped scrollbar styles (self-contained) */}
+          <style>{`
+            .ultra-thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(74,86,210,.6) transparent; }
+            .ultra-thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+            .ultra-thin-scroll::-webkit-scrollbar-track { background: transparent; }
+            .ultra-thin-scroll::-webkit-scrollbar-thumb { background: rgba(74,86,210,.6); border-radius: 9999px; }
+            .ultra-thin-scroll::-webkit-scrollbar-thumb:hover { background: rgba(74,86,210,.8); }
+          `}</style>
+
           <motion.div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={onClose}
+            key={`apply-${job.id}`}
+            className="fixed inset-0 z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-          />
-          <motion.div
-            className="absolute inset-0 flex items-start sm:items-center justify-center p-0 sm:p-4 overscroll-contain"
-            initial={{ y: 20, scale: 0.98 }}
-            animate={{ y: 0, scale: 1 }}
-            exit={{ y: 10, scale: 0.98 }}
           >
-            <div
-              role="dialog"
-              aria-modal="true"
-              className="relative w-full max-w-2xl sm:rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[100svh] sm:max-h-[90vh]"
-              onClick={(e) => e.stopPropagation()}
+            <motion.div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={onClose}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+            {/* Modified for mobile: items-end and pb-safe */}
+            <motion.div
+              className="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-contain pb-safe"
+              initial={{ y: 20, scale: 0.98 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: 10, scale: 0.98 }}
             >
-              {/* Header */}
-              <div className="flex items-start justify-between p-4 sm:p-5 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
-                <div>
-                  <h3 className="text-base sm:text-lg font-semibold">Apply — {job.title}</h3>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {job.department} • {(job.locations || []).join(", ")}
-                  </p>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="rounded-lg border border-slate-700 px-2 py-1 text-slate-300 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Body (scrollable form) */}
-              <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-                <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Input label="Full Name" required value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
-                  <Input
-                    label="Email"
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(v) => setForm({ ...form, email: v })}
-                  />
-                  <Input label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
-                  <Input
-                    label="LinkedIn"
-                    placeholder="https://"
-                    value={form.linkedin}
-                    onChange={(v) => setForm({ ...form, linkedin: v })}
-                  />
-                  <Input
-                    label="Experience (yrs)"
-                    type="number"
-                    value={form.expYears}
-                    onChange={(v) => setForm({ ...form, expYears: v })}
-                  />
-                  <Input
-                    label="Current Location"
-                    value={form.currentLocation}
-                    onChange={(v) => setForm({ ...form, currentLocation: v })}
-                  />
-
-                  <div className="md:col-span-2">
-                    <Label>Resume (PDF/DOC)</Label>
-                    <input
-                      id="apply-resume"
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#1a237e] file:text-white file:px-3 file:py-1.5 file:hover:bg-[#18206b] bg-slate-900/80 border border-slate-700 rounded-xl p-1.5"
-                      onChange={(e) => setForm({ ...form, resume: e.target.files?.[0] || null })}
-                    />
+              <div
+                role="dialog"
+                aria-modal="true"
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-2xl sm:rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[90svh] sm:max-h-[90vh]"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between p-4 sm:p-5 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold">Apply — {job.title}</h3>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {job.department} • {(job.locations || []).join(", ")}
+                    </p>
                   </div>
-
-                  <div className="md:col-span-2">
-                    <Label>Cover Letter</Label>
-                    <textarea
-                      rows={3}
-                      className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40 transition-colors"
-                      value={form.coverLetter}
-                      onChange={(e) => setForm({ ...form, coverLetter: e.target.value })}
-                    />
-                  </div>
-
-                  {/* Footer spacer for mobile */}
-                  <div className="md:col-span-2 h-1" />
-                </form>
-              </div>
-
-              {/* Footer (sticky) */}
-              <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-900 sticky bottom-0">
-                <div className="flex items-center gap-2">
                   <button
-                    disabled={submitting}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold text-white bg-gradient-to-r from-[#1a237e] to-[#4a56d2] hover:from-[#18206b] hover:to-[#4450cf] transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => submit()}
-                  >
-                    {submitting ? "Submitting…" : "Submit"}
-                  </button>
-                  <button
-                    type="button"
                     onClick={onClose}
-                    className="rounded-xl border border-slate-700 px-4 py-2.5 font-semibold hover:border-slate-500"
+                    className="rounded-lg border border-slate-700 px-2 py-1 text-slate-300 hover:text-white"
                   >
-                    Cancel
+                    ✕
                   </button>
-                  {msg && <span className="text-[11px] sm:text-xs text-slate-300 ml-auto">{msg}</span>}
+                </div>
+
+                {/* Body (thin scrollbar) */}
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4 ultra-thin-scroll">
+                  <form onSubmit={submit} noValidate className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Input id="apply-name" label="Full Name" value={form.name}
+                      onChange={(v) => { setForm({ ...form, name: v }); if (errors.name) setErrors({ ...errors, name: "" }); }}
+                      error={errors.name}
+                    />
+                    <Input id="apply-email" label="Email" type="email" value={form.email}
+                      onChange={(v) => { setForm({ ...form, email: v }); if (errors.email) setErrors({ ...errors, email: "" }); }}
+                      error={errors.email}
+                    />
+                    <Input id="apply-phone" label="Phone" value={form.phone}
+                      onChange={(v) => { setForm({ ...form, phone: v }); if (errors.phone) setErrors({ ...errors, phone: "" }); }}
+                      error={errors.phone}
+                    />
+                    <Input id="apply-linkedin" label="LinkedIn" placeholder="https://"
+                      value={form.linkedin}
+                      onChange={(v) => { setForm({ ...form, linkedin: v }); if (errors.linkedin) setErrors({ ...errors, linkedin: "" }); }}
+                      error={errors.linkedin}
+                    />
+                    <Input id="apply-expYears" label="Experience (yrs)" type="number"
+                      value={form.expYears}
+                      onChange={(v) => { setForm({ ...form, expYears: v }); if (errors.expYears) setErrors({ ...errors, expYears: "" }); }}
+                      error={errors.expYears}
+                    />
+                    <Input id="apply-currentLocation" label="Current Location" value={form.currentLocation}
+                      onChange={(v) => { setForm({ ...form, currentLocation: v }); if (errors.currentLocation) setErrors({ ...errors, currentLocation: "" }); }}
+                      error={errors.currentLocation}
+                    />
+
+                    <div className="md:col-span-2">
+                      <Label htmlFor="apply-resume">Resume (PDF/DOC)</Label>
+                      <input
+                        id="apply-resume"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          setForm({ ...form, resume: f });
+                          if (errors.resume) setErrors({ ...errors, resume: "" });
+                        }}
+                        className={`block w-full text-sm text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#1a237e] file:text-white file:px-3 file:py-1.5 file:hover:bg-[#18206b] bg-slate-900/80 border rounded-xl p-1.5
+                          ${errors.resume ? "border-red-500 focus:border-red-500" : "border-slate-700"}
+                        `}
+                      />
+                      {errors.resume && <span className="mt-1 block text-xs text-red-400">{errors.resume}</span>}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <Label htmlFor="apply-cover">Cover Letter</Label>
+                      <textarea
+                        id="apply-cover"
+                        rows={3}
+                        value={form.coverLetter}
+                        onChange={(e) => {
+                          setForm({ ...form, coverLetter: e.target.value });
+                          if (errors.coverLetter) setErrors({ ...errors, coverLetter: "" });
+                        }}
+                        className={`w-full bg-slate-900/80 border rounded-xl px-3 py-2 text-slate-200 outline-none transition-colors
+                          ${errors.coverLetter ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30" : "border-slate-700 focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40"}
+                        `}
+                      />
+                      {errors.coverLetter && <span className="mt-1 block text-xs text-red-400">{errors.coverLetter}</span>}
+                    </div>
+
+                    <div className="md:col-span-2 h-1" />
+                  </form>
+                </div>
+
+                {/* Footer - Modified for mobile */}
+                <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-900">
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold text-white bg-gradient-to-r from-[#1a237e] to-[#4a56d2] hover:from-[#18206b] hover:to-[#4450cf] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => submit()}
+                    >
+                      {submitting ? "Submitting…" : "Submit"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="w-full sm:w-auto rounded-xl border border-slate-700 px-4 py-2.5 font-semibold hover:border-slate-500"
+                    >
+                      Cancel
+                    </button>
+                    {msg && <span className="text-[11px] sm:text-xs text-slate-300 mt-2 sm:mt-0 sm:ml-auto">{msg}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
+        </>
       )}
     </AnimatePresence>
   );
 }
+
 
 /* —————————————————— Send Resume Modal —————————————————— */
 
@@ -1126,14 +1198,15 @@ function SendResumeModal({ open, onClose }: { open: boolean; onClose: () => void
     resume: null as File | null,
   };
   const [form, setForm] = useState({ ...empty });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open) {
       setMsg("");
       setSubmitting(false);
       setForm({ ...empty });
+      setErrors({});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {
@@ -1150,33 +1223,66 @@ function SendResumeModal({ open, onClose }: { open: boolean; onClose: () => void
 
   if (!open) return null;
 
+  function validate() {
+    const e: Record<string, string> = {};
+    if (!form.name.trim()) e.name = "Full name is required";
+    if (!form.email.trim()) e.email = "Email is required";
+    else if (!EMAIL_RX.test(form.email)) e.email = "Enter a valid email";
+    if (!form.phone.trim()) e.phone = "Phone is required";
+    if (!form.targetDepartment.trim()) e.targetDepartment = "Preferred department is required";
+    if (!form.roleTitle.trim()) e.roleTitle = "Desired role title is required";
+    if (!form.linkedin.trim()) e.linkedin = "LinkedIn is required";
+    const fileErr = fileError(form.resume);
+    if (fileErr) e.resume = fileErr;
+    if (!form.coverLetter.trim()) e.coverLetter = "Cover letter is required";
+    return e;
+  }
+
+  function scrollFirstError(errs: Record<string, string>) {
+    const first = Object.keys(errs)[0];
+    if (first) {
+      const el = document.getElementById(`resume-${first}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault?.();
     setSubmitting(true);
     setMsg("");
+
+    const errs = validate();
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      scrollFirstError(errs);
+      setMsg("Please fix the highlighted fields.");
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const fd = new FormData();
-      fd.append("name", form.name);
-      fd.append("email", form.email);
-      if (form.phone) fd.append("phone", form.phone);
-      if (form.targetDepartment) fd.append("targetDepartment", form.targetDepartment);
-      if (form.roleTitle) fd.append("roleTitle", form.roleTitle);
-      if (form.linkedin) fd.append("linkedin", form.linkedin);
-      if (form.coverLetter) fd.append("coverLetter", form.coverLetter);
+      fd.append("name", form.name.trim());
+      fd.append("email", form.email.trim());
+      fd.append("phone", form.phone.trim());
+      fd.append("targetDepartment", form.targetDepartment.trim());
+      fd.append("roleTitle", form.roleTitle.trim());
+      fd.append("linkedin", form.linkedin.trim());
+      fd.append("coverLetter", form.coverLetter.trim());
       if (form.resume) fd.append("resume", form.resume);
 
       const res = await fetch(`${API_BASE}/resume`, { method: "POST", body: fd });
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw new Error(t || "Failed to send resume");
-      }
+      let payload: any = null;
+      try { payload = await res.json(); } catch {}
+      if (!res.ok) throw new Error(payload?.error || "Failed to send resume");
 
       setMsg("Thanks! Your resume has been received.");
       setTimeout(() => {
         setForm({ ...empty });
+        setErrors({});
         setMsg("");
         onClose();
-      }, 1400);
+      }, 1200);
     } catch (e: any) {
       setMsg(e?.message || "Something went wrong");
     } finally {
@@ -1187,127 +1293,153 @@ function SendResumeModal({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
-          key="send-resume"
-          className="fixed inset-0 z-50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
+        <>
+          <style>{`
+            .ultra-thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(74,86,210,.6) transparent; }
+            .ultra-thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+            .ultra-thin-scroll::-webkit-scrollbar-track { background: transparent; }
+            .ultra-thin-scroll::-webkit-scrollbar-thumb { background: rgba(74,86,210,.6); border-radius: 9999px; }
+            .ultra-thin-scroll::-webkit-scrollbar-thumb:hover { background: rgba(74,86,210,.8); }
+          `}</style>
+
           <motion.div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={onClose}
+            key="send-resume"
+            className="fixed inset-0 z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-          />
-          <motion.div
-            className="absolute inset-0 flex items-start sm:items-center justify-center p-0 sm:p-4 overscroll-contain"
-            initial={{ y: 20, scale: 0.98 }}
-            animate={{ y: 0, scale: 1 }}
-            exit={{ y: 10, scale: 0.98 }}
           >
-            <div
-              role="dialog"
-              aria-modal="true"
-              className="relative w-full max-w-2xl sm:rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[100svh] sm:max-h-[90vh]"
-              onClick={(e) => e.stopPropagation()}
+            <motion.div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={onClose}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+            {/* Modified for mobile: items-end and pb-safe */}
+            <motion.div
+              className="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-contain pb-safe"
+              initial={{ y: 20, scale: 0.98 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: 10, scale: 0.98 }}
             >
-              {/* Header */}
-              <div className="flex items-start justify-between p-4 sm:p-5 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
-                <div>
-                  <h3 className="text-base sm:text-lg font-semibold">Send Resume</h3>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    No matching role? Share your profile for future openings.
-                  </p>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="rounded-lg border border-slate-700 px-2 py-1 text-slate-300 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Body (scrollable form) */}
-              <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-                <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Input label="Full Name" required value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
-                  <Input
-                    label="Email"
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(v) => setForm({ ...form, email: v })}
-                  />
-                  <Input label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
-                  <Input
-                    label="Preferred Department"
-                    placeholder="Engineering / Product / Design / Growth / Research"
-                    value={form.targetDepartment}
-                    onChange={(v) => setForm({ ...form, targetDepartment: v })}
-                  />
-                  <Input
-                    label="Desired Role Title"
-                    placeholder="e.g., React Engineer, DevOps, PM"
-                    value={form.roleTitle}
-                    onChange={(v) => setForm({ ...form, roleTitle: v })}
-                  />
-                  <Input
-                    label="LinkedIn"
-                    placeholder="https://"
-                    value={form.linkedin}
-                    onChange={(v) => setForm({ ...form, linkedin: v })}
-                  />
-
-                  <div className="md:col-span-2">
-                    <Label>Resume (PDF/DOC)</Label>
-                    <input
-                      id="general-resume"
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#1a237e] file:text-white file:px-3 file:py-1.5 file:hover:bg-[#18206b] bg-slate-900/80 border border-slate-700 rounded-xl p-1.5"
-                      onChange={(e) => setForm({ ...form, resume: e.target.files?.[0] || null })}
-                    />
+              <div
+                role="dialog"
+                aria-modal="true"
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-2xl sm:rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[90svh] sm:max-h-[90vh]"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between p-4 sm:p-5 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold">Send Resume</h3>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      No matching role? Share your profile for future openings.
+                    </p>
                   </div>
-
-                  <div className="md:col-span-2">
-                    <Label>Cover Letter</Label>
-                    <textarea
-                      rows={3}
-                      className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40 transition-colors"
-                      value={form.coverLetter}
-                      onChange={(e) => setForm({ ...form, coverLetter: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 h-1" />
-                </form>
-              </div>
-
-              {/* Footer (sticky) */}
-              <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-900 sticky bottom-0">
-                <div className="flex items-center gap-2">
                   <button
-                    disabled={submitting}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold text-white bg-gradient-to-r from-[#1a237e] to-[#4a56d2] hover:from-[#18206b] hover:to-[#4450cf] transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => submit()}
-                  >
-                    {submitting ? "Submitting…" : "Send"}
-                  </button>
-                  <button
-                    type="button"
                     onClick={onClose}
-                    className="rounded-xl border border-slate-700 px-4 py-2.5 font-semibold hover:border-slate-500"
+                    className="rounded-lg border border-slate-700 px-2 py-1 text-slate-300 hover:text-white"
                   >
-                    Cancel
+                    ✕
                   </button>
-                  {msg && <span className="text-[11px] sm:text-xs text-slate-300 ml-auto">{msg}</span>}
+                </div>
+
+                {/* Body (thin scrollbar) */}
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4 ultra-thin-scroll">
+                  <form onSubmit={submit} noValidate className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Input id="resume-name" label="Full Name" value={form.name}
+                      onChange={(v) => { setForm({ ...form, name: v }); if (errors.name) setErrors({ ...errors, name: "" }); }}
+                      error={errors.name}
+                    />
+                    <Input id="resume-email" label="Email" type="email" value={form.email}
+                      onChange={(v) => { setForm({ ...form, email: v }); if (errors.email) setErrors({ ...errors, email: "" }); }}
+                      error={errors.email}
+                    />
+                    <Input id="resume-phone" label="Phone" value={form.phone}
+                      onChange={(v) => { setForm({ ...form, phone: v }); if (errors.phone) setErrors({ ...errors, phone: "" }); }}
+                      error={errors.phone}
+                    />
+                    <Input id="resume-targetDepartment" label="Preferred Department"
+                      value={form.targetDepartment}
+                      onChange={(v) => { setForm({ ...form, targetDepartment: v }); if (errors.targetDepartment) setErrors({ ...errors, targetDepartment: "" }); }}
+                      error={errors.targetDepartment}
+                    />
+                    <Input id="resume-roleTitle" label="Desired Role Title"
+                      value={form.roleTitle}
+                      onChange={(v) => { setForm({ ...form, roleTitle: v }); if (errors.roleTitle) setErrors({ ...errors, roleTitle: "" }); }}
+                      error={errors.roleTitle}
+                    />
+                    <Input id="resume-linkedin" label="LinkedIn" placeholder="https://"
+                      value={form.linkedin}
+                      onChange={(v) => { setForm({ ...form, linkedin: v }); if (errors.linkedin) setErrors({ ...errors, linkedin: "" }); }}
+                      error={errors.linkedin}
+                    />
+
+                    <div className="md:col-span-2">
+                      <Label htmlFor="general-resume">Resume (PDF/DOC)</Label>
+                      <input
+                        id="general-resume"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          setForm({ ...form, resume: f });
+                          if (errors.resume) setErrors({ ...errors, resume: "" });
+                        }}
+                        className={`block w-full text-sm text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#1a237e] file:text-white file:px-3 file:py-1.5 file:hover:bg-[#18206b] bg-slate-900/80 border rounded-xl p-1.5
+                          ${errors.resume ? "border-red-500 focus:border-red-500" : "border-slate-700"}
+                        `}
+                      />
+                      {errors.resume && <span className="mt-1 block text-xs text-red-400">{errors.resume}</span>}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <Label htmlFor="resume-cover">Cover Letter</Label>
+                      <textarea
+                        id="resume-cover"
+                        rows={3}
+                        value={form.coverLetter}
+                        onChange={(e) => {
+                          setForm({ ...form, coverLetter: e.target.value });
+                          if (errors.coverLetter) setErrors({ ...errors, coverLetter: "" });
+                        }}
+                        className={`w-full bg-slate-900/80 border rounded-xl px-3 py-2 text-slate-200 outline-none transition-colors
+                          ${errors.coverLetter ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30" : "border-slate-700 focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40"}
+                        `}
+                      />
+                      {errors.coverLetter && <span className="mt-1 block text-xs text-red-400">{errors.coverLetter}</span>}
+                    </div>
+
+                    <div className="md:col-span-2 h-1" />
+                  </form>
+                </div>
+
+                {/* Footer - Modified for mobile */}
+                <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-900">
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold text-white bg-gradient-to-r from-[#1a237e] to-[#4a56d2] hover:from-[#18206b] hover:to-[#4450cf] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => submit()}
+                    >
+                      {submitting ? "Submitting…" : "Send"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="w-full sm:w-auto rounded-xl border border-slate-700 px-4 py-2.5 font-semibold hover:border-slate-500"
+                    >
+                      Cancel
+                    </button>
+                    {msg && <span className="text-[11px] sm:text-xs text-slate-300 mt-2 sm:mt-0 sm:ml-auto">{msg}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
+        </>
       )}
     </AnimatePresence>
   );
@@ -1315,36 +1447,49 @@ function SendResumeModal({ open, onClose }: { open: boolean; onClose: () => void
 
 /* —————————————————— Small UI helpers —————————————————— */
 
-function Label({ children }: { children: React.ReactNode }) {
-  return <div className="text-xs uppercase tracking-wider text-slate-400 mb-1.5">{children}</div>;
+function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
+  return (
+    <label htmlFor={htmlFor} className="text-xs uppercase tracking-wider text-slate-400 mb-1.5">
+      {children} <span className="text-red-400">*</span>
+    </label>
+  );
 }
 
 function Input({
+  id,
   label,
   value,
   onChange,
   type = "text",
-  required,
   placeholder,
+  error,
 }: {
+  id?: string;
   label: string;
   value: string | number;
   onChange: (v: string) => void;
   type?: string;
-  required?: boolean;
   placeholder?: string;
+  error?: string;
 }) {
+  const hasError = !!error;
   return (
     <div className="flex flex-col">
-      <Label>{label}</Label>
+      <Label htmlFor={id}>{label}</Label>
       <input
-        required={required}
+        id={id}
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40 transition-colors"
+        aria-invalid={hasError}
+        className={`w-full bg-slate-900/80 border rounded-xl px-3 py-2 text-slate-200 outline-none transition-colors
+        ${hasError
+          ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30"
+          : "border-slate-700 focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40"
+        }`}
       />
+      {hasError && <span className="mt-1 text-xs text-red-400">{error}</span>}
     </div>
   );
 }
