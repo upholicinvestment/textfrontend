@@ -33,14 +33,17 @@ const normalizeVariantKey = (k: string) => {
   const s = (k || "").toLowerCase();
   if (["starter", "starter_scalping"].includes(s)) return "starter";
   if (["pro", "option_scalper_pro"].includes(s)) return "pro";
-  if (["swing", "sniper_algo", "swing_trader_master"].includes(s)) return "swing";
+  if (["swing", "sniper_algo", "swing_trader_master"].includes(s))
+    return "swing";
   return s;
 };
 
 const variantDescription = (k: string) => {
-  if (k === "starter") return "Perfect for beginners starting with algorithmic trading";
+  if (k === "starter")
+    return "Perfect for beginners starting with algorithmic trading";
   if (k === "pro") return "Advanced scalping with real-time execution";
-  if (k === "swing") return "Comprehensive swing trading with advanced analytics";
+  if (k === "swing")
+    return "Comprehensive swing trading with advanced analytics";
   return "Premium trading solution";
 };
 
@@ -135,19 +138,20 @@ const Price = () => {
 
   const bundlePrice = bundle?.priceMonthly
     ? `₹${bundle.priceMonthly.toLocaleString("en-IN")}`
-    : "₹499";
+    : "₹1";            //499
   const bundlePeriod = "month";
 
   const algoPlans = useMemo(() => {
     const vs = (algo?.variants || []).map((v) => {
       const normKey = normalizeVariantKey(v.key);
       return {
-        id: v.key === "starter" ? 5999 : v.key === "pro" ? 2 : 3,
+        id: v.key === "starter" ? 1 : v.key === "pro" ? 2 : 3,
+        //5999
         key: normKey,
         name: v.name,
         price: v.priceMonthly
           ? `₹${v.priceMonthly.toLocaleString("en-IN")}`
-          : "₹5999",
+          : "₹1",     //5999
         period: "month",
         description: variantDescription(normKey),
         features: variantFeatures(normKey),
@@ -157,7 +161,8 @@ const Price = () => {
     });
 
     // Desired visual order
-    const rank = (k: string) => ({ starter: 1, pro: 2, swing: 3 } as const)[k] ?? 99;
+    const rank = (k: string) =>
+      (({ starter: 1, pro: 2, swing: 3 } as const)[k] ?? 99);
     vs.sort((a, b) => rank(a.key) - rank(b.key));
 
     if (vs.length && selectedAlgo === null)
@@ -169,18 +174,18 @@ const Price = () => {
   const journalingPrice =
     typeof journaling?.priceMonthly === "number"
       ? `₹${journaling.priceMonthly.toLocaleString("en-IN")}`
-      : "₹299";
+      : "₹1";     //299
   const journalingPeriod = "month";
 
   // ── ★ Added static plan info (display only; no logic changes) ──
-  const BUNDLE_MONTHLY = 499;
-  const BUNDLE_ANNUAL = 4999;
+  const BUNDLE_MONTHLY = 1;    //499
+  const BUNDLE_ANNUAL = 2;   //4999
   const bundleSavePct = Math.round(
     (1 - BUNDLE_ANNUAL / (BUNDLE_MONTHLY * 12)) * 100
   );
 
-  const JOURNAL_MONTHLY = 299;
-  const JOURNAL_ANNUAL = 2499;
+  const JOURNAL_MONTHLY = 1;   //299
+  const JOURNAL_ANNUAL = 2;   //2499
   const journalingSavePct = Math.round(
     (1 - JOURNAL_ANNUAL / (JOURNAL_MONTHLY * 12)) * 100
   );
@@ -336,7 +341,9 @@ const Price = () => {
                           <div className="text-sm text-blue-200">Starts at</div>
                           <div className="text-3xl md:text-4xl font-bold leading-none">
                             {bundlePrice}
-                            <span className="text-lg font-normal">/{bundlePeriod}</span>
+                            <span className="text-lg font-normal">
+                              /{bundlePeriod}
+                            </span>
                           </div>
                           <div className="text-xs md:text-sm text-blue-100 mt-1">
                             No hidden fees • Cancel anytime
@@ -344,9 +351,18 @@ const Price = () => {
 
                           {/* ★ Added display-only pricing info */}
                           <div className="text-xs md:text-sm text-emerald-200 mt-2">
-                            Special: <strong>₹{BUNDLE_MONTHLY.toLocaleString("en-IN")}</strong>/month •{" "}
-                            <strong>₹{BUNDLE_ANNUAL.toLocaleString("en-IN")}</strong>/year{" "}
-                            <span className="text-emerald-300 font-semibold">(Save {bundleSavePct}%)</span>
+                            Special:{" "}
+                            <strong>
+                              ₹{BUNDLE_MONTHLY.toLocaleString("en-IN")}
+                            </strong>
+                            /month •{" "}
+                            <strong>
+                              ₹{BUNDLE_ANNUAL.toLocaleString("en-IN")}
+                            </strong>
+                            /year{" "}
+                            <span className="text-emerald-300 font-semibold">
+                              (Save {bundleSavePct}%)
+                            </span>
                           </div>
                           {/* ★ /Added */}
                         </div>
@@ -354,17 +370,19 @@ const Price = () => {
 
                       {/* Quick highlights */}
                       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {["2 tools included", "Save up to 60%", "Priority support"].map(
-                          (h) => (
-                            <div
-                              key={h}
-                              className="flex items-center gap-2 bg-black/15 border border-white/15 rounded-xl px-3 py-2"
-                            >
-                              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                              <span className="text-sm text-blue-50">{h}</span>
-                            </div>
-                          )
-                        )}
+                        {[
+                          "2 tools included",
+                          "Save up to 60%",
+                          "Priority support",
+                        ].map((h) => (
+                          <div
+                            key={h}
+                            className="flex items-center gap-2 bg-black/15 border border-white/15 rounded-xl px-3 py-2"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                            <span className="text-sm text-blue-50">{h}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -383,7 +401,9 @@ const Price = () => {
                             className="inline-flex items-center gap-2 rounded-full border border-gray-700 bg-gray-800/50 px-3 py-1.5"
                           >
                             <span className="text-lg">{t.icon}</span>
-                            <span className="text-sm text-gray-200">{t.name}</span>
+                            <span className="text-sm text-gray-200">
+                              {t.name}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -418,9 +438,14 @@ const Price = () => {
                               </p>
                               <ul className="space-y-1.5">
                                 {tool.features.map((f, i) => (
-                                  <li key={i} className="flex items-start gap-2">
+                                  <li
+                                    key={i}
+                                    className="flex items-start gap-2"
+                                  >
                                     <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-blue-400" />
-                                    <span className="text-[12px] text-gray-300">{f}</span>
+                                    <span className="text-[12px] text-gray-300">
+                                      {f}
+                                    </span>
                                   </li>
                                 ))}
                               </ul>
@@ -508,91 +533,105 @@ const Price = () => {
                     const isSelected = selectedAlgo === plan.id;
                     const popular = plan.popular;
                     return (
-                      <div
+                      <motion.div
                         key={plan.key}
-                        className={`relative w-full max-w-[360px] rounded-2xl border ${
-                          popular ? "border-yellow-400" : "border-purple-600/50"
-                        } bg-[#101223] px-6 py-10 ${
-                          popular ? "shadow-yellow-500/20" : "shadow-purple-500/20"
-                        } shadow-2xl group h-full mx-auto flex flex-col justify-between transition-all duration-300 ${
-                          isSelected ? "transform scale-105" : ""
-                        } ${popular ? "md:-translate-y-5" : ""}`}
-                        onClick={() => setSelectedAlgo(plan.id)}
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ duration: 0.25 }}
+                        style={{ transformOrigin: "center" }} // keeps zoom centered
+                        className="w-full" // keep layout same
                       >
-                        {/* Ribbon */}
-                        {popular && (
-                          <div className="pointer-events-none absolute top-0 right-0 bg-yellow-400 text-black text-xs font-bold px-4 py-1 rounded-bl-lg rounded-tr-lg">
-                            MOST POPULAR
-                          </div>
-                        )}
-
-                        {/* Glow layer */}
                         <div
-                          className={`pointer-events-none absolute -inset-0.5 bg-gradient-to-r ${
+                          className={`relative w-full max-w-[360px] rounded-2xl border ${
                             popular
-                              ? "from-yellow-400 to-amber-500"
-                              : "from-purple-600 to-indigo-500"
-                          } rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300`}
-                        />
-
-                        {/* Content */}
-                        <div className="relative z-10">
-                          <div className="flex items-center gap-3 mb-4">
-                            {variantIcon(plan.key)}
-                            <h3 className="text-xl font-bold">
-                              {plan.name}
-                              {popular && (
-                                <span className="ml-2 text-yellow-400">
-                                  <BadgeCheck className="inline w-5 h-5" />
-                                </span>
-                              )}
-                            </h3>
-                          </div>
-
-                          <p className="text-gray-400 text-sm mb-4">
-                            {plan.description}
-                          </p>
-
-                          <div className="mb-6">
-                            <div className="text-4xl font-bold mb-1">
-                              {plan.price}
-                            </div>
-                            <div className="text-gray-400 text-sm">
-                              per month
-                            </div>
-                          </div>
-
-                          <ul className="space-y-3 text-sm text-gray-300 text-left mb-8">
-                            {plan.features.map((f) => (
-                              <li key={f} className="flex items-start gap-2">
-                                <CheckCircle2
-                                  className={`flex-shrink-0 ${
-                                    popular
-                                      ? "text-yellow-400"
-                                      : "text-purple-400"
-                                  } w-4 h-4 mt-0.5`}
-                                />
-                                <span>{f}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-
-                        {/* Button */}
-                        <Link
-                          to={toRegister(algo?.key || "algo_simulator", plan.key)}
-                          onClick={(e) => e.stopPropagation()}
-                          className={`relative z-10 w-full mt-auto py-3 rounded-xl font-semibold transition-all duration-300 text-center ${
+                              ? "border-yellow-400"
+                              : "border-purple-600/50"
+                          } bg-[#101223] px-6 py-10 ${
                             popular
-                              ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-black hover:shadow-lg hover:shadow-yellow-500/30"
-                              : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg hover:shadow-purple-500/30"
-                          } flex items-center justify-center gap-2`}
-                          aria-label={`Pay now for ${plan.name}`}
+                              ? "shadow-yellow-500/20"
+                              : "shadow-purple-500/20"
+                          } shadow-2xl group h-full mx-auto flex flex-col justify-between transition-all duration-300 ${
+                            isSelected ? "transform scale-105" : ""
+                          } ${popular ? "md:-translate-y-5" : ""}`}
+                          onClick={() => setSelectedAlgo(plan.id)}
                         >
-                          Pay Now
-                          <ChevronRight className="w-4 h-4" />
-                        </Link>
-                      </div>
+                          {/* Ribbon */}
+                          {popular && (
+                            <div className="pointer-events-none absolute top-0 right-0 bg-yellow-400 text-black text-xs font-bold px-4 py-1 rounded-bl-lg rounded-tr-lg">
+                              MOST POPULAR
+                            </div>
+                          )}
+
+                          {/* Glow layer */}
+                          <div
+                            className={`pointer-events-none absolute -inset-0.5 bg-gradient-to-r ${
+                              popular
+                                ? "from-yellow-400 to-amber-500"
+                                : "from-purple-600 to-indigo-500"
+                            } rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300`}
+                          />
+
+                          {/* Content */}
+                          <div className="relative z-10">
+                            <div className="flex items-center gap-3 mb-4">
+                              {variantIcon(plan.key)}
+                              <h3 className="text-xl font-bold">
+                                {plan.name}
+                                {popular && (
+                                  <span className="ml-2 text-yellow-400">
+                                    <BadgeCheck className="inline w-5 h-5" />
+                                  </span>
+                                )}
+                              </h3>
+                            </div>
+
+                            <p className="text-gray-400 text-sm mb-4">
+                              {plan.description}
+                            </p>
+
+                            <div className="mb-6">
+                              <div className="text-4xl font-bold mb-1">
+                                {plan.price}
+                              </div>
+                              <div className="text-gray-400 text-sm">
+                                per month
+                              </div>
+                            </div>
+
+                            <ul className="space-y-3 text-sm text-gray-300 text-left mb-8">
+                              {plan.features.map((f) => (
+                                <li key={f} className="flex items-start gap-2">
+                                  <CheckCircle2
+                                    className={`flex-shrink-0 ${
+                                      popular
+                                        ? "text-yellow-400"
+                                        : "text-purple-400"
+                                    } w-4 h-4 mt-0.5`}
+                                  />
+                                  <span>{f}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          {/* Button */}
+                          <Link
+                            to={toRegister(
+                              algo?.key || "algo_simulator",
+                              plan.key
+                            )}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`relative z-10 w-full mt-auto py-3 rounded-xl font-semibold transition-all duration-300 text-center ${
+                              popular
+                                ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-black hover:shadow-lg hover:shadow-yellow-500/30"
+                                : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg hover:shadow-purple-500/30"
+                            } flex items-center justify-center gap-2`}
+                            aria-label={`Pay now for ${plan.name}`}
+                          >
+                            Pay Now
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      </motion.div>
                     );
                   })}
                 </div>
@@ -651,9 +690,18 @@ const Price = () => {
 
                           {/* ★ Added display-only pricing info */}
                           <div className="text-xs md:text-sm text-emerald-200 mt-2">
-                            Special: <strong>₹{JOURNAL_MONTHLY.toLocaleString("en-IN")}</strong>/month •{" "}
-                            <strong>₹{JOURNAL_ANNUAL.toLocaleString("en-IN")}</strong>/year{" "}
-                            <span className="text-emerald-300 font-semibold">(Save {journalingSavePct}%)</span>
+                            Special:{" "}
+                            <strong>
+                              ₹{JOURNAL_MONTHLY.toLocaleString("en-IN")}
+                            </strong>
+                            /month •{" "}
+                            <strong>
+                              ₹{JOURNAL_ANNUAL.toLocaleString("en-IN")}
+                            </strong>
+                            /year{" "}
+                            <span className="text-emerald-300 font-semibold">
+                              (Save {journalingSavePct}%)
+                            </span>
                           </div>
                           {/* ★ /Added */}
                         </div>
@@ -875,7 +923,9 @@ const Price = () => {
                           </Link>
 
                           <Link
-                            to={toRegister(journaling?.key || "journaling_solo")}
+                            to={toRegister(
+                              journaling?.key || "journaling_solo"
+                            )}
                             aria-label="Get Journaling Only"
                           >
                             <motion.button

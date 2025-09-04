@@ -21,10 +21,10 @@ const Footer: React.FC = () => {
   const services = [
     { name: 'Technical Scanner', path: '/comming-soon' },
     { name: 'Fundamental Scanner', path: '/comming-soon' },
-    { name: 'ALGO Simulator', path: '/comming-soon' },
-    { name: 'FNO Khazana', path: '/fno-khazana' },
+    { name: 'ALGO Simulator', path: '/algo-simulator' },
+    { name: 'FNO Khazana', path: '/comming-soon' },
     { name: 'TradeKhata', path: '/journaling' }, // ← renamed only
-    { name: 'FIIs/DIIs Data', path: '/main-fii-dii' },
+    { name: 'FIIs/DIIs Data', path: '/fii-dii-fno-home' },
   ];
 
   const resources = [

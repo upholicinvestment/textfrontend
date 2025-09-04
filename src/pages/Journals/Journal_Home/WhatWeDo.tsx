@@ -143,7 +143,7 @@ const TABS: TabDef[] = [
         bgColor: "bg-purple-500/10",
       },
     ],
-    cta: "Open Journal",
+    cta: "Open TradeKhata",
   },
   {
     key: "daily",
@@ -190,7 +190,7 @@ const TABS: TabDef[] = [
         bgColor: "bg-purple-500/10",
       },
     ],
-    cta: "Open Journal",
+    cta: "Open TradeKhata",
   },
   {
     key: "details",
@@ -237,7 +237,7 @@ const TABS: TabDef[] = [
         bgColor: "bg-purple-500/10",
       },
     ],
-    cta: "Open Journal",
+    cta: "Open TradeKhata",
   },
 ];
 
@@ -518,7 +518,7 @@ export default function WhatWeDo() {
                 <button
                   onClick={handleCTA}
                   className="px-8 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:opacity-90 transition-opacity shadow-lg"
-                  aria-label="Open Journal"
+                  aria-label="Open TradeKhata"
                 >
                   {tab.cta}
                 </button>

@@ -117,7 +117,7 @@ const ContactUs: React.FC = () => {
       <div 
         className="absolute inset-0 z-0 opacity-20"
         style={{
-          backgroundImage: "url('https://static.vecteezy.com/system/resources/previews/025/481/738/large_2x/bull-with-background-of-uptrend-stock-market-concept-of-bullish-market-ai-generated-free-photo.jpeg')",
+          backgroundImage: "url('https://static.vecteezy.com/system/resources/previews/001/857/362/large_2x/stock-market-design-of-bull-and-bear-vector.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat"

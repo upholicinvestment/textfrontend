@@ -86,8 +86,8 @@ export default function Orb({ height = 610, railBreakpointPx = 1024 }: OrbProps)
     {
       id: 4,
       place: "Trade Analysis",
-      title: "JOURNALING",
-      title2: "PLATFORM",
+      title: "Trade",
+      title2: "Khata",
       description:
         "Systematically record, analyze, and improve your trading performance. Track your trades, identify patterns in your wins and losses, and refine your strategy.",
       image:
