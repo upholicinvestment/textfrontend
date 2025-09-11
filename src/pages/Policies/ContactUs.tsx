@@ -9,6 +9,8 @@ import {
   FiBriefcase,
 } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 type FormState = {
   firstName: string;
@@ -23,12 +25,16 @@ type FormState = {
 
 const personas = [
   { label: "Select a product", value: "" },
-  { label: "5-in-1 Trader's Essential Bundle", value: "5-in-1 Trader's Essential Bundle" },
+  {
+    label: "2-in-1 Trader's Essential Bundle",
+    value: "2-in-1 Trader's Essential Bundle",
+  },
   { label: "ALGO Simulator", value: "ALGO Simulator" },
   { label: "Both / Not sure", value: "Both / Not sure" },
 ];
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE || "https://api.upholictech.com";
+const API_BASE =
+  (import.meta as any).env?.VITE_API_BASE || "https://api.upholictech.com";
 
 const ContactUs: React.FC = () => {
   const navigate = useNavigate();
@@ -48,19 +54,31 @@ const ContactUs: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const isEmail = (x: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x);
-  const isPhoneLike = (x: string) => (x.replace(/\D/g, "").length >= 8);
+  const isPhoneLike = (x: string) => x.replace(/\D/g, "").length === 10; // Updated to require exactly 10 digits
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (!form.firstName.trim()) e.firstName = "First name is required";
     if (!form.lastName.trim()) e.lastName = "Last name is required";
-    if (!form.email.trim() || !isEmail(form.email)) e.email = "Valid email is required";
-    if (form.company && !isPhoneLike(form.company)) e.company = "Mobile number looks invalid";
+    if (!form.email.trim() || !isEmail(form.email))
+      e.email = "Valid email is required";
+    if (form.company && !isPhoneLike(form.company))
+      e.company = "Please enter a valid 10-digit mobile number"; // Updated error message
     if (!form.persona) e.persona = "Please select a product";
     if (!form.agree) e.agree = "You must agree to Terms & Privacy";
-    if (form.website && form.website.trim().length > 0) e.website = "Spam detected";
+    if (form.website && form.website.trim().length > 0)
+      e.website = "Spam detected";
     setErrors(e);
-    return Object.keys(e).length === 0;
+
+    if (Object.keys(e).length > 0) {
+      // Surface the first error via toast (inline messages still render)
+      const first = Object.values(e)[0];
+      toast.error(first || "Please fix the highlighted fields.", {
+        autoClose: 3000,
+      });
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -84,13 +102,23 @@ const ContactUs: React.FC = () => {
         }),
       });
 
-      const data = await res.json();
+      // Try to parse JSON, but don't crash on non-JSON responses
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        /* ignore */
+      }
+
       if (!res.ok) {
-        alert(data?.error || "Submission failed");
+        toast.error(data?.error || "Submission failed. Please try again.", {
+          autoClose: 3500,
+        });
         return;
       }
 
-      alert("Thanks! We received your message.");
+      toast.success("Thanks! We received your message.", { autoClose: 2500 });
+
       // Optional reset
       setForm({
         firstName: "",
@@ -105,22 +133,44 @@ const ContactUs: React.FC = () => {
       setErrors({});
     } catch (err) {
       console.error(err);
-      alert("Network error");
+      toast.error(
+        "Network error. Please check your connection and try again.",
+        { autoClose: 3500 }
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  // Function to handle mobile number input with validation
+  const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    // Allow only numbers and limit to 10 digits
+    const numbersOnly = input.replace(/\D/g, "");
+    if (numbersOnly.length <= 10) {
+      setForm((s) => ({ ...s, company: numbersOnly }));
+    }
+  };
+
   return (
     <section className="relative min-h-screen w-full overflow-hidden bg-[#0b0d10] text-white text-left">
+      {/* Toasts */}
+      <ToastContainer
+        position="bottom-right"
+        theme="dark"
+        newestOnTop
+        pauseOnHover
+      />
+
       {/* Background Image */}
-      <div 
+      <div
         className="absolute inset-0 z-0 opacity-20"
         style={{
-          backgroundImage: "url('https://static.vecteezy.com/system/resources/previews/001/857/362/large_2x/stock-market-design-of-bull-and-bear-vector.jpg')",
+          backgroundImage:
+            "url('https://static.vecteezy.com/system/resources/previews/001/857/362/large_2x/stock-market-design-of-bull-and-bear-vector.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          backgroundRepeat: "no-repeat"
+          backgroundRepeat: "no-repeat",
         }}
       />
 
@@ -156,8 +206,8 @@ const ContactUs: React.FC = () => {
             </h1>
 
             <p className="mt-4 text-left text-sm leading-relaxed text-gray-400">
-              We’re here to help. Whether you’re interested in learning more
-              about our services or need support, we’re happy to assist you.
+              We're here to help. Whether you're interested in learning more
+              about our services or need support, we're happy to assist you.
             </p>
 
             <ul className="mt-4 space-y-2 text-left">
@@ -182,8 +232,8 @@ const ContactUs: React.FC = () => {
                 General Contact Info
               </div>
               <p className="mt-2 text-xs leading-relaxed text-gray-400">
-                We’re here to help. Whether you’re interested in learning more
-                about our services or need support, we’re happy to assist you.
+                We're here to help. Whether you're interested in learning more
+                about our services or need support, we're happy to assist you.
               </p>
 
               <div className="mt-6 space-y-3 text-sm">
@@ -234,7 +284,9 @@ const ContactUs: React.FC = () => {
                     tabIndex={-1}
                     autoComplete="off"
                     value={form.website}
-                    onChange={(e) => setForm((s) => ({ ...s, website: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, website: e.target.value }))
+                    }
                   />
                 </label>
               </div>
@@ -246,7 +298,9 @@ const ContactUs: React.FC = () => {
                     First Name
                   </label>
                   <input
-                    className={`h-11 w-full rounded-full border ${errors.firstName ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
+                    className={`h-11 w-full rounded-full border ${
+                      errors.firstName ? "border-red-500/70" : "border-white/10"
+                    } bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
                     placeholder="Enter First Name"
                     value={form.firstName}
                     onChange={(e) =>
@@ -255,7 +309,9 @@ const ContactUs: React.FC = () => {
                     required
                   />
                   {errors.firstName && (
-                    <p className="mt-1 text-xs text-red-400">{errors.firstName}</p>
+                    <p className="mt-1 text-xs text-red-400">
+                      {errors.firstName}
+                    </p>
                   )}
                 </div>
                 <div className="text-left">
@@ -263,7 +319,9 @@ const ContactUs: React.FC = () => {
                     Last Name
                   </label>
                   <input
-                    className={`h-11 w-full rounded-full border ${errors.lastName ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
+                    className={`h-11 w-full rounded-full border ${
+                      errors.lastName ? "border-red-500/70" : "border-white/10"
+                    } bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
                     placeholder="Enter Last Name"
                     value={form.lastName}
                     onChange={(e) =>
@@ -272,7 +330,9 @@ const ContactUs: React.FC = () => {
                     required
                   />
                   {errors.lastName && (
-                    <p className="mt-1 text-xs text-red-400">{errors.lastName}</p>
+                    <p className="mt-1 text-xs text-red-400">
+                      {errors.lastName}
+                    </p>
                   )}
                 </div>
               </div>
@@ -284,7 +344,9 @@ const ContactUs: React.FC = () => {
                 </label>
                 <input
                   type="email"
-                  className={`h-11 w-full rounded-full border ${errors.email ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
+                  className={`h-11 w-full rounded-full border ${
+                    errors.email ? "border-red-500/70" : "border-white/10"
+                  } bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
                   placeholder="albert@susanto.com"
                   value={form.email}
                   onChange={(e) =>
@@ -304,14 +366,15 @@ const ContactUs: React.FC = () => {
                 </label>
                 <input
                   type="tel"
-                  inputMode="tel"
+                  inputMode="numeric"
                   autoComplete="tel"
-                  className={`h-11 w-full rounded-full border ${errors.company ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
-                  placeholder="+91 98765 43210"
+                  className={`h-11 w-full rounded-full border ${
+                    errors.company ? "border-red-500/70" : "border-white/10"
+                  } bg-white/5 px-4 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
+                  placeholder="9876543210"
                   value={form.company}
-                  onChange={(e) =>
-                    setForm((s) => ({ ...s, company: e.target.value }))
-                  }
+                  onChange={handleMobileChange}
+                  maxLength={10}
                 />
                 {errors.company && (
                   <p className="mt-1 text-xs text-red-400">{errors.company}</p>
@@ -325,7 +388,9 @@ const ContactUs: React.FC = () => {
                 </label>
                 <div className="relative text-left">
                   <select
-                    className={`h-11 w-full appearance-none rounded-full border ${errors.persona ? "border-red-500/70" : "border-white/10"} bg-white/5 px-4 pr-10 text-left text-sm text-white outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
+                    className={`h-11 w-full appearance-none rounded-full border ${
+                      errors.persona ? "border-red-500/70" : "border-white/10"
+                    } bg-white/5 px-4 pr-10 text-left text-sm text-white outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10`}
                     value={form.persona}
                     onChange={(e) =>
                       setForm((s) => ({ ...s, persona: e.target.value }))
@@ -333,7 +398,11 @@ const ContactUs: React.FC = () => {
                     required
                   >
                     {personas.map((p) => (
-                      <option key={p.value + p.label} value={p.value} className="bg-[#0b0d10]">
+                      <option
+                        key={p.value + p.label}
+                        value={p.value}
+                        className="bg-[#0b0d10]"
+                      >
                         {p.label}
                       </option>
                     ))}
@@ -351,7 +420,7 @@ const ContactUs: React.FC = () => {
                   Message
                 </label>
                 <textarea
-                  className="min-h-[160px] w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                  className="min-h[160px] w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white placeholder-gray-400 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
                   placeholder="Write your message..."
                   value={form.message}
                   onChange={(e) =>
@@ -374,11 +443,14 @@ const ContactUs: React.FC = () => {
                   />
                   <span className="text-left">
                     I agree to Fireside{" "}
-                    <Link className="underline underline-offset-2" to='/terms'>
+                    <Link className="underline underline-offset-2" to="/terms">
                       Terms of Use
                     </Link>{" "}
                     and{" "}
-                    <Link className="underline underline-offset-2" to='/privacy'>
+                    <Link
+                      className="underline underline-offset-2"
+                      to="/privacy"
+                    >
                       Privacy Policy
                     </Link>{" "}
                     <span className="text-emerald-400">*</span>
@@ -392,7 +464,9 @@ const ContactUs: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`ml-auto inline-flex items-center justify-center rounded-md px-5 py-2 text-sm font-semibold shadow-md shadow-purple-500/20 transition active:translate-y-[1px] bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white ${loading ? "opacity-70 cursor-not-allowed" : ""}`}
+                  className={`ml-auto inline-flex items-center justify-center rounded-md px-5 py-2 text-sm font-semibold shadow-md shadow-purple-500/20 transition active:translate-y-[1px] bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white ${
+                    loading ? "opacity-70 cursor-not-allowed" : ""
+                  }`}
                 >
                   {loading ? "Submitting..." : "Submit"}
                 </button>

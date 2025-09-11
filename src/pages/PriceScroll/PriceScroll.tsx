@@ -22,16 +22,16 @@ interface StockData {
 }
 
 const symbolMap: Record<number, { symbol: string; name: string }> = {
-  65226: { symbol: 'TITAN', name: '	Titan Company' },
-  64452: { symbol: 'INDUSINDBK', name: 'IndusInd Bank' },
-  65035: { symbol: 'SBILIFE', name: 'SBI Life Insurance' },
-  65231: { symbol: 'TRENT', name: 'Trent Ltd' },
-  64904: { symbol: 'MARUTI', name: 'Maruti Suzuki India' },
-  65124: { symbol: 'SHRIRAMFIN', name: 'Shriram Finance' },
-  64390: { symbol: 'COALINDIA', name: 'Coal India Ltd' },
-  64405: { symbol: 'EICHERMOT', name: 'Eicher Motors Ltd' },
-  64220: { symbol: 'BAJFINANCE', name: 'Bajaj Finance Ltd' },
-  64229: { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd' },
+  3506: { symbol: 'TITAN', name: '	Titan Company' },
+  5258: { symbol: 'INDUSINDBK', name: 'IndusInd Bank' },
+  21808: { symbol: 'SBILIFE', name: 'SBI Life Insurance' },
+  1964: { symbol: 'TRENT', name: 'Trent Ltd' },
+  10999: { symbol: 'MARUTI', name: 'Maruti Suzuki India' },
+  4306: { symbol: 'SHRIRAMFIN', name: 'Shriram Finance' },
+  20374: { symbol: 'COALINDIA', name: 'Coal India Ltd' },
+  910: { symbol: 'EICHERMOT', name: 'Eicher Motors Ltd' },
+  317: { symbol: 'BAJFINANCE', name: 'Bajaj Finance Ltd' },
+  10604: { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd' },
 };
 
 const API_URL = 'https://api.upholictech.com/api/stocks';

@@ -14,52 +14,66 @@ const stats = [
   { value: 91.4, label: "Plan–Execution Match", color: "text-purple-400", circleColor: "border-purple-500", suffix: "%" },
 ];
 
-/* ---------- Entitlement keys/tokens that grant JOURNAL access ---------- */
-const JOURNAL_KEYS = new Set(["journaling_solo", "smart_journaling", "journaling", "trade_journal"]);
-const BUNDLE_KEYS  = new Set(["essentials_bundle", "essentials", "trader_essentials", "bundle"]);
-const JOURNAL_TOKENS = ["journal", "journaling", "smart journaling", "trade journal"];
-const BUNDLE_TOKENS  = ["trader's essential bundle", "essentials bundle", "essential bundle", "trader essentials", "bundle"];
+/* ---------- Entitlement keys that grant JOURNAL access ---------- */
+const JOURNAL_KEYS = new Set([
+  "journaling_solo",
+  "smart_journaling",
+  "journaling",
+  "trade_journal",
+  "trading_journal_pro",
+]);
 
-/* ---------------- helpers to parse arbitrary backend payloads ---------------- */
-function includesAnyToken(s: string, tokens: string[]) {
-  const x = s.toLowerCase();
-  return tokens.some(t => x.includes(t));
-}
+const BUNDLE_KEYS = new Set([
+  "essentials_bundle",
+  "essentials",
+  "trader_essentials",
+  "bundle",
+]);
 
-function deepSome(obj: any, pred: (v: any) => boolean): boolean {
-  if (obj == null) return false;
-  if (pred(obj)) return true;
-  if (Array.isArray(obj)) return obj.some(v => deepSome(v, pred));
-  if (typeof obj === "object") return Object.values(obj).some(v => deepSome(v, pred));
-  return false;
-}
-
-function extractKeys(payload: any): string[] {
+/* ---------- Robust key extraction (handles variant.key & variants[]) ---------- */
+function extractKeys(anyObj: any): string[] {
   const out: string[] = [];
+
   const push = (x: any) => {
     if (!x) return;
-    if (typeof x === "string") out.push(x);
-    else if (typeof x === "object") {
-      out.push(
-        x.key || x.productKey || x.slug || x.route || x.code || x.id || x.name?.toLowerCase?.()
-      );
+
+    if (typeof x === "string") {
+      out.push(x);
+      return;
+    }
+
+    if (typeof x === "object") {
+      const single =
+        x?.variant?.key ??
+        x?.key ??
+        x?.productKey ??
+        x?.slug ??
+        x?.route ??
+        x?.code ??
+        x?.id ??
+        (typeof x?.name === "string" ? x.name : undefined);
+      if (single) out.push(single);
+
+      if (Array.isArray(x?.variants)) {
+        for (const v of x.variants) {
+          if (v?.key) out.push(v.key);
+        }
+      }
     }
   };
 
-  if (!payload) return out;
+  if (!anyObj) return out;
 
   const pools = [
-    payload.products,
-    payload.activeProducts,
-    payload.entitlements,
-    payload.purchases,
-    payload.subscriptions,
-    payload.bundles,
-    payload.modules,
-    payload.features,
-    payload.items,
-    payload.menu,
-    payload.nav,
+    anyObj.products,
+    anyObj.activeProducts,
+    anyObj.entitlements,
+    anyObj.purchases,
+    anyObj.subscriptions,
+    anyObj.bundles,
+    anyObj.modules,
+    anyObj.features,
+    anyObj.items,
   ].filter(Boolean);
 
   for (const p of pools) {
@@ -67,33 +81,13 @@ function extractKeys(payload: any): string[] {
     else push(p);
   }
 
-  // also check for nested "components" (e.g. bundle.components: ["journaling", ...])
-  const hasJournalingComponent = deepSome(payload, (v) => {
-    if (v && typeof v === "object" && Array.isArray((v as any).components)) {
-      return (v as any).components.some((c: any) => {
-        const k = typeof c === "string" ? c : (c?.key || c?.name || "");
-        return String(k).toLowerCase() === "journaling";
-      });
-    }
-    return false;
-  });
-  if (hasJournalingComponent) out.push("journaling");
-
-  return out.filter(Boolean).map(s => String(s).toLowerCase());
+  return out.filter(Boolean).map((s) => String(s).toLowerCase());
 }
 
 function payloadGrantsJournal(payload: any): boolean {
   if (!payload) return false;
-
-  // 1) explicit keys
   const keys = extractKeys(payload);
-  if (keys.some(k => JOURNAL_KEYS.has(k))) return true;
-  if (keys.some(k => BUNDLE_KEYS.has(k))) return true;
-
-  // 2) fallback name scanning
-  const mentionsJournaling = deepSome(payload, (v) => typeof v === "string" && includesAnyToken(v, JOURNAL_TOKENS));
-  const mentionsBundle    = deepSome(payload, (v) => typeof v === "string" && includesAnyToken(v, BUNDLE_TOKENS));
-  return mentionsJournaling || mentionsBundle;
+  return keys.some((k) => JOURNAL_KEYS.has(k)) || keys.some((k) => BUNDLE_KEYS.has(k));
 }
 
 /* -------------------------------- component -------------------------------- */
@@ -105,76 +99,95 @@ const StatsSection = () => {
   const [hasJournalAccess, setHasJournalAccess] = useState<boolean | null>(null);
   const checkingRef = useRef(false);
 
-  // quick local check (AuthContext + localStorage snapshot)
+  // Quick local check (sticky + AuthContext + localStorage snapshot)
   useEffect(() => {
     let decided = false;
+
+    if (sessionStorage.getItem("hasJournalAccess") === "true") {
+      setHasJournalAccess(true);
+      decided = true;
+    }
+
     const tryLocal = (payload: any) => {
       if (decided || !payload) return;
       if (payloadGrantsJournal(payload)) {
-        decided = true;
         setHasJournalAccess(true);
         sessionStorage.setItem("hasJournalAccess", "true"); // cache only positive
+        decided = true;
       }
     };
+
     tryLocal(user);
     try {
       const cached = JSON.parse(localStorage.getItem("user") || "null");
       tryLocal(cached);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     if (!decided) setHasJournalAccess(null);
   }, [user]);
 
-  // server check through a few likely endpoints
+  // Server check (prefer /users/me/products, then fallbacks)
   const checkEntitlementLive = async (): Promise<boolean> => {
     if (checkingRef.current) return hasJournalAccess === true;
     checkingRef.current = true;
 
+    // short-circuit if sticky already true
+    if (sessionStorage.getItem("hasJournalAccess") === "true") {
+      setHasJournalAccess(true);
+      checkingRef.current = false;
+      return true;
+    }
+
+    const grant = () => {
+      setHasJournalAccess(true);
+      sessionStorage.setItem("hasJournalAccess", "true");
+      checkingRef.current = false;
+      return true;
+    };
+    const deny = () => {
+      setHasJournalAccess(false);
+      checkingRef.current = false;
+      return false;
+    };
+
     const endpoints = [
-      "/me/products",
-      "/me/subscriptions",
-      "/users/me",
-      "/account",
-      "/billing/active-products",
-      "/nav",
-      "/me/menu",
-      "/entitlements",
-      "/profile", // just in case your API exposes products here
+      "/users/me/products",        // preferred (entitlements list)
+      "/users/me",                 // fallback (profile snapshot)
+      "/billing/active-products",  // extra safety net if you expose it
     ];
 
     for (const url of endpoints) {
       try {
         const r = await api.get(url);
-        if (payloadGrantsJournal(r.data)) {
-          setHasJournalAccess(true);
-          sessionStorage.setItem("hasJournalAccess", "true");
-          checkingRef.current = false;
-          return true;
-        }
+        if (payloadGrantsJournal(r.data)) return grant();
       } catch {
-        // ignore 404/401 and continue
+        // ignore and continue
       }
     }
-    setHasJournalAccess(false);
-    checkingRef.current = false;
-    return false;
+
+    return deny();
   };
 
   const handleCTA = async () => {
-    // if we’ve already confirmed access in this tab/session, just go
-    if (sessionStorage.getItem("hasJournalAccess") === "true" || hasJournalAccess === true) {
+    // Not logged in → go to Journaling Solo signup
+    const hasToken = !!localStorage.getItem("token");
+    if (!user && !hasToken) {
+      navigate("/signup?productKey=journaling_solo");
+      return;
+    }
+
+    // Already known to have access (bundle or journaling)
+    if (hasJournalAccess === true || sessionStorage.getItem("hasJournalAccess") === "true") {
       navigate("/journal");
       return;
     }
 
-    // otherwise, try a live check now
+    // Live verify now
     const ok = await checkEntitlementLive();
-    if (ok) {
-      navigate("/journal");
-    } else {
-      // ALGO-only or no access → take them to Journaling Solo signup
-      navigate("/signup?productKey=journaling_solo");
-    }
+    if (ok) navigate("/journal");
+    else navigate("/signup?productKey=journaling_solo");
   };
 
   return (

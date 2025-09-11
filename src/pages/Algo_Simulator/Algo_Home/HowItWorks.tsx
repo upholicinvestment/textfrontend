@@ -9,7 +9,7 @@ import {
   Link2, ExternalLink, Clipboard, ClipboardCheck, ChevronDown
 } from "lucide-react";
 import { motion, useScroll, useSpring } from "framer-motion";
-import { Link } from "react-router-dom";
+// import { Link } from "react-router-dom";
 
 /* -------------------- Copy helper -------------------- */
 function useCopy() {
@@ -160,7 +160,7 @@ export default function HowItWorks() {
         </div>
 
         {/* CTA */}
-        <div className="mt-12 text-center">
+        {/* <div className="mt-12 text-center">
           <Link
             to="/signup"
             className="inline-flex items-center gap-3 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 px-8 py-3 text-sm font-semibold text-white transition-all hover:from-cyan-400 hover:to-violet-400 hover:scale-105 hover:shadow-lg hover:shadow-violet-500/25"
@@ -168,7 +168,7 @@ export default function HowItWorks() {
             Start Registration
             <ExternalLink className="h-4 w-4" />
           </Link>
-        </div>
+        </div> */}
       </div>
     </section>
   );

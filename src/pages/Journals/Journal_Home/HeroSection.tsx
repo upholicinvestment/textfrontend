@@ -13,6 +13,7 @@ const JOURNAL_KEYS = new Set([
   "smart_journaling",
   "journaling",
   "trade_journal",
+  "trading_journal_pro",
 ]);
 const BUNDLE_KEYS = new Set([
   "essentials_bundle",
@@ -21,17 +22,42 @@ const BUNDLE_KEYS = new Set([
   "bundle",
 ]);
 
-/* ---------- helpers (keys only; no token scanning) ---------- */
+/* ---------- robust key extraction (handles variant.key & variants[]) ---------- */
 function extractKeys(anyObj: any): string[] {
   const out: string[] = [];
+
   const push = (x: any) => {
     if (!x) return;
-    if (typeof x === "string") out.push(x);
-    else if (typeof x === "object")
-      out.push(
-        x.key || x.productKey || x.slug || x.route || x.code || x.id || x.name?.toLowerCase?.()
-      );
+
+    // direct string (already a key)
+    if (typeof x === "string") {
+      out.push(x);
+      return;
+    }
+
+    if (typeof x === "object") {
+      // common single-key fields
+      const single =
+        x?.variant?.key ??
+        x?.key ??
+        x?.productKey ??
+        x?.slug ??
+        x?.route ??
+        x?.code ??
+        x?.id ??
+        (typeof x?.name === "string" ? x.name : undefined);
+
+      if (single) out.push(single);
+
+      // arrays of variants: [{ key }]
+      if (Array.isArray(x?.variants)) {
+        for (const v of x.variants) {
+          if (v?.key) out.push(v.key);
+        }
+      }
+    }
   };
+
   if (!anyObj) return out;
 
   const pools = [
@@ -42,13 +68,18 @@ function extractKeys(anyObj: any): string[] {
     anyObj.subscriptions,
     anyObj.bundles,
     anyObj.items,
+    anyObj.modules,
+    anyObj.features,
   ].filter(Boolean);
 
   for (const p of pools) {
     if (Array.isArray(p)) p.forEach(push);
     else push(p);
   }
-  return out.filter(Boolean).map((s) => String(s).toLowerCase());
+
+  return out
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase());
 }
 
 function hasJournalByKeys(payload: any): boolean {
@@ -106,9 +137,17 @@ const HeroSection = () => {
   const [hasJournalAccess, setHasJournalAccess] = useState<boolean | null>(null);
   const checkingRef = useRef(false);
 
-  // Fast local checks (AuthContext + localStorage.user)
+  // Fast local checks (AuthContext + localStorage.user + sticky session flag)
   useEffect(() => {
     let decided = false;
+
+    // sticky success from earlier session (only cache true)
+    const sticky = sessionStorage.getItem("hasJournalAccess") === "true";
+    if (sticky) {
+      setHasJournalAccess(true);
+      decided = true;
+    }
+
     const tryLocal = (payload: any) => {
       if (decided || !payload) return;
       if (hasJournalByKeys(payload)) {
@@ -117,6 +156,7 @@ const HeroSection = () => {
         decided = true;
       }
     };
+
     tryLocal(user);
     try {
       const cached = JSON.parse(localStorage.getItem("user") || "null");
@@ -127,35 +167,68 @@ const HeroSection = () => {
     if (!decided) setHasJournalAccess(null);
   }, [user]);
 
-  // Live check — use only /users/me (your logs show others 404)
+  // Prefer /users/me/products; fallback to /users/me
   const doLiveCheck = async (): Promise<boolean> => {
     if (checkingRef.current) return hasJournalAccess === true;
     checkingRef.current = true;
+
+    // if we already have a sticky "true", short-circuit
+    if (sessionStorage.getItem("hasJournalAccess") === "true") {
+      setHasJournalAccess(true);
+      checkingRef.current = false;
+      return true;
+    }
+
+    const grant = () => {
+      setHasJournalAccess(true);
+      sessionStorage.setItem("hasJournalAccess", "true");
+      checkingRef.current = false;
+      return true;
+    };
+
+    const deny = () => {
+      setHasJournalAccess(false);
+      checkingRef.current = false;
+      return false;
+    };
+
     try {
-      const r = await api.get("/users/me");
-      if (hasJournalByKeys(r.data)) {
-        setHasJournalAccess(true);
-        sessionStorage.setItem("hasJournalAccess", "true");
-        checkingRef.current = false;
-        return true;
+      // 1) Try richer endpoint first
+      const r1 = await api.get("/users/me/products");
+      if (r1?.data && hasJournalByKeys(r1.data)) {
+        return grant();
       }
     } catch {
-      /* ignore */
+      // ignore and fallback
     }
-    setHasJournalAccess(false);
-    checkingRef.current = false;
-    return false;
+
+    try {
+      // 2) Fallback to /users/me
+      const r2 = await api.get("/users/me");
+      if (r2?.data && hasJournalByKeys(r2.data)) {
+        return grant();
+      }
+    } catch {
+      // ignore
+    }
+
+    return deny();
   };
 
   // FINAL navigation logic (no “optimistic” /journal)
   const navigateToJournal = async () => {
     const isLoggedIn = !!localStorage.getItem("token");
     if (!isLoggedIn) {
+      // user not logged in → go to journaling signup
       return navigate("/signup?productKey=journaling_solo");
     }
+
+    // If we already know they have access (bundle OR journaling), go straight in
     if (hasJournalAccess === true) {
       return navigate("/journal");
     }
+
+    // Live confirm — this now checks bundle too
     const ok = await doLiveCheck();
     return ok ? navigate("/journal") : navigate("/signup?productKey=journaling_solo");
   };

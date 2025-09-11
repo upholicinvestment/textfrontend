@@ -26,6 +26,7 @@ const JOURNAL_KEYS = new Set([
   "smart_journaling",
   "journaling",
   "trade_journal",
+  "trading_journal_pro",
 ]);
 
 // Any of these bundle keys should also unlock /journal
@@ -36,16 +37,36 @@ const BUNDLE_KEYS = new Set([
   "bundle",
 ]);
 
-/* -------------------- Helpers for entitlement parsing -------------------- */
+/* -------------------- Robust key extraction (handles variant.key & variants[]) -------------------- */
 function extractKeys(anyObj: any): string[] {
   const out: string[] = [];
+
   const push = (x: any) => {
     if (!x) return;
-    if (typeof x === "string") out.push(x);
-    else if (typeof x === "object")
-      out.push(
-        x.key || x.productKey || x.slug || x.route || x.code || x.id || x.name?.toLowerCase?.()
-      );
+
+    if (typeof x === "string") {
+      out.push(x);
+      return;
+    }
+
+    if (typeof x === "object") {
+      const single =
+        x?.variant?.key ??
+        x?.key ??
+        x?.productKey ??
+        x?.slug ??
+        x?.route ??
+        x?.code ??
+        x?.id ??
+        (typeof x?.name === "string" ? x.name : undefined);
+      if (single) out.push(single);
+
+      if (Array.isArray(x?.variants)) {
+        for (const v of x.variants) {
+          if (v?.key) out.push(v.key);
+        }
+      }
+    }
   };
 
   if (!anyObj) return out;
@@ -67,7 +88,9 @@ function extractKeys(anyObj: any): string[] {
     else push(p);
   }
 
-  return out.filter(Boolean).map((s) => String(s).toLowerCase());
+  return out
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase());
 }
 
 function keysGrantJournal(keys: string[]): boolean {
@@ -256,9 +279,15 @@ export default function WhatWeDo() {
   const [hasJournalAccess, setHasJournalAccess] = useState<boolean | null>(null);
   const checkingRef = useRef(false);
 
-  // Fast local check: look for product keys on the user object / cached user
+  // Fast local check: sticky success + user + cached user
   useEffect(() => {
     let decided = false;
+
+    // Sticky from earlier in the session: short-circuit to true
+    if (sessionStorage.getItem("hasJournalAccess") === "true") {
+      setHasJournalAccess(true);
+      decided = true;
+    }
 
     const tryLocal = (payload: any) => {
       if (decided || !payload) return;
@@ -281,36 +310,48 @@ export default function WhatWeDo() {
     if (!decided) setHasJournalAccess(null);
   }, [user]);
 
-  // Live check only against entitlement endpoints to avoid false positives
+  // Live check — prefer entitlement endpoints; fallback to /users/me
   const doLiveCheck = async (): Promise<boolean> => {
     if (checkingRef.current) return hasJournalAccess === true;
     checkingRef.current = true;
 
+    // if sticky already true, don't call backend again
+    if (sessionStorage.getItem("hasJournalAccess") === "true") {
+      setHasJournalAccess(true);
+      checkingRef.current = false;
+      return true;
+    }
+
+    const grant = () => {
+      setHasJournalAccess(true);
+      sessionStorage.setItem("hasJournalAccess", "true");
+      checkingRef.current = false;
+      return true;
+    };
+    const deny = () => {
+      setHasJournalAccess(false);
+      checkingRef.current = false;
+      return false;
+    };
+
     const endpoints = [
-      "/me/products",
-      "/me/subscriptions",
-      "/users/me",
-      "/account",
+      "/users/me/products",     // preferred
+      "/users/me/subscriptions",
       "/billing/active-products",
+      "/users/me",              // fallback
+      "/account",               // last resort
     ];
 
     for (const url of endpoints) {
       try {
         const r = await api.get(url);
         const keys = extractKeys(r.data);
-        if (keysGrantJournal(keys)) {
-          setHasJournalAccess(true);
-          sessionStorage.setItem("hasJournalAccess", "true");
-          checkingRef.current = false;
-          return true;
-        }
+        if (keysGrantJournal(keys)) return grant();
       } catch {
-        // continue
+        // continue to next endpoint
       }
     }
-    setHasJournalAccess(false);
-    checkingRef.current = false;
-    return false;
+    return deny();
   };
 
   const handleCTA = async () => {
@@ -321,13 +362,13 @@ export default function WhatWeDo() {
       return;
     }
 
-    // Known access
+    // Known access (bundle or journaling) → /journal
     if (hasJournalAccess === true) {
       navigate("/journal");
       return;
     }
 
-    // Live verify if unknown or false
+    // Live verify if unknown or false (now checks bundle too)
     const ok = await doLiveCheck();
     if (ok) navigate("/journal");
     else navigate("/signup?productKey=journaling_solo");
@@ -366,9 +407,9 @@ export default function WhatWeDo() {
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-center">
             {tab.heading.replace("Institutional-Grade", "Institutional-Grade")}{" "}
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-              {active === "dashboard"
+              {tab.key === "dashboard"
                 ? "Market Intelligence"
-                : active === "daily"
+                : tab.key === "daily"
                 ? "Daily Planning"
                 : "Performance Review"}
             </span>

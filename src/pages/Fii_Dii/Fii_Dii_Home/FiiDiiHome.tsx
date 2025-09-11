@@ -8,7 +8,7 @@ export default function FiiDiiHome() {
   return (
     <main className="w-full bg-slate-950 text-white">
       <Navbar />
-      {/* CTA route is decided inside Hero via entitlement logic */}
+      {/* CTA label is now dynamic inside Hero; this prop is only the fallback for non-owners */}
       <Hero ctaLabel="Get Analysis" />
       <WhatWeDo />
       <AnalysisSection />

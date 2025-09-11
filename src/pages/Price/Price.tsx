@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Gem,
 } from "lucide-react";
+import { useEntitlements } from "../../hooks/useEntitlements";
 
 type Variant = {
   _id: string;
@@ -30,10 +31,19 @@ type Product = {
 };
 
 const normalizeVariantKey = (k: string) => {
-  const s = (k || "").toLowerCase();
+  const s = (k || "").toLowerCase().trim();
   if (["starter", "starter_scalping"].includes(s)) return "starter";
-  if (["pro", "option_scalper_pro"].includes(s)) return "pro";
-  if (["swing", "sniper_algo", "swing_trader_master"].includes(s)) return "swing";
+  if (["pro", "option_scalper_pro", "option-scalper-pro"].includes(s))
+    return "pro";
+  if (
+    [
+      "swing",
+      "sniper_algo",
+      "swing_trader_master",
+      "swing-trader-master",
+    ].includes(s)
+  )
+    return "swing";
   return s;
 };
 
@@ -88,6 +98,59 @@ const variantIcon = (k: string): JSX.Element => {
   return <Shield className="w-6 h-6 text-amber-600" />;
 };
 
+/** Load Razorpay SDK once */
+const loadRazorpay = (): Promise<boolean> =>
+  new Promise((resolve) => {
+    if (typeof window !== "undefined" && (window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
+/* ------------ robust key extractor (for /users/me snapshot) ------------- */
+function extractKeys(payload: any): string[] {
+  const out: string[] = [];
+  const push = (x: any) => {
+    if (!x) return;
+    if (typeof x === "string") out.push(x);
+    else if (typeof x === "object") {
+      const cand =
+        x?.variant?.key ??
+        x.key ??
+        x.productKey ??
+        x.slug ??
+        x.route ??
+        x.code ??
+        x.id ??
+        (typeof x.name === "string" ? x.name : undefined);
+      if (typeof cand === "string") out.push(cand);
+    }
+  };
+  if (!payload) return out;
+  const pools = [
+    payload.products,
+    payload.activeProducts,
+    payload.entitlements,
+    payload.purchases,
+    payload.subscriptions,
+    payload.bundles,
+    payload.items,
+    payload.modules,
+    payload.features,
+  ].filter(Boolean);
+  for (const p of pools) {
+    if (Array.isArray(p)) p.forEach(push);
+    else push(p);
+  }
+  return out.filter(Boolean).map((s) => String(s).toLowerCase());
+}
+
 const Price = () => {
   const [selectedBundle, setSelectedBundle] = useState(1);
   const [selectedAlgo, setSelectedAlgo] = useState<number | null>(null);
@@ -114,12 +177,45 @@ const Price = () => {
     return `/signup${qs ? `?${qs}` : ""}`;
   };
 
+  // ========= ownership sources (entitlements + snapshot) =========
+  const { items: entitlements, loading: entLoading } = useEntitlements();
+  const [userSnapshot, setUserSnapshot] = useState<any>(null);
+  const [userLoading, setUserLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    (async () => {
+      setUserLoading(true);
+      try {
+        const local = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("user") || "null");
+          } catch {
+            return null;
+          }
+        })();
+        if (local) {
+          setUserSnapshot(local);
+        } else {
+          const token = localStorage.getItem("token");
+          if (token) {
+            const r = await api.get("/users/me");
+            setUserSnapshot(r?.data ?? null);
+          } else {
+            setUserSnapshot(null);
+          }
+        }
+      } finally {
+        setUserLoading(false);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
         const res = await api.get<Product[]>("/products");
         setProducts(res.data || []);
-      } catch (e) {
+      } catch {
         setProducts([]);
       }
     })();
@@ -132,11 +228,11 @@ const Price = () => {
   // ---------- Pricing helpers ----------
   const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
-  // Fallback sample numbers (replace with real ones)
-  const BUNDLE_MONTHLY = 499;   // e.g., 499
-  const BUNDLE_ANNUAL = 4999;    // e.g., 4999
-  const JOURNAL_MONTHLY = 299;  // e.g., 299
-  const JOURNAL_ANNUAL = 2499;   // e.g., 2499
+  // Fallback sample numbers (replace with real ones or keep env-backed)
+  const BUNDLE_MONTHLY = 499;
+  const BUNDLE_ANNUAL = 4999;
+  const JOURNAL_MONTHLY = 299;
+  const JOURNAL_ANNUAL = 2499;
 
   const bundleMonthlyNum =
     typeof bundle?.priceMonthly === "number" ? bundle.priceMonthly : BUNDLE_MONTHLY;
@@ -149,24 +245,13 @@ const Price = () => {
   const bundleSavePct = Math.round((1 - bundleAnnualNum / (bundleMonthlyNum * 12)) * 100);
   const journalingSavePct = Math.round((1 - journalingAnnualNum / (journalingMonthlyNum * 12)) * 100);
 
-  const displayBundlePrice =
-    bundleBilling === "monthly" ? fmtINR(bundleMonthlyNum) : fmtINR(bundleAnnualNum);
+  const displayBundlePrice = bundleBilling === "monthly" ? fmtINR(bundleMonthlyNum) : fmtINR(bundleAnnualNum);
   const bundlePeriod = bundleBilling === "monthly" ? "month" : "year";
 
   const displayJournalPrice =
     journalBilling === "monthly" ? fmtINR(journalingMonthlyNum) : fmtINR(journalingAnnualNum);
   const journalingPeriod = journalBilling === "monthly" ? "month" : "year";
 
-  const journalingFeatures = [
-    "Trade tracking & performance analytics",
-    "Psychology markers & emotional tracking",
-    "Exportable reports in multiple formats",
-    "Custom tagging & categorization",
-    "Advanced filtering & search",
-    "Portfolio correlation analysis",
-    "Trade replay functionality",
-    "Risk management statistics",
-  ];
 
   const bundleTools = [
     {
@@ -187,14 +272,138 @@ const Price = () => {
 
   const selectedBundleTool = bundleTools.find((t) => t.id === selectedBundle) || bundleTools[0];
 
+  // ========= ALGO OWNERSHIP + CHECKOUT =========
+  const OWN_KEYS_BY_VARIANT: Record<"starter" | "pro" | "swing", string[]> = {
+    starter: ["starter", "starter_scalping"],
+    pro: ["pro", "option_scalper_pro", "option-scalper-pro"],
+    swing: ["swing", "sniper_algo", "swing_trader_master", "swing-trader-master"],
+  };
+
+  const collectEntitlementVariantKeys = () => {
+    const keys = new Set<string>();
+    for (const it of entitlements || []) {
+      const single = (it as any)?.variant?.key && normalizeVariantKey((it as any).variant.key);
+      if (single) keys.add(single);
+      const maybeArray = (it as any)?.variants as Array<{ key?: string }> | undefined;
+      if (Array.isArray(maybeArray)) {
+        for (const v of maybeArray) {
+          const kk = v?.key && normalizeVariantKey(v.key);
+          if (kk) keys.add(kk);
+        }
+      }
+    }
+    return keys;
+  };
+
+  const ownedExactVariant = (normVariant: "starter" | "pro" | "swing") => {
+    const desired = new Set(OWN_KEYS_BY_VARIANT[normVariant].map((k) => normalizeVariantKey(k)));
+    const entKeys = collectEntitlementVariantKeys();
+    const snapKeys = new Set(extractKeys(userSnapshot).map((k) => normalizeVariantKey(k)));
+    for (const k of desired) {
+      if (entKeys.has(k) || snapKeys.has(k)) return true;
+    }
+    return false;
+  };
+
+  const variantIdFor = (norm: "starter" | "pro" | "swing") => {
+    const wanted = OWN_KEYS_BY_VARIANT[norm].map((k) => normalizeVariantKey(k));
+    const found = algo?.variants?.find((v) => wanted.includes(normalizeVariantKey(v.key)));
+    return found?._id || null;
+  };
+
+  const openCheckout = async (normVariant: "starter" | "pro" | "swing") => {
+    try {
+      if (!algo) {
+        navigate(toRegister("algo_simulator", normVariant));
+        return;
+      }
+      const vId = variantIdFor(normVariant);
+      if (!vId) {
+        navigate(toRegister("algo_simulator", normVariant));
+        return;
+      }
+
+      const orderRes = await api.post("/payments/create-order", {
+        productId: algo._id,
+        variantId: vId,
+      });
+
+      if (orderRes.status === 204) {
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+
+      const ord = orderRes.data;
+      const ok = await loadRazorpay();
+      if (!ok || !(window as any).Razorpay) {
+        navigate(toRegister("algo_simulator", normVariant));
+        return;
+      }
+
+      const rz = new (window as any).Razorpay({
+        key: ord.key,
+        amount: ord.amount,
+        currency: ord.currency,
+        name: ord.name,
+        description: ord.description,
+        order_id: ord.orderId,
+        prefill: {
+          name: ord.user?.name,
+          email: ord.user?.email,
+          contact: ord.user?.contact,
+        },
+        theme: { color: "#4f46e5" },
+        handler: async (rsp: any) => {
+          try {
+            await api.post("/payments/verify", {
+              intentId: ord.intentId,
+              razorpay_order_id: rsp.razorpay_order_id,
+              razorpay_payment_id: rsp.razorpay_payment_id,
+              razorpay_signature: rsp.razorpay_signature,
+            });
+            navigate("/dashboard", { replace: true });
+          } catch {
+            navigate(toRegister("algo_simulator", normVariant));
+          }
+        },
+        modal: { ondismiss: () => {} },
+      });
+
+      rz.open();
+    } catch {
+      navigate(toRegister("algo_simulator", normVariant));
+    }
+  };
+
+  const onAlgoCtaClick =
+    (variantKey: "starter" | "pro" | "swing") =>
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const token = localStorage.getItem("token");
+      const isOwned = ownedExactVariant(variantKey);
+
+      if (isOwned) {
+        navigate("/dashboard");
+        return;
+      }
+      if (!token) {
+        navigate(toRegister("algo_simulator", variantKey));
+        return;
+      }
+      await openCheckout(variantKey);
+    };
+
+  // ---------- ALGO plans ----------
   const algoPlans = useMemo(() => {
     const vs = (algo?.variants || []).map((v) => {
-      const normKey = normalizeVariantKey(v.key);
+      const normKey = normalizeVariantKey(v.key) as "starter" | "pro" | "swing";
       return {
         id: v.key === "starter" ? 1 : v.key === "pro" ? 2 : 3,
         key: normKey,
         name: v.name,
-        price: v.priceMonthly ? `₹${v.priceMonthly.toLocaleString("en-IN")}` : "₹1", // fallback
+        price: v.priceMonthly ? `₹${v.priceMonthly.toLocaleString("en-IN")}` : "₹1",
         period: "month",
         description: variantDescription(normKey),
         features: variantFeatures(normKey),
@@ -203,12 +412,199 @@ const Price = () => {
       };
     });
 
-    const rank = (k: string) => (({ starter: 1, pro: 2, swing: 3 } as const)[k] ?? 99);
+    const rank = (k: "starter" | "pro" | "swing") => ({ starter: 1, pro: 2, swing: 3 }[k]);
     vs.sort((a, b) => rank(a.key) - rank(b.key));
 
     if (vs.length && selectedAlgo === null) setSelectedAlgo(vs.find((x) => x.popular)?.id ?? vs[0].id);
     return vs;
   }, [algo, selectedAlgo]);
+
+  // ======== BUNDLE OWNERSHIP DECISION ========
+  type BundleStatus = { owned: boolean; interval: "monthly" | "yearly" | null };
+
+  const getBundleStatus = (items: any[]): BundleStatus => {
+    const ACTIVE = (x: any) =>
+      String(x?.status || "inactive").toLowerCase() === "active" &&
+      (x?.endsAt === null || new Date(x.endsAt).getTime() > Date.now());
+
+    const byKey = (k: string) =>
+      (items || []).find(
+        (it) => String(it?.key || "").toLowerCase() === k && ACTIVE(it)
+      );
+
+    // 1) Direct bundle entitlement
+    const bundleEnt = byKey("essentials_bundle");
+    if (bundleEnt) {
+      const rawInterval =
+        (bundleEnt?.meta && (bundleEnt.meta as any).interval) ||
+        (bundleEnt?.variant && (bundleEnt.variant as any).interval) ||
+        (Array.isArray(bundleEnt?.variants) && bundleEnt.variants.length
+          ? (bundleEnt.variants[0] as any)?.interval
+          : null) ||
+        null;
+
+      const iv =
+        rawInterval === "yearly"
+          ? "yearly"
+          : rawInterval === "monthly"
+          ? "monthly"
+          : null;
+
+      return { owned: true, interval: iv };
+    }
+
+    // 2) Infer bundle from components (journaling + fii_dii_data)
+    const journ = byKey("journaling");
+    const fii = byKey("fii_dii_data");
+    if (journ && fii) {
+      const durDays = (it: any) => {
+        const s = it?.startedAt ? new Date(it.startedAt).getTime() : NaN;
+        const e = it?.endsAt ? new Date(it.endsAt).getTime() : NaN;
+        if (!isFinite(s) || !isFinite(e) || e <= s) return NaN;
+        return (e - s) / 86400000;
+      };
+
+      const jd = durDays(journ);
+      const fd = durDays(fii);
+
+      let d =
+        isFinite(jd) && isFinite(fd)
+          ? (jd + fd) / 2
+          : isFinite(jd)
+          ? jd
+          : isFinite(fd)
+          ? fd
+          : NaN;
+
+      const interval: "monthly" | "yearly" =
+        isFinite(d) && d >= 300 ? "yearly" : "monthly";
+
+      return { owned: true, interval };
+    }
+
+    return { owned: false, interval: null };
+  };
+
+  const bundleStatus = getBundleStatus(entitlements as any);
+
+  /** Bundle CTA label (reflects toggle + ownership) */
+  const bundleCtaLabel = (() => {
+    if (userLoading || entLoading) return "Checking...";
+    if (!bundleStatus.owned) {
+      return `Get Complete Bundle - ${displayBundlePrice}/${bundlePeriod}`;
+    }
+    if (bundleStatus.interval === "yearly") {
+      return "Go to Dashboard";
+    }
+    if (bundleBilling === "monthly") {
+      return "Go to Dashboard";
+    }
+    return `Get Complete Bundle - ${fmtINR(bundleAnnualNum)}/year`;
+  })();
+
+  /** Bundle CTA click behavior */
+  const handleBundleCta = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (userLoading || entLoading) return;
+
+    if (bundleStatus.owned) {
+      if (bundleStatus.interval === "yearly") {
+        navigate("/dashboard");
+        return;
+      }
+      if (bundleBilling === "monthly") {
+        navigate("/dashboard");
+        return;
+      }
+      navigate(toRegister("essentials_bundle", null, "yearly"));
+      return;
+    }
+    navigate(toRegister("essentials_bundle", null, bundleBilling));
+  };
+
+  // ======== JOURNALING OWNERSHIP DECISION (NEW) ========
+  type SingleStatus = { owned: boolean; interval: "monthly" | "yearly" | null };
+
+  /** Check ownership & interval for one product using a set of keys (e.g. journaling_solo, journaling) */
+  const getSingleStatus = (items: any[], keys: string[]): SingleStatus => {
+    const ACTIVE = (x: any) =>
+      String(x?.status || "inactive").toLowerCase() === "active" &&
+      (x?.endsAt === null || new Date(x.endsAt).getTime() > Date.now());
+
+    const ent = (items || []).find((it: any) =>
+      keys.includes(String(it?.key || "").toLowerCase()) && ACTIVE(it)
+    );
+
+    if (!ent) return { owned: false, interval: null };
+
+    const rawInterval =
+      (ent?.meta && (ent.meta as any).interval) ||
+      (ent?.variant && (ent.variant as any).interval) ||
+      (Array.isArray(ent?.variants) && ent.variants.length
+        ? (ent.variants[0] as any)?.interval
+        : null) ||
+      null;
+
+    if (rawInterval === "yearly" || rawInterval === "monthly") {
+      return { owned: true, interval: rawInterval };
+    }
+
+    // Fallback: infer via duration
+    const s = ent?.startedAt ? new Date(ent.startedAt).getTime() : NaN;
+    const e = ent?.endsAt ? new Date(ent.endsAt).getTime() : NaN;
+    const days = isFinite(s) && isFinite(e) && e > s ? (e - s) / 86400000 : NaN;
+    const interval = isFinite(days) && days >= 300 ? "yearly" : "monthly";
+
+    return { owned: true, interval };
+  };
+
+  const journalingStatus = getSingleStatus(
+    entitlements as any,
+    ["journaling", "journaling_solo", "trading_journal_pro"] // include all aliases you use
+  );
+
+  /** Journaling CTA label (mirrors bundle behavior & your requirement) */
+  const journalingCtaLabel = (() => {
+    if (userLoading || entLoading) return "Checking...";
+    if (!journalingStatus.owned) {
+      return `Get Journaling Only - ${displayJournalPrice}/${journalingPeriod}`;
+    }
+    if (journalingStatus.interval === "yearly") {
+      // yearly owners see Go to Dashboard on BOTH toggles
+      return "Go to Dashboard";
+    }
+    // monthly owner
+    if (journalBilling === "monthly") {
+      return "Go to Dashboard";
+    }
+    // monthly owner on yearly toggle → show upgrade CTA
+    return `Get Journaling Only - ${fmtINR(journalingAnnualNum)}/year`;
+  })();
+
+  /** Journaling CTA click behavior */
+  const handleJournalingCta = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (userLoading || entLoading) return;
+
+    if (journalingStatus.owned) {
+      if (journalingStatus.interval === "yearly") {
+        navigate("/dashboard");
+        return;
+      }
+      if (journalBilling === "monthly") {
+        navigate("/dashboard");
+        return;
+      }
+      // Owns monthly but toggle is yearly → upgrade flow
+      navigate(toRegister(journaling?.key || "journaling_solo", null, "yearly"));
+      return;
+    }
+
+    // Not owned → normal purchase
+    navigate(toRegister(journaling?.key || "journaling_solo", null, journalBilling));
+  };
 
   return (
     <>
@@ -229,7 +625,9 @@ const Price = () => {
             transition={{ duration: 0.5 }}
             className="text-center mb-16"
           >
-            <div className="text-lg font-semibold text-blue-400 mb-4 tracking-wider">TRADER'S TOOLKIT</div>
+            <div className="text-lg font-semibold text-blue-400 mb-4 tracking-wider">
+              TRADER'S TOOLKIT
+            </div>
             <h1 className="text-4xl font-bold sm:text-5xl lg:text-6xl mb-6">
               Professional{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
@@ -252,7 +650,9 @@ const Price = () => {
               <button
                 onClick={() => setActiveTab("bundle")}
                 className={`px-8 py-3 rounded-xl transition-all ${
-                  activeTab === "bundle" ? "bg-blue-700 text-white shadow-md" : "text-gray-400 hover:text-white"
+                  activeTab === "bundle"
+                    ? "bg-blue-700 text-white shadow-md"
+                    : "text-gray-400 hover:text-white"
                 }`}
               >
                 Essential Bundle
@@ -260,7 +660,9 @@ const Price = () => {
               <button
                 onClick={() => setActiveTab("algo")}
                 className={`px-8 py-3 rounded-xl transition-all ${
-                  activeTab === "algo" ? "bg-blue-700 text-white shadow-md" : "text-gray-400 hover:text-white"
+                  activeTab === "algo"
+                    ? "bg-blue-700 text-white shadow-md"
+                    : "text-gray-400 hover:text-white"
                 }`}
               >
                 ALGO Simulator
@@ -268,7 +670,9 @@ const Price = () => {
               <button
                 onClick={() => setActiveTab("journaling")}
                 className={`px-8 py-3 rounded-xl transition-all ${
-                  activeTab === "journaling" ? "bg-blue-700 text-white shadow-md" : "text-gray-400 hover:text-white"
+                  activeTab === "journaling"
+                    ? "bg-blue-700 text-white shadow-md"
+                    : "text-gray-400 hover:text-white"
                 }`}
               >
                 Journaling
@@ -300,7 +704,9 @@ const Price = () => {
                             <BadgeCheck className="w-4 h-4 text-yellow-300" />
                             BEST VALUE
                           </div>
-                          <h2 className="text-2xl md:text-3xl font-bold">Trader's Essential Bundle</h2>
+                          <h2 className="text-2xl md:text-3xl font-bold">
+                            Trader's Essential Bundle
+                          </h2>
                           <p className="text-blue-100 mt-1">All 2 premium tools for the price of one</p>
                         </div>
 
@@ -324,7 +730,7 @@ const Price = () => {
                               >
                                 Yearly
                                 {bundleBilling === "yearly" && (
-                                  <span className="ml-2 inline-flex items-center gap-1 text-emerald-200 text-xs font-semibold">
+                                  <span className="ml-2 inline-flex items-center gap-1 text-green-400 text-xl font-semibold">
                                     Save {bundleSavePct}%
                                   </span>
                                 )}
@@ -337,16 +743,17 @@ const Price = () => {
                             {displayBundlePrice}
                             <span className="text-lg font-normal">/{bundlePeriod}</span>
                           </div>
-                          <div className="text-xs md:text-sm text-blue-100 mt-1">
-                            No hidden fees • Cancel anytime
-                          </div>
+                          <div className="text-xs md:text-sm text-blue-100 mt-1">No hidden fees • Cancel anytime</div>
                         </div>
                       </div>
 
                       {/* Highlights */}
                       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {["2 tools included", "Save up to 60%", "Priority support"].map((h) => (
-                          <div key={h} className="flex items-center gap-2 bg-black/15 border border-white/15 rounded-xl px-3 py-2">
+                          <div
+                            key={h}
+                            className="flex items-center gap-2 bg-black/15 border border-white/15 rounded-xl px-3 py-2"
+                          >
                             <CheckCircle2 className="w-4 h-4 text-emerald-300" />
                             <span className="text-sm text-blue-50">{h}</span>
                           </div>
@@ -362,7 +769,10 @@ const Price = () => {
                       <div className="text-xs tracking-wider text-blue-300/80 mb-2">WHAT'S INSIDE</div>
                       <div className="flex flex-wrap gap-2">
                         {bundleTools.map((t) => (
-                          <div key={t.id} className="inline-flex items-center gap-2 rounded-full border border-gray-700 bg-gray-800/50 px-3 py-1.5">
+                          <div
+                            key={t.id}
+                            className="inline-flex items-center gap-2 rounded-full border border-gray-700 bg-gray-800/50 px-3 py-1.5"
+                          >
                             <span className="text-lg">{t.icon}</span>
                             <span className="text-sm text-gray-200">{t.name}</span>
                           </div>
@@ -408,7 +818,8 @@ const Price = () => {
                     <div className="mb-6 rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
                       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                         <div className="text-sm text-blue-200">
-                          Selected tool: <strong className="text-white">{selectedBundleTool.name}</strong>
+                          Selected tool:{" "}
+                          <strong className="text-white">{selectedBundleTool.name}</strong>
                           <span className="hidden md:inline"> • </span>
                           <span className="block md:inline text-blue-200/90">
                             Included with the bundle along with{" "}
@@ -428,13 +839,18 @@ const Price = () => {
                     <div className="flex flex-col sm:flex-row justify-between items-center pt-5 border-t border-gray-700">
                       <div className="mb-4 sm:mb-0 text-gray-300 text-sm">Unlock all tools + future updates</div>
 
-                      <Link to={toRegister(bundle?.key || "essentials_bundle", null, bundleBilling)} aria-label="Get Complete Bundle">
+                      <Link
+                        to={toRegister(bundle?.key || "essentials_bundle", null, bundleBilling)}
+                        aria-label="Get Complete Bundle"
+                        onClick={handleBundleCta}
+                      >
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           className="group inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg"
+                          disabled={userLoading || entLoading}
                         >
-                          Get Complete Bundle - {displayBundlePrice}/{bundlePeriod}
+                          {bundleCtaLabel}
                           <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                         </motion.button>
                       </Link>
@@ -465,12 +881,46 @@ const Price = () => {
                   {algoPlans.map((plan) => {
                     const isSelected = selectedAlgo === plan.id;
                     const popular = plan.popular;
+
+                    const token =
+                      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+                    const isOwned =
+                      plan.key === "starter"
+                        ? ownedExactVariant("starter")
+                        : plan.key === "pro"
+                        ? ownedExactVariant("pro")
+                        : ownedExactVariant("swing");
+
+                    const label =
+                      userLoading || entLoading
+                        ? "Checking..."
+                        : isOwned
+                        ? "Open Dashboard"
+                        : token
+                        ? "Pay Now"
+                        : "Get Started";
+
+                    const linkTo = isOwned
+                      ? "/dashboard"
+                      : token
+                      ? "#"
+                      : toRegister(algo?.key || "algo_simulator", plan.key);
+
                     return (
-                      <motion.div key={plan.key} whileHover={{ scale: 1.05 }} transition={{ duration: 0.25 }} style={{ transformOrigin: "center" }} className="w-full">
+                      <motion.div
+                        key={plan.key}
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ duration: 0.25 }}
+                        style={{ transformOrigin: "center" }}
+                        className="w-full"
+                      >
                         <div
                           className={`relative w-full max-w-[360px] rounded-2xl border ${
                             popular ? "border-yellow-400" : "border-purple-600/50"
-                          } bg-[#101223] px-6 py-10 ${popular ? "shadow-yellow-500/20" : "shadow-purple-500/20"} shadow-2xl group h-full mx-auto flex flex-col justify-between transition-all duration-300 ${
+                          } bg-[#101223] px-6 py-10 ${
+                            popular ? "shadow-yellow-500/20" : "shadow-purple-500/20"
+                          } shadow-2xl group h-full mx-auto flex flex-col justify-between transition-all duration-300 ${
                             isSelected ? "transform scale-105" : ""
                           } ${popular ? "md:-translate-y-5" : ""}`}
                           onClick={() => setSelectedAlgo(plan.id)}
@@ -492,7 +942,11 @@ const Price = () => {
                               {variantIcon(plan.key)}
                               <h3 className="text-xl font-bold">
                                 {plan.name}
-                                {popular && <span className="ml-2 text-yellow-400"><BadgeCheck className="inline w-5 h-5" /></span>}
+                                {popular && (
+                                  <span className="ml-2 text-yellow-400">
+                                    <BadgeCheck className="inline w-5 h-5" />
+                                  </span>
+                                )}
                               </h3>
                             </div>
 
@@ -506,7 +960,11 @@ const Price = () => {
                             <ul className="space-y-3 text-sm text-gray-300 text-left mb-8">
                               {plan.features.map((f) => (
                                 <li key={f} className="flex items-start gap-2">
-                                  <CheckCircle2 className={`flex-shrink-0 ${popular ? "text-yellow-400" : "text-purple-400"} w-4 h-4 mt-0.5`} />
+                                  <CheckCircle2
+                                    className={`flex-shrink-0 ${
+                                      popular ? "text-yellow-400" : "text-purple-400"
+                                    } w-4 h-4 mt-0.5`}
+                                  />
                                   <span>{f}</span>
                                 </li>
                               ))}
@@ -514,16 +972,19 @@ const Price = () => {
                           </div>
 
                           <Link
-                            to={toRegister(algo?.key || "algo_simulator", plan.key)}
-                            onClick={(e) => e.stopPropagation()}
+                            to={linkTo}
+                            onClick={(e) => onAlgoCtaClick(plan.key as "starter" | "pro" | "swing")(e)}
                             className={`relative z-10 w-full mt-auto py-3 rounded-xl font-semibold transition-all duration-300 text-center ${
                               popular
                                 ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-black hover:shadow-lg hover:shadow-yellow-500/30"
                                 : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg hover:shadow-purple-500/30"
-                            } flex items-center justify-center gap-2`}
-                            aria-label={`Pay now for ${plan.name}`}
+                            } flex items-center justify-center gap-2 ${
+                              userLoading || entLoading ? "opacity-70 cursor-not-allowed" : ""
+                            }`}
+                            aria-disabled={userLoading || entLoading}
+                            aria-label={`${label} for ${plan.name}`}
                           >
-                            Pay Now
+                            {label}
                             <ChevronRight className="w-4 h-4" />
                           </Link>
                         </div>
@@ -569,7 +1030,7 @@ const Price = () => {
                         </div>
 
                         <div className="text-right">
-                          {/* Billing toggle */}
+                          {/* Billing toggle remains visible; CTA below respects ownership */}
                           <div className="flex items-center justify-end mb-3">
                             <div className="inline-flex rounded-xl bg-white/10 border border-white/20 p-1">
                               <button
@@ -588,7 +1049,7 @@ const Price = () => {
                               >
                                 Yearly
                                 {journalBilling === "yearly" && (
-                                  <span className="ml-2 inline-flex items-center gap-1 text-emerald-200 text-xs font-semibold">
+                                  <span className="ml-2 inline-flex items-center gap-1 text-green-400 text-xl font-semibold">
                                     Save {journalingSavePct}%
                                   </span>
                                 )}
@@ -679,7 +1140,16 @@ const Price = () => {
                       <div className="bg-black/20 rounded-lg p-6 mb-8 border border-gray-700">
                         <div className="text-center text-lg font-semibold mb-4 text-blue-300">COMPREHENSIVE FEATURES</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-                          {journalingFeatures.map((feature, index) => (
+                          {[
+                            "Trade tracking & performance analytics",
+                            "Psychology markers & emotional tracking",
+                            "Exportable reports in multiple formats",
+                            "Custom tagging & categorization",
+                            "Advanced filtering & search",
+                            "Portfolio correlation analysis",
+                            "Trade replay functionality",
+                            "Risk management statistics",
+                          ].map((feature, index) => (
                             <div key={index} className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
                               <div className="text-sm text-gray-300">{feature}</div>
                             </div>
@@ -689,7 +1159,9 @@ const Price = () => {
 
                       <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-gray-700">
                         <div className="mb-4 sm:mb-0">
-                          <div className="text-gray-400 text-sm mb-1">Included in Essential Bundle</div>
+                          <div className="text-gray-400 text-sm mb-1">
+                            {bundleStatus.owned ? "Included in your Essential Bundle" : "Included in Essential Bundle"}
+                          </div>
                           <div className="flex items-center text-white">
                             <svg className="h-5 w-5 text-green-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -699,28 +1171,63 @@ const Price = () => {
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-4">
-                          <Link to={toRegister("essentials_bundle", null, bundleBilling)} aria-label="Get Complete Bundle">
-                            <motion.button
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              className="bg-gradient-to-r from-blue-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-md mb-2 sm:mb-0"
-                            >
-                              Get Complete Bundle
-                            </motion.button>
-                          </Link>
-
+                          {/* Bundle CTA (unchanged) */}
                           <Link
-                            to={toRegister(journaling?.key || "journaling_solo", null, journalBilling)}
-                            aria-label="Get Journaling Only"
+                            to={toRegister("essentials_bundle", null, bundleBilling)}
+                            aria-label="Get Complete Bundle"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (userLoading || entLoading) return;
+                              if (bundleStatus.owned) {
+                                if (bundleStatus.interval === "yearly" || bundleBilling === "monthly") {
+                                  navigate("/dashboard");
+                                } else {
+                                  navigate(toRegister("essentials_bundle", null, "yearly"));
+                                }
+                              } else {
+                                navigate(toRegister("essentials_bundle", null, bundleBilling));
+                              }
+                            }}
                           >
                             <motion.button
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
-                              className="border border-blue-500 text-blue-400 hover:bg-blue-900/30 font-semibold py-3 px-6 rounded-lg transition-all"
+                              className="bg-gradient-to-r from-blue-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-md mb-2 sm:mb-0"
+                              disabled={userLoading || entLoading}
                             >
-                              Get Journaling Only - {displayJournalPrice}/{journalingPeriod}
+                              {bundleStatus.owned
+                                ? bundleStatus.interval === "yearly" || bundleBilling === "monthly"
+                                  ? "Go to Dashboard"
+                                  : `Get Complete Bundle - ${fmtINR(BUNDLE_ANNUAL)}/year`
+                                : `Get Complete Bundle - ${displayBundlePrice}/${bundlePeriod}`}
                             </motion.button>
                           </Link>
+
+                          {/* Journaling-only CTA: respects journaling ownership */}
+                          {!bundleStatus.owned && (
+                            <Link
+                              to={
+                                journalingStatus.owned
+                                  ? "/dashboard"
+                                  : toRegister(journaling?.key || "journaling_solo", null, journalBilling)
+                              }
+                              aria-label={journalingCtaLabel}
+                              onClick={handleJournalingCta}
+                            >
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className={`border font-semibold py-3 px-6 rounded-lg transition-all ${
+                                  journalingStatus.owned
+                                    ? "border-emerald-500 text-emerald-400 hover:bg-emerald-900/30"
+                                    : "border-blue-500 text-blue-400 hover:bg-blue-900/30"
+                                }`}
+                                disabled={userLoading || entLoading}
+                              >
+                                {journalingCtaLabel}
+                              </motion.button>
+                            </Link>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -10,7 +10,7 @@ import { AuthContext } from "../../../context/AuthContext";
 const VIDEO_URL =
   "https://cdn.pixabay.com/video/2024/03/15/204306-923909642_large.mp4";
 
-/* --------- ONLY bundle keys grant access ---------- */
+/* --------- product keys/tokens that should unlock FII/DII analysis ---------- */
 const BUNDLE_KEYS = new Set([
   "essentials_bundle",
   "essentials",
@@ -19,30 +19,98 @@ const BUNDLE_KEYS = new Set([
   "trader's essential bundle",
 ]);
 
-/* ---------- helpers: keys-only (no fuzzy token scans) ---------- */
-function extractKeys(anyObj: any): string[] {
+// If your API exposes the tool itself as an entitlement, accept it too.
+const FIIDIID_KEYS = new Set(["fii_dii_data", "fiidii", "fii-dii", "fii_dii"]);
+
+// Fuzzy strings as a fallback if payload only has names/titles
+const BUNDLE_TOKENS = [
+  "essential bundle",
+  "essentials bundle",
+  "trader essentials",
+  "trader's essential bundle",
+  "bundle",
+];
+const FIIDIID_TOKENS = ["fii/dii", "fii dii", "fiidii", "fii & dii", "fii_dii_data"];
+
+/* ---------------- helpers ---------------- */
+function includesAnyToken(s: unknown, tokens: string[]) {
+  if (typeof s !== "string") return false;
+  const x = s.toLowerCase();
+  return tokens.some((t) => x.includes(t));
+}
+
+function deepSome(obj: any, pred: (v: any) => boolean): boolean {
+  if (obj == null) return false;
+  if (pred(obj)) return true;
+  if (Array.isArray(obj)) return obj.some((v) => deepSome(v, pred));
+  if (typeof obj === "object") {
+    for (const v of Object.values(obj)) {
+      if (deepSome(v, pred)) return true;
+    }
+  }
+  return false;
+}
+
+// A conservative "active" check when available; if fields are missing, we assume active.
+function isActiveLike(x: any): boolean {
+  const status = String(x?.status ?? "active").toLowerCase();
+  const endsAt = x?.endsAt ? new Date(x.endsAt).getTime() : null;
+  if (endsAt && Number.isFinite(endsAt) && endsAt < Date.now()) return false;
+  return status === "active" || status === "trialing" || status === "paid";
+}
+
+/** Extracts possible keys from many shapes (object, arrays, variant.key, variants[], etc) */
+function extractKeys(payload: any): string[] {
   const out: string[] = [];
+
   const push = (x: any) => {
     if (!x) return;
-    if (typeof x === "string") out.push(x);
-    else if (typeof x === "object")
-      out.push(
-        x.key || x.productKey || x.slug || x.route || x.code || x.id || x.name?.toLowerCase?.()
-      );
+    if (typeof x === "string") {
+      out.push(x);
+      return;
+    }
+    if (typeof x === "object") {
+      const single =
+        x?.variant?.key ??
+        x?.key ??
+        x?.productKey ??
+        x?.slug ??
+        x?.route ??
+        x?.code ??
+        x?.id ??
+        (typeof x?.name === "string" ? x.name : undefined);
+      if (single) out.push(single);
+
+      // scan variants list
+      if (Array.isArray(x?.variants)) {
+        for (const v of x.variants) {
+          if (v?.key) out.push(v.key);
+        }
+      }
+
+      // some APIs nest "items" with product info inside
+      if (Array.isArray(x?.items)) {
+        for (const it of x.items) push(it);
+      }
+
+      // some APIs use "components" or similar
+      if (Array.isArray(x?.components)) {
+        for (const c of x.components) push(c);
+      }
+    }
   };
 
-  if (!anyObj) return out;
-
   const pools = [
-    anyObj.products,
-    anyObj.activeProducts,
-    anyObj.entitlements,
-    anyObj.purchases,
-    anyObj.subscriptions,
-    anyObj.bundles,
-    anyObj.items,
-    anyObj.modules,
-    anyObj.features,
+    payload?.products,
+    payload?.activeProducts,
+    payload?.entitlements,
+    payload?.purchases,
+    payload?.subscriptions,
+    payload?.bundles,
+    payload?.items,
+    payload?.modules,
+    payload?.features,
+    payload?.data,
   ].filter(Boolean);
 
   for (const p of pools) {
@@ -50,16 +118,52 @@ function extractKeys(anyObj: any): string[] {
     else push(p);
   }
 
-  return out.filter(Boolean).map((s) => String(s).toLowerCase());
+  // Also push the root object itself to catch top-level keys/variants
+  push(payload);
+
+  return out
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase());
 }
 
-function hasBundleAccess(payload: any): boolean {
+/** Does this payload grant access to FII/DII? (Bundle OR direct FII/DII) */
+function payloadGrantsFiiDii(payload: any): boolean {
+  if (!payload) return false;
+
+  // 1) Explicit keys (with active check where present)
   const keys = extractKeys(payload);
-  return keys.some((k) => BUNDLE_KEYS.has(k));
+  const explicit =
+    keys.some((k) => BUNDLE_KEYS.has(k)) || keys.some((k) => FIIDIID_KEYS.has(k));
+  if (explicit) {
+    const hasActiveRecord = deepSome(payload, (v) => {
+      if (v && typeof v === "object" && isActiveLike(v)) {
+        const k =
+          v?.variant?.key ??
+          v?.key ??
+          v?.productKey ??
+          v?.slug ??
+          v?.route ??
+          v?.code ??
+          (typeof v?.name === "string" ? v.name : "");
+        const lowered = String(k || "").toLowerCase();
+        return BUNDLE_KEYS.has(lowered) || FIIDIID_KEYS.has(lowered);
+      }
+      return false;
+    });
+    return hasActiveRecord || true;
+  }
+
+  // 2) Fuzzy string mentions as a last resort
+  const mentions =
+    deepSome(payload, (v) => includesAnyToken(v, BUNDLE_TOKENS)) ||
+    deepSome(payload, (v) => includesAnyToken(v, FIIDIID_TOKENS));
+
+  return mentions;
 }
 
 /* ---------------- component ---------------- */
 type Props = {
+  /** Fallback label for non-owners (e.g., "Get Analysis") */
   ctaLabel?: string;
 };
 
@@ -70,13 +174,18 @@ export default function Hero({ ctaLabel = "Get Analysis" }: Props) {
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const checkingRef = useRef(false);
 
-  // fast local check (AuthContext + localStorage user) — keys only
+  // fast local check (sticky + AuthContext + localStorage user)
   useEffect(() => {
     let decided = false;
 
+    if (sessionStorage.getItem("hasFiiDiiAccess") === "true") {
+      setHasAccess(true);
+      decided = true;
+    }
+
     const tryLocal = (payload: any) => {
       if (decided || !payload) return;
-      if (hasBundleAccess(payload)) {
+      if (payloadGrantsFiiDii(payload)) {
         setHasAccess(true);
         sessionStorage.setItem("hasFiiDiiAccess", "true"); // cache only positive
         decided = true;
@@ -87,56 +196,86 @@ export default function Hero({ ctaLabel = "Get Analysis" }: Props) {
     try {
       const cached = JSON.parse(localStorage.getItem("user") || "null");
       tryLocal(cached);
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
 
     if (!decided) setHasAccess(null);
   }, [user]);
 
-  // live probe (use /users/me since others 404 in your env)
+  // optional: kick off a background verify when logged in so label flips proactively
+  useEffect(() => {
+    const hasToken = !!localStorage.getItem("token");
+    if (hasToken && hasAccess === null && !checkingRef.current) {
+      void doLiveCheck(); // fire-and-forget to improve UX
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasAccess]);
+
+  // live probe (prefer entitlements, then billing, then profile)
   const doLiveCheck = async (): Promise<boolean> => {
     if (checkingRef.current) return hasAccess === true;
     checkingRef.current = true;
 
-    try {
-      const r = await api.get("/users/me");
-      if (hasBundleAccess(r.data)) {
-        setHasAccess(true);
-        sessionStorage.setItem("hasFiiDiiAccess", "true");
-        checkingRef.current = false;
-        return true;
-      }
-    } catch {
-      /* ignore */
+    if (sessionStorage.getItem("hasFiiDiiAccess") === "true") {
+      setHasAccess(true);
+      checkingRef.current = false;
+      return true;
     }
-    setHasAccess(false);
-    checkingRef.current = false;
-    return false;
+
+    const grant = () => {
+      setHasAccess(true);
+      sessionStorage.setItem("hasFiiDiiAccess", "true");
+      checkingRef.current = false;
+      return true;
+    };
+    const deny = () => {
+      setHasAccess(false);
+      checkingRef.current = false;
+      return false;
+    };
+
+    const endpoints = [
+      "/users/me/products",
+      "/billing/active-products",
+      "/users/me",
+    ];
+
+    for (const url of endpoints) {
+      try {
+        const r = await api.get(url);
+        if (payloadGrantsFiiDii(r.data)) return grant();
+      } catch {
+        // continue
+      }
+    }
+
+    return deny();
   };
 
   const onCTA = async () => {
     const isLoggedIn = !!localStorage.getItem("token");
 
-    // not logged in ⇒ send to bundle signup
     if (!isLoggedIn) {
       navigate("/signup?productKey=essentials_bundle");
       return;
     }
 
-    // already confirmed
-    if (hasAccess === true) {
-      navigate("/main-fii-dii");
+    if (hasAccess === true || sessionStorage.getItem("hasFiiDiiAccess") === "true") {
+      navigate("/main-fii-dii"); // ⬅️ changed
       return;
     }
 
-    // verify once from server; only bundle unlocks
     const ok = await doLiveCheck();
-    if (ok) navigate("/main-fii-dii");
+    if (ok) navigate("/main-fii-dii"); // ⬅️ changed
     else navigate("/signup?productKey=essentials_bundle");
   };
 
-  /* copy deck text once to avoid re-renders */
+  // dynamic label: "Dashboard" if owned; otherwise fallback ctaLabel
+  const buttonLabel = useMemo(() => {
+    return hasAccess === true || sessionStorage.getItem("hasFiiDiiAccess") === "true"
+      ? "Dashboard"
+      : ctaLabel;
+  }, [hasAccess, ctaLabel]);
+
   const sub = useMemo(
     () =>
       "Track institutional money flows to anticipate market movements. Position yourself ahead of trends by aligning with FII/DII activity and master options trading with institutional insights.",
@@ -192,9 +331,9 @@ export default function Hero({ ctaLabel = "Get Analysis" }: Props) {
           <button
             onClick={onCTA}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 font-semibold text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:from-blue-600 hover:to-purple-700"
-            aria-label={ctaLabel}
+            aria-label={buttonLabel}
           >
-            {ctaLabel}
+            {buttonLabel}
             <motion.span
               animate={{ x: [0, 4, 0] }}
               transition={{ duration: 1.5, repeat: Infinity }}

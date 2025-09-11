@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../../api";
 import { AuthContext } from "../../../context/AuthContext";
 
-/* ---------- keys that grant FII/DII access ---------- */
+/* ---------- product keys/tokens that should unlock FII/DII analysis ---------- */
 const FIIDII_KEYS = new Set([
   "fii_dii_data",
   "fii_dii",
@@ -15,7 +15,6 @@ const FIIDII_KEYS = new Set([
   "fii_dii_pro",
 ]);
 
-/* owning bundle should also unlock this */
 const BUNDLE_KEYS = new Set([
   "essentials_bundle",
   "essentials",
@@ -24,37 +23,80 @@ const BUNDLE_KEYS = new Set([
   "trader's essential bundle",
 ]);
 
-/* ---------------- keys-only utils ---------------- */
-function extractKeys(anyObj: any): string[] {
+const BUNDLE_TOKENS = [
+  "essential bundle",
+  "essentials bundle",
+  "trader essentials",
+  "trader's essential bundle",
+  "bundle",
+];
+const FIIDII_TOKENS = ["fii/dii", "fii dii", "fiidii", "fii & dii", "fii_dii_data"];
+
+/* ---------------- helpers (robust) ---------------- */
+function includesAnyToken(s: unknown, tokens: string[]) {
+  if (typeof s !== "string") return false;
+  const x = s.toLowerCase();
+  return tokens.some((t) => x.includes(t));
+}
+
+function deepSome(obj: any, pred: (v: any) => boolean): boolean {
+  if (obj == null) return false;
+  if (pred(obj)) return true;
+  if (Array.isArray(obj)) return obj.some((v) => deepSome(v, pred));
+  if (typeof obj === "object") {
+    for (const v of Object.values(obj)) {
+      if (deepSome(v, pred)) return true;
+    }
+  }
+  return false;
+}
+
+// Conservative "active" check when present; if fields are missing, assume active
+function isActiveLike(x: any): boolean {
+  const status = String(x?.status ?? "active").toLowerCase();
+  const endsAt = x?.endsAt ? new Date(x.endsAt).getTime() : null;
+  if (endsAt && Number.isFinite(endsAt) && endsAt < Date.now()) return false;
+  return status === "active" || status === "trialing" || status === "paid";
+}
+
+/** Extract keys from many shapes (object, arrays, variant.key, variants[], nested items/components) */
+function extractKeys(payload: any): string[] {
   const out: string[] = [];
   const push = (x: any) => {
     if (!x) return;
-    if (typeof x === "string") out.push(x);
-    else if (typeof x === "object") {
-      const cand =
-        x.key ||
-        x.productKey ||
-        x.slug ||
-        x.route ||
-        x.code ||
-        x.id ||
-        (typeof x.name === "string" ? x.name : undefined);
-      if (typeof cand === "string") out.push(cand);
+    if (typeof x === "string") {
+      out.push(x);
+      return;
+    }
+    if (typeof x === "object") {
+      const single =
+        x?.variant?.key ??
+        x?.key ??
+        x?.productKey ??
+        x?.slug ??
+        x?.route ??
+        x?.code ??
+        x?.id ??
+        (typeof x?.name === "string" ? x.name : undefined);
+      if (single) out.push(single);
+
+      if (Array.isArray(x?.variants)) for (const v of x.variants) if (v?.key) out.push(v.key);
+      if (Array.isArray(x?.items)) for (const it of x.items) push(it);
+      if (Array.isArray(x?.components)) for (const c of x.components) push(c);
     }
   };
 
-  if (!anyObj) return out;
-
   const pools = [
-    anyObj.products,
-    anyObj.activeProducts,
-    anyObj.entitlements,
-    anyObj.purchases,
-    anyObj.subscriptions,
-    anyObj.bundles,
-    anyObj.modules,
-    anyObj.features,
-    anyObj.items,
+    payload?.products,
+    payload?.activeProducts,
+    payload?.entitlements,
+    payload?.purchases,
+    payload?.subscriptions,
+    payload?.bundles,
+    payload?.modules,
+    payload?.features,
+    payload?.items,
+    payload?.data, // some APIs wrap under data
   ].filter(Boolean);
 
   for (const p of pools) {
@@ -62,16 +104,45 @@ function extractKeys(anyObj: any): string[] {
     else push(p);
   }
 
+  // also check root
+  push(payload);
+
   return out.filter(Boolean).map((s) => String(s).toLowerCase());
 }
 
-function payloadGrantsFiiDiiKeysOnly(payload: any): boolean {
-  try {
-    const keys = extractKeys(payload);
-    return keys.some((k) => FIIDII_KEYS.has(k)) || keys.some((k) => BUNDLE_KEYS.has(k));
-  } catch {
-    return false;
+/** Does this payload grant access to FII/DII? (Bundle OR direct FII/DII) */
+function payloadGrantsFiiDii(payload: any): boolean {
+  if (!payload) return false;
+
+  // 1) explicit keys
+  const keys = extractKeys(payload);
+  const explicit =
+    keys.some((k) => BUNDLE_KEYS.has(k)) || keys.some((k) => FIIDII_KEYS.has(k));
+  if (explicit) {
+    // If detailed records exist, ensure at least one active-like record matches
+    const hasActiveRecord = deepSome(payload, (v) => {
+      if (v && typeof v === "object" && isActiveLike(v)) {
+        const k =
+          v?.variant?.key ??
+          v?.key ??
+          v?.productKey ??
+          v?.slug ??
+          v?.route ??
+          v?.code ??
+          (typeof v?.name === "string" ? v.name : "");
+        const lowered = String(k || "").toLowerCase();
+        return BUNDLE_KEYS.has(lowered) || FIIDII_KEYS.has(lowered);
+      }
+      return false;
+    });
+    return hasActiveRecord || true; // allow if explicit keys but no itemized records
   }
+
+  // 2) fuzzy fallback
+  const mentions =
+    deepSome(payload, (v) => includesAnyToken(v, BUNDLE_TOKENS)) ||
+    deepSome(payload, (v) => includesAnyToken(v, FIIDII_TOKENS));
+  return mentions;
 }
 
 export default function AnalysisSection() {
@@ -83,6 +154,7 @@ export default function AnalysisSection() {
   const [hasFiiDiiAccess, setHasFiiDiiAccess] = useState<boolean | null>(null);
   const checkingRef = useRef(false);
 
+  /* ---------- rotate feature cards ---------- */
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveFeature((prev) => (prev + 1) % 4);
@@ -98,9 +170,39 @@ export default function AnalysisSection() {
     });
   };
 
-  // quick local entitlement check (keys-only) + positive cache
+  /* ---------- sync with login state; clear sticky on logout ---------- */
+  useEffect(() => {
+    const syncWithAuth = () => {
+      const hasToken = !!localStorage.getItem("token");
+      if (!hasToken) {
+        // clear sticky flag & state when logged out
+        sessionStorage.removeItem("hasFiiDiiAccess");
+        setHasFiiDiiAccess(false);
+      }
+    };
+
+    // run once on mount and whenever user changes
+    syncWithAuth();
+
+    // respond to logout/login from other tabs
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "token") syncWithAuth();
+      if (e.key === "user") syncWithAuth();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [user]);
+
+  /* ---------- local entitlement check (sticky + AuthContext + localStorage) ---------- */
   useEffect(() => {
     let decided = false;
+
+    const hasToken = !!localStorage.getItem("token");
+    if (!hasToken) {
+      // logged out: ensure state is not "true"
+      setHasFiiDiiAccess(false);
+      return;
+    }
 
     if (sessionStorage.getItem("hasFiiDiiAccess") === "true") {
       setHasFiiDiiAccess(true);
@@ -109,7 +211,7 @@ export default function AnalysisSection() {
 
     const tryLocal = (payload: any) => {
       if (decided || !payload) return;
-      if (payloadGrantsFiiDiiKeysOnly(payload)) {
+      if (payloadGrantsFiiDii(payload)) {
         setHasFiiDiiAccess(true);
         sessionStorage.setItem("hasFiiDiiAccess", "true");
         decided = true;
@@ -127,48 +229,84 @@ export default function AnalysisSection() {
     if (!decided) setHasFiiDiiAccess(null);
   }, [user]);
 
-  // live probe (only /users/me, like Hero.tsx)
+  /* ---------- live probe (entitlements → billing → profile) ---------- */
   const doLiveCheck = async (): Promise<boolean> => {
     if (checkingRef.current) return hasFiiDiiAccess === true;
     checkingRef.current = true;
 
-    try {
-      const r = await api.get("/users/me");
-      if (payloadGrantsFiiDiiKeysOnly(r.data)) {
-        setHasFiiDiiAccess(true);
-        sessionStorage.setItem("hasFiiDiiAccess", "true");
-        checkingRef.current = false;
-        return true;
-      }
-    } catch {
-      /* ignore */
+    const hasToken = !!localStorage.getItem("token");
+    if (!hasToken) {
+      // logged out mid-check — treat as no access
+      sessionStorage.removeItem("hasFiiDiiAccess");
+      setHasFiiDiiAccess(false);
+      checkingRef.current = false;
+      return false;
     }
-    setHasFiiDiiAccess(false);
-    checkingRef.current = false;
-    return false;
+
+    // short-circuit if sticky already true
+    if (sessionStorage.getItem("hasFiiDiiAccess") === "true") {
+      setHasFiiDiiAccess(true);
+      checkingRef.current = false;
+      return true;
+    }
+
+    const grant = () => {
+      setHasFiiDiiAccess(true);
+      sessionStorage.setItem("hasFiiDiiAccess", "true");
+      checkingRef.current = false;
+      return true;
+    };
+    const deny = () => {
+      setHasFiiDiiAccess(false);
+      checkingRef.current = false;
+      return false;
+    };
+
+    const endpoints = [
+      "/users/me/products",        // preferred (entitlements)
+      "/billing/active-products",  // if exposed
+      "/users/me",                 // fallback
+    ];
+
+    for (const url of endpoints) {
+      try {
+        const r = await api.get(url);
+        if (payloadGrantsFiiDii(r.data)) return grant();
+      } catch {
+        // continue
+      }
+    }
+
+    return deny();
   };
 
-  // === Use the same CTA logic as the Hero component ===
+  /* ---------- CTA ---------- */
   const onCTA = async () => {
-    const isLoggedIn = !!localStorage.getItem("token");
+    const hasToken = !!localStorage.getItem("token");
 
-    // not logged in ⇒ send to bundle signup
-    if (!isLoggedIn) {
+    if (!hasToken) {
       navigate("/signup?productKey=essentials_bundle");
       return;
     }
 
-    // already confirmed access
-    if (hasFiiDiiAccess === true) {
-      navigate("/main-fii-dii");
+    if (hasFiiDiiAccess === true || sessionStorage.getItem("hasFiiDiiAccess") === "true") {
+      navigate("/main-fii-dii"); // changed from /dashboard
       return;
     }
 
-    // verify once from server; only bundle or direct FII/DII keys unlock
     const ok = await doLiveCheck();
-    if (ok) navigate("/main-fii-dii");
+    if (ok) navigate("/main-fii-dii"); // changed from /dashboard
     else navigate("/signup?productKey=essentials_bundle");
   };
+
+  /* ---------- label logic (respects logout) ---------- */
+  const buttonLabel = useMemo(() => {
+    const hasToken = !!localStorage.getItem("token");
+    if (!hasToken) return "Unlock Full Analysis";
+    return hasFiiDiiAccess === true || sessionStorage.getItem("hasFiiDiiAccess") === "true"
+      ? "Dashboard"
+      : "Unlock Full Analysis";
+  }, [hasFiiDiiAccess, user]);
 
   const features = useMemo(
     () => [
@@ -315,15 +453,17 @@ export default function AnalysisSection() {
           <button
             onClick={onCTA}
             className="group relative inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-400 px-6 sm:px-8 py-3.5 sm:py-4 font-semibold text-white text-base sm:text-lg shadow-lg shadow-blue-500/25 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/40 hover:scale-105"
-            aria-label="Unlock Full Analysis"
+            aria-label={buttonLabel}
           >
-            <span>Unlock Full Analysis</span>
+            <span>{buttonLabel}</span>
             <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
           </button>
 
           <p className="mt-4 sm:mt-6 text-white/60 text-sm sm:text-base md:text-lg">
-            Full dashboards, alerts, and historical studies unlock after signup.
+            {buttonLabel === "Dashboard"
+              ? "You're all set — jump into your dashboard."
+              : "Full dashboards, alerts, and historical studies unlock after signup."}
           </p>
         </div>
       </div>
