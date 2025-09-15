@@ -12,7 +12,7 @@ const PlanOfAction: React.FC<PlanOfActionProps> = ({ planOfAction }) => {
       <style>
         {`
           .glass-card {
-            background: #121212;
+            background: bg-[#0a0d13];
             backdrop-filter: blur(12px);
             border: 1px solid rgba(75, 85, 99, 0.2);
           }

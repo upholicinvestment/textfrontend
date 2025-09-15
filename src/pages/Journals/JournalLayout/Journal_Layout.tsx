@@ -5,6 +5,7 @@ import { SidebarLayout } from "../JournalDashboard/SidebarLayout";
 import DailyJournal from "../JournalDashboard/DailyJournal";
 import TradesTable from "../JournalDashboard/TradesTable";
 import UploadButton from "../JournalDashboard/UploadButton";
+import TradeCalendar from "../JournalDashboard/TradeCalendar";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 const SIDEBAR_WIDTH = 265;
@@ -156,6 +157,8 @@ const Journal_Layout = () => {
           {active === "dashboard" && <JournalDashboard ref={dashboardRef} />}
           {active === "journal" && <DailyJournal />}
           {active === "trades" && <TradesTable />}
+          {active === "calendar" && <TradeCalendar />}
+
         </div>
       </div>
     </div>

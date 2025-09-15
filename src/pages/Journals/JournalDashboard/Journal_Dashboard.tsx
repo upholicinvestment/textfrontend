@@ -1,21 +1,34 @@
 import { useEffect, useState, forwardRef, useImperativeHandle, Fragment } from "react";
 import axios from "axios";
+import { API_BASE, getUserId } from "../../../api";
 import UpholicScoreCard from "../JournalDashboard/UpholicScoreCard";
 import DemonFinder from "../JournalDashboard/DemonFinder";
 import PlanOfAction from "../JournalDashboard/PlanOfAction";
 import { Dialog, Transition } from "@headlessui/react";
 
-// Formatting function unchanged
+/* ===== auth helpers + per-user ===== */
+const AUTH_TOKEN_KEYS = ["accessToken", "token", "jwt", "authToken"];
+const getAuthToken = () => {
+  for (const k of AUTH_TOKEN_KEYS) {
+    const v = localStorage.getItem(k);
+    if (v) return v;
+  }
+  return null;
+};
+const authHeaders = () => {
+  const t = getAuthToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+
+/* ===== formatting ===== */
 const formatCurrency = (value: number | undefined) => {
   if (value === undefined) return "--";
   const absValue = Math.abs(value);
-  if (value < 0) {
-    return `-₹${absValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
-  return `₹${absValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const str = absValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return value < 0 ? `-₹${str}` : `₹${str}`;
 };
 
-// Gauge component unchanged (but smaller)
+/* ===== Gauge ===== */
 const Gauge = ({ value = 0, color = "#34d399" }: { value: number; color?: string }) => {
   const percent = Math.max(0, Math.min(100, value));
   const dash = 62.8;
@@ -29,13 +42,14 @@ const Gauge = ({ value = 0, color = "#34d399" }: { value: number; color?: string
         strokeWidth="4"
         strokeDasharray={dash}
         strokeDashoffset={dash - (dash * percent) / 100}
-        style={{ transition: 'stroke-dashoffset 0.5s' }}
+        style={{ transition: "stroke-dashoffset 0.5s" }}
       />
     </svg>
   );
 };
 
-const DisclaimerModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => (
+/* ===== Disclaimer modal ===== */
+const DisclaimerModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
   <Transition appear show={isOpen} as={Fragment}>
     <Dialog as="div" className="relative z-50" onClose={onClose}>
       <Transition.Child
@@ -61,32 +75,30 @@ const DisclaimerModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => 
             leaveTo="opacity-0 scale-95"
           >
             <Dialog.Panel className="w-full max-w-xs transform overflow-hidden rounded-xl bg-[#181820] p-5 text-left align-middle shadow-xl transition-all">
-              <Dialog.Title
-                as="h3"
-                className="text-base font-semibold leading-6 text-white flex items-center"
-              >
+              <Dialog.Title as="h3" className="text-base font-semibold leading-6 text-white flex items-center">
                 <svg className="w-4 h-4 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
                 </svg>
                 Important Notice
               </Dialog.Title>
-              <div className="mt-3">
-                <p className="text-xs text-gray-400 mb-2">
-                  The analytics and insights provided by this trading journal are for educational purposes only. Results may differ from your broker's official statements due to:
-                </p>
-                <ul className="list-disc pl-4 space-y-0.5 text-xs text-gray-500 mb-2">
-                  <li>Missing or unmatched trades in provided data</li>
-                  <li>Estimated brokerage and tax calculations</li>
-                  <li>Different treatment of short positions</li>
-                </ul>
-                <p className="text-[10px] text-gray-500 italic">
-                  Always verify critical numbers with your broker before making trading decisions.
-                </p>
-              </div>
+              <div
+  className="mt-3 text-xs text-gray-400"
+  title="Figures are derived from your CSV using FIFO pairing and per-leg charge proration. Open positions, partial fills across days, missing/rounded charges, or timestamp differences can make our analytics differ from the broker display. Where possible we reconcile to broker totals; otherwise values are best-effort estimates."
+>
+  Analytics are estimates derived from your orderbook CSV. Results may vary from your broker due to open positions,
+  FIFO pairing, partial fills across days, charge availability/proration, and rounding. Where possible we reconcile to
+  broker totals; otherwise values are best-effort. Always verify with your broker statement.
+</div>
+
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
-                  className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 transition"
+                  className="inline-flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
                   onClick={onClose}
                 >
                   I Understand
@@ -112,23 +124,21 @@ type Metric = {
   winWidth?: number;
   lossWidth?: number;
 };
-
-/** >>> ONLY THIS COMPONENT UPDATED FOR SPACING <<< */
 const MetricCard = ({ metric }: { metric: Metric }) => (
-  <div className="bg-[#17181c] rounded-lg shadow-md p-4 md:p-5 lg:p-6 flex flex-col justify-between min-h-[96px]">
+  <div className="bg-[#0f1120] rounded-md border border-[#202336] shadow-[0_8px_24px_rgba(0,0,0,0.25)] hover:shadow-[0_12px_28px_rgba(0,0,0,0.32)] transition-shadow duration-200 p-4 md:p-5 lg:p-6 flex flex-col justify-between min-h-[96px]">
     <div className="flex items-center justify-between mb-2.5">
-      <span className="text-[11px] text-gray-400 font-semibold tracking-wide">{metric.label}</span>
+      <span className="text-[11px] text-gray-300 font-semibold tracking-wide">{metric.label}</span>
       <svg
-        className="w-4 h-4 text-gray-400/90 cursor-pointer"
+        className="w-4 h-4 text-gray-400/90"
         fill="none"
         stroke="currentColor"
         strokeWidth={2}
         viewBox="0 0 24 24"
         role="img"
-        aria-label={metric.info}  // optional for a11y
+        aria-label={metric.info}
       >
         <title>{metric.info}</title>
-        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={2} />
+        <circle cx="12" cy="12" r="10" />
         <path d="M12 16v-4m0-4h.01" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </div>
@@ -146,7 +156,7 @@ const MetricCard = ({ metric }: { metric: Metric }) => (
           <span className="text-[11px] font-semibold text-white">/</span>
           <span className="text-[11px] font-semibold text-red-400">{formatCurrency(metric.avgLoss)}</span>
         </div>
-        <div className="w-full h-2 mt-1.5 bg-gray-800 rounded flex overflow-hidden">
+        <div className="w-full h-2 mt-1.5 bg-[#202336] rounded flex overflow-hidden">
           <div className="bg-green-500" style={{ width: `${metric.winWidth}%` }} />
           <div className="bg-red-500" style={{ width: `${metric.lossWidth}%` }} />
         </div>
@@ -157,98 +167,108 @@ const MetricCard = ({ metric }: { metric: Metric }) => (
   </div>
 );
 
+
 const Journal_Dashboard = forwardRef((_props, ref) => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
-  // --- Disclaimer: Only after upload, not on refresh/tab switch
   const [showDisclaimer, setShowDisclaimer] = useState(false);
+  const [userId, setUserId] = useState<string | null>(getUserId());
 
+  // pagination for scrip table
+  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
+  const [page, setPage] = useState<number>(1);
+
+  // react to user changes
   useEffect(() => {
-    const uploadedAt = localStorage.getItem("orderbook_uploaded_at");
-    const disclaimerSeen = localStorage.getItem("orderbook_disclaimer_seen");
-    setShowDisclaimer(!!uploadedAt && disclaimerSeen !== uploadedAt);
+    const sync = () => setUserId(getUserId());
+    window.addEventListener("storage", sync);
+    const i = setInterval(sync, 1000);
+    return () => {
+      window.removeEventListener("storage", sync);
+      clearInterval(i);
+    };
   }, []);
 
+  useEffect(() => {
+    const uploadedAt = localStorage.getItem(userId ? `orderbook_uploaded_at:${userId}` : "orderbook_uploaded_at");
+    const disclaimerSeen = localStorage.getItem("orderbook_disclaimer_seen");
+    setShowDisclaimer(!!uploadedAt && disclaimerSeen !== uploadedAt);
+  }, [userId]);
+
   const handleDisclaimerClose = () => {
-    const uploadedAt = localStorage.getItem("orderbook_uploaded_at");
+    const uploadedAt = localStorage.getItem(userId ? `orderbook_uploaded_at:${userId}` : "orderbook_uploaded_at");
     if (uploadedAt) localStorage.setItem("orderbook_disclaimer_seen", uploadedAt);
     setShowDisclaimer(false);
   };
 
-  // Metric bar calculations
-  let avgWin = 0,
-    avgLoss = 0,
-    winLossRatio: string | null = null,
-    winWidth = 50,
-    lossWidth = 50;
-  if (stats) {
-    avgWin = stats.avgWinLoss?.avgWin ?? 0;
-    avgLoss = stats.avgWinLoss?.avgLoss ?? 0;
-    winWidth = avgWin || avgLoss ? Math.min(100, (Math.abs(avgWin) / (Math.abs(avgWin) + Math.abs(avgLoss))) * 100) : 50;
-    lossWidth = 100 - winWidth;
-    if (avgWin && avgLoss) {
-      const ratio = Math.abs(avgLoss) > 0 ? avgWin / Math.abs(avgLoss) : 0;
-      winLossRatio = ratio ? ratio.toFixed(2) : "--";
-    }
-  }
-
-  // Fetch stats API
+  // fetch stats scoped by user
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get("https://api.upholictech.com/api/stats");
+      const url = new URL(`${API_BASE}/stats`);
+      if (userId) url.searchParams.set("userId", userId);
+      url.searchParams.set("_", Date.now().toString());
+      const { data } = await axios.get(url.toString(), {
+        withCredentials: true,
+        headers: authHeaders(),
+      });
       setStats(data.empty ? null : data);
-    } catch (error) {
+    } catch {
       setStats(null);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-  useImperativeHandle(ref, () => ({ refreshStats: fetchStats }));
+  // ref refresh + reload if user changes
+  useImperativeHandle(ref, () => ({ refreshStats: fetchStats }), [userId]);
 
-  if (loading)
+  useEffect(() => {
+    setStats(null);
+    fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // reset pagination when dataset or rowsPerPage changes
+  useEffect(() => setPage(1), [rowsPerPage, stats]);
+
+  // derive scrip table slices (no hooks inside conditionals)
+  const scripSummary: any[] = Array.isArray(stats?.scripSummary) ? stats.scripSummary : [];
+  const totalRows = scripSummary.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+  const startIdx = (page - 1) * rowsPerPage;
+  const endIdx = Math.min(totalRows, startIdx + rowsPerPage);
+  const visibleRows = scripSummary.slice(startIdx, endIdx);
+
+  if (loading) return <div className="py-16 text-center text-base text-gray-400">Loading...</div>;
+  if (!stats) {
     return (
-      <div className="py-16 text-center text-base text-gray-400">
-        Loading...
-      </div>
-    );
-if (!stats) {
-  return (
-    <>
-      {/* Parent (card/section) */}
-      <div className="relative min-h-[320px]">
-        {/* Centered placeholder */}
-        <div className="absolute inset-0 grid place-items-center text-gray-400">
-          <div className="text-center">
-            <svg
-              className="w-8 h-8 text-indigo-400 mx-auto mb-2"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                d="M12 4v16m8-8H4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <div className="text-lg mb-1 font-semibold">No stats yet</div>
-            <div className="text-sm">
-              Upload your orderbook CSV to see dashboard stats.
+      <>
+        <div className="relative min-h-[320px]">
+          <div className="absolute inset-0 grid place-items-center text-gray-400">
+            <div className="text-center">
+              <svg className="w-8 h-8 text-indigo-400 mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <div className="text-lg mb-1 font-semibold">No stats yet</div>
+              <div className="text-sm">Upload your orderbook CSV to see dashboard stats.</div>
             </div>
           </div>
         </div>
-      </div>
-    </>
-  );
-}
+      </>
+    );
+  }
 
+  // headline metrics
+  const avgWin = stats.avgWinLoss?.avgWin ?? 0;
+  const avgLoss = stats.avgWinLoss?.avgLoss ?? 0;
+  const winWidth =
+    avgWin || avgLoss
+      ? Math.min(100, (Math.abs(avgWin) / (Math.abs(avgWin) + Math.abs(avgLoss))) * 100)
+      : 50;
+  const lossWidth = 100 - winWidth;
+  const winLossRatio =
+    avgWin && avgLoss ? (Math.abs(avgLoss) > 0 ? (avgWin / Math.abs(avgLoss)).toFixed(2) : "--") : "--";
 
   const metrics: Metric[] = [
     {
@@ -293,28 +313,121 @@ if (!stats) {
     <div className="min-h-screen bg-[#0d0d14] p-5">
       <DisclaimerModal isOpen={showDisclaimer} onClose={handleDisclaimerClose} />
 
-      {/* Top row: 3 cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3 max-w-full">
         {[0, 1, 2].map((idx) => (
           <MetricCard key={idx} metric={metrics[idx]} />
         ))}
       </div>
 
-      {/* Bottom row: 2 cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-3 mb-3 max-w-full">
         {[3, 4].map((idx) => (
           <MetricCard key={idx} metric={metrics[idx]} />
         ))}
       </div>
 
-      {/* Bottom section with UpholicScoreCard and PlanOfAction side by side */}
+      {/* ====== P&L Summary by Scrip (vertical dividers + pagination; no Adj column) ====== */}
+      {totalRows > 0 && (
+        <div className="bg-[#0a0d13] mb-4">
+          <div className="rounded-md border border-[#202336] overflow-hidden">
+            <div className="px-4 py-3 bg-[#121420] border-b border-[#202336]">
+              <h3 className="text-base font-bold text-gray-100 text-center">P&amp;L Summary by Scrip</h3>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead>
+                  <tr className="bg-[#11131b] text-gray-300">
+                    <th className="px-3 py-2 text-center border-r border-[#202336]">Scrip Name</th>
+                    <th className="px-3 py-2 text-center border-r border-[#202336]">Quantity</th>
+                    <th className="px-3 py-2 text-center border-r border-[#202336]">Avg. Buy Price</th>
+                    <th className="px-3 py-2 text-center border-r border-[#202336]">Avg. Sell Price</th>
+                    <th className="px-3 py-2 text-center border-r border-[#202336]">Charges</th>
+                    <th className="px-3 py-2 text-center">Net Realised P&amp;L</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#202336]">
+                  {visibleRows.map((row: any, i: number) => (
+                    <tr key={row.symbol + i} className="bg-[#0f1120] hover:bg-[#14172a]">
+                      <td className="px-3 py-2 text-gray-200 border-r border-[#202336]">{row.symbol}</td>
+                      <td className="px-3 py-2 text-center text-gray-200 border-r border-[#202336]">
+                        {row.quantity?.toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-200 border-r border-[#202336]">
+                        {formatCurrency(row.avgBuy)}
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-200 border-r border-[#202336]">
+                        {formatCurrency(row.avgSell)}
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-300 border-r border-[#202336]">
+                        {formatCurrency(row.charges)}
+                      </td>
+                      <td
+                        className={`px-3 py-2 text-center font-bold ${
+                          row.netRealized >= 0 ? "text-green-400" : "text-red-400"
+                        }`}
+                      >
+                        {formatCurrency(row.netRealized)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* footer: rows-per-page + pagination (bottom-right) */}
+            <div className="flex items-center justify-between px-4 py-2 bg-[#0f1120] border-t border-[#202336]">
+              <div className="text-[11px] text-gray-400">
+                Showing{" "}
+                <span className="font-semibold text-gray-200">{totalRows ? startIdx + 1 : 0}</span> to{" "}
+                <span className="font-semibold text-gray-200">{endIdx}</span> of{" "}
+                <span className="font-semibold text-gray-200">{totalRows}</span> entries
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 text-[11px] text-gray-300">
+                  <span>Rows per page:</span>
+                  <select
+                    className="bg-[#0b0d18] border border-[#202336] rounded px-2 py-1 text-[11px] focus:outline-none"
+                    value={rowsPerPage}
+                    onChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    className="px-2 py-1 rounded border border-[#202336] text-gray-300 hover:bg-[#151836] disabled:opacity-40"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    ‹
+                  </button>
+                  <span className="text-[11px] text-gray-300 px-2">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    className="px-2 py-1 rounded border border-[#202336] text-gray-300 hover:bg-[#151836] disabled:opacity-40"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 max-w-full">
         <UpholicScoreCard stats={stats} />
         <PlanOfAction planOfAction={stats.upholicPointers?.planOfAction} />
       </div>
 
-      {/* DemonFinder full width below */}
-      <DemonFinder trades={stats.trades ?? []} />
+      <DemonFinder trades={stats.trades ?? []} netPnl={stats.netPnl} />
     </div>
   );
 });

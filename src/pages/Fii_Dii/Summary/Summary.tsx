@@ -59,13 +59,23 @@ const Summary = () => {
       .catch((err) => console.error('Error fetching available dates:', err));
   }, []);
 
+  const FIXED_ORDER = ["FII","Client","Pro","DII"];
+
   useEffect(() => {
     if (!selectedDate) return;
     fetch(`https://api.upholictech.com/summary?date=${selectedDate}`)
       .then((res) => res.json())
+      // .then((result) => {
+      //   setParticipants(result.data || []);
+      // })
       .then((result) => {
-        setParticipants(result.data || []);
-      })
+      const rows: ParticipantType[] = result.data || [];
+      const byName = new Map(rows.map(r => [r.participant, r]));
+      const ordered = FIXED_ORDER
+        .map(name => byName.get(name))
+        .filter(Boolean) as ParticipantType[];
+      setParticipants(ordered);
+    })
       .catch((err) => console.error('Error fetching summary:', err));
   }, [selectedDate]);
 
@@ -273,3 +283,4 @@ const Summary = () => {
 };
 
 export default Summary;
+

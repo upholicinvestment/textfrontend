@@ -229,10 +229,10 @@ const Price = () => {
   const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
   // Fallback sample numbers (replace with real ones or keep env-backed)
-  const BUNDLE_MONTHLY = 499;
-  const BUNDLE_ANNUAL = 4999;
-  const JOURNAL_MONTHLY = 299;
-  const JOURNAL_ANNUAL = 2499;
+  const BUNDLE_MONTHLY = 499;   //499
+  const BUNDLE_ANNUAL = 4999;   //4999
+  const JOURNAL_MONTHLY = 299;  //299
+  const JOURNAL_ANNUAL = 2499;  //2499
 
   const bundleMonthlyNum =
     typeof bundle?.priceMonthly === "number" ? bundle.priceMonthly : BUNDLE_MONTHLY;

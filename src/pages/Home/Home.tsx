@@ -6,17 +6,16 @@ import Orb from "../../Orb/Orb";
 const Home = () => {
   return (
     <div className="min-h-screen bg-[#0a0b2a] relative overflow-x-hidden">
-
       {/* Sticky Navbar at top (in flow) */}
       <Navbar />
-      
-            {/* Ticker just below navbar */}
+
+      {/* Ticker just below navbar */}
       {/* <div className="mt-1"> */}
-        {/* <PriceScroll /> */}
+      {/* <PriceScroll /> */}
       {/* </div> */}
 
       {/* <div className=" inset-0 -z-10 pointer-events-none"> */}
-        <Orb />
+      <Orb />
       {/* </div> */}
 
       {/* Footer */}

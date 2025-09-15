@@ -23,9 +23,13 @@ interface Trade {
 
 interface Props {
   trades?: Trade[];
+  /** Broker-exact net P&L from backend; when provided, this is used for "Actual Net P&L" */
+  netPnl?: number;
 }
 
-export default function DemonFinder({ trades = [] }: Props) {
+const round2 = (n: number) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
+export default function DemonFinder({ trades = [], netPnl }: Props) {
   const [modal, setModal] = useState<{ title: string; list: Trade[] } | null>(null);
 
   const filtered = trades;
@@ -107,9 +111,14 @@ export default function DemonFinder({ trades = [] }: Props) {
   }, [filtered]);
 
   // ---- Totals ----
-  const actualNetPnL = useMemo(() => filtered.reduce((sum, t) => sum + t.PnL, 0), [filtered]);
-  const badCost = useMemo(() => uniqueTradePnLSum(filtered, t => t.isBadTrade, "neg"), [filtered]);
-  const potentialPnL = useMemo(() => actualNetPnL + badCost, [actualNetPnL, badCost]);
+  // Use broker-exact net if provided; otherwise fall back to sum of paired trades.
+  const sumOfPairs = useMemo(() => filtered.reduce((sum, t) => sum + t.PnL, 0), [filtered]);
+  const actualNetPnL = useMemo(
+    () => (typeof netPnl === "number" && !Number.isNaN(netPnl) ? round2(netPnl) : round2(sumOfPairs)),
+    [netPnl, sumOfPairs]
+  );
+  const badCost = useMemo(() => round2(uniqueTradePnLSum(filtered, t => t.isBadTrade, "neg")), [filtered]);
+  const potentialPnL = useMemo(() => round2(actualNetPnL + badCost), [actualNetPnL, badCost]);
 
   // ---- Best/Worst trades ----
   const bestTrade = useMemo(() => {
@@ -184,12 +193,12 @@ export default function DemonFinder({ trades = [] }: Props) {
           .thin-scrollbar::-webkit-scrollbar-thumb:hover { background: #5e6686; }
           .thin-scrollbar { scrollbar-width: thin; scrollbar-color: #333a56 #1c2130; }
           .elegant-card {
-            background: #121212;
+            background: bg-[#0a0d13];
             border: 1px solid #21263b;
             box-shadow: 0 2px 9px rgba(0,0,0,0.18);
           }
           .metric-card {
-            background: #121212;
+            background: bg-[#0a0d13];
             border: 1px solid #21263b;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
           }

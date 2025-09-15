@@ -66,7 +66,7 @@ const ForgetPassword = () => {
             </h1>
             <p className="text-gray-500">
               {step === 'request'
-                ? 'Enter your email or phone to receive an OTP.'
+                ? 'Enter your phone number to receive an OTP.'
                 : 'Enter the OTP you received and set a new password.'}
             </p>
           </div>
@@ -88,7 +88,7 @@ const ForgetPassword = () => {
                 <FiPhone className="absolute left-8 top-1/2 -translate-y-1/2 text-gray-300" />
                 <input
                   type="text"
-                  placeholder="Email or Phone"
+                  placeholder="Phone"
                   value={emailOrPhone}
                   onChange={(e) => setEmailOrPhone(e.target.value)}
                   className="w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"

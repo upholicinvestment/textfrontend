@@ -1,29 +1,7 @@
 import { useEffect, useMemo, useState, useContext } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import upholictech from "../../assets/Upholictech.png";
-import {
-  BarChart3,
-  TrendingUp,
-  Bot,
-  BookOpen,
-  Building2,
-  Home as HomeIcon,
-  Calendar,
-  LogOut,
-  ArrowUpRight,
-  ArrowDownRight,
-  Clock,
-  Bell,
-  Search,
-  Menu,
-  X,
-  ChevronRight,
-  ChevronDown,
-  Activity,
-  DollarSign,
-  Users,
-  PackageOpen,
-} from "lucide-react";
+import { BarChart3, TrendingUp, Bot, BookOpen, Building2, Home as HomeIcon, Calendar, LogOut, ArrowUpRight, ArrowDownRight, Clock, Bell, Search, Menu, X, ChevronRight, ChevronDown, Activity, DollarSign, Users, PackageOpen, } from "lucide-react";
 import api from "../../api";
 
 // ---------- Types returned by /users/me/products ----------
@@ -48,6 +26,30 @@ interface MyProduct {
   /** if backend groups multiple entitlements into one product, all variants arrive here */
   variants?: MyVariant[];
 }
+
+// ---------- Summary & Strategies ----------
+type Summary = {
+  totalPnl: number;
+  totalTrades: number;
+  openPositions: number;
+  successRatePct: number;
+  riskReward: number;
+};
+type StrategyPnL = {
+  strategyName: string;
+  pnl: number;
+  orders: number;
+  roundTrips: number;
+  wins: number;
+  losses: number;
+  winRatePct: number;
+  rnr: number | null;
+  openPositions: number;
+};
+type SummaryDoc = Summary & {
+  dateKey: string; // "DD-MMM-YYYY"
+  ts?: string | Date;
+};
 
 // ---------- UI Types ----------
 interface ProductUI {
@@ -86,6 +88,69 @@ interface Stat {
   progress: number;
 }
 
+// ---------- Date helpers (IST) ----------
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const istTodayParts = () => {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const dd = parts.find((p) => p.type === "day")?.value ?? "01";
+  const mm = parts.find((p) => p.type === "month")?.value ?? "01";
+  const yyyy = parts.find((p) => p.type === "year")?.value ?? "1970";
+  return { dd, mm, yyyy };
+};
+const todayDateKeyIST = (): string => {
+  const { dd, mm, yyyy } = istTodayParts();
+  const monShort = MONTHS_SHORT[Number(mm) - 1] ?? "Jan";
+  return `${dd}-${monShort}-${yyyy}`;
+};
+const todayISO = (): string => {
+  const { dd, mm, yyyy } = istTodayParts();
+  return `${yyyy}-${mm}-${dd}`;
+};
+// "DD-MMM-YYYY" -> "YYYY-MM-DD"
+const dateKeyToISO = (dk: string): string => {
+  if (!/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(dk)) return todayISO();
+  const [dd, mon, yyyy] = dk.split("-");
+  const mIdx = MONTHS_SHORT.indexOf(mon);
+  const mm = String(mIdx + 1).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+// "YYYY-MM-DD" -> "DD-MMM-YYYY"
+const isoToDateKey = (iso: string): string => {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return todayDateKeyIST();
+  const [, yyyy, mm, dd] = m;
+  const monShort = MONTHS_SHORT[Number(mm) - 1] ?? "Jan";
+  return `${dd}-${monShort}-${yyyy}`;
+};
+// Sort key for "DD-MMM-YYYY"
+const dateKeyStamp = (dk: string): number => {
+  if (!/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(dk)) return 0;
+  const [dd, mon, yyyy] = dk.split("-");
+  const mIdx = MONTHS_SHORT.indexOf(mon);
+  const d = new Date(Date.UTC(Number(yyyy), Math.max(0, mIdx), Number(dd)));
+  return d.getTime();
+};
+
 const componentLabelMap: Record<
   string,
   { label: string; icon: React.ReactNode }
@@ -110,19 +175,59 @@ const prettyINR = (n?: number | null) =>
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
 
+  // ---------- Sidebar / UI ----------
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [bundleOpen, setBundleOpen] = useState(false);
   const [algoOpen, setAlgoOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // ---------- Entitlements ----------
   const [myProducts, setMyProducts] = useState<MyProduct[]>([]);
   const [loadingEntitlements, setLoadingEntitlements] = useState<boolean>(true);
 
+  // ---------- Summary (live or by-date) ----------
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  // ---------- History + selection ----------
+  const [history, setHistory] = useState<SummaryDoc[]>([]);
+  const [selectedKey, setSelectedKey] = useState<string>("today");
+  const [dateInputISO, setDateInputISO] = useState<string>(todayISO());
+  const [dateInputNoData, setDateInputNoData] = useState<string | null>(null);
+  const isToday = selectedKey === "today";
+
+  // ---------- Strategies (for the selected day) ----------
+  const [strategies, setStrategies] = useState<StrategyPnL[]>([]);
+  const [strategiesLoading, setStrategiesLoading] = useState<boolean>(false);
+  const [strategiesError, setStrategiesError] = useState<string | null>(null);
+  // Suppress unused warnings until you render a strategies UI
+  void strategies;
+  void strategiesLoading;
+  void strategiesError;
+
+  // ---------- Helpers ----------
+  const withUser = <T extends Record<string, any>>(params?: T) => {
+    const uid = user?.id?.trim();
+    return uid ? { ...(params || {}), userId: uid } : params || {};
+  };
+
+  // Attach X-User-Id header for Express
+  useEffect(() => {
+    const uid = user?.id?.trim();
+    if (uid) {
+      api.defaults.headers.common["X-User-Id"] = uid;
+    } else {
+      delete api.defaults.headers.common["X-User-Id"];
+    }
+  }, [user?.id]);
+
+  // Load entitlements
   useEffect(() => {
     (async () => {
       try {
         setLoadingEntitlements(true);
-        const res = await api.get("/users/me/products");
+        const res = await api.get("/users/me/products", { params: withUser() });
         const items: MyProduct[] = Array.isArray(res.data?.items)
           ? res.data.items
           : [];
@@ -134,22 +239,172 @@ const Dashboard = () => {
         setLoadingEntitlements(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load summary history (latest N days)
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await api.get("/summary/history?limit=30", {
+          params: withUser(),
+        });
+        const arr = Array.isArray(r.data?.data) ? r.data.data : [];
+        const sorted = [...arr].sort(
+          (a: SummaryDoc, b: SummaryDoc) =>
+            dateKeyStamp(a.dateKey) - dateKeyStamp(b.dateKey)
+        );
+        setHistory(sorted);
+      } catch (e) {
+        console.error("Failed to load /summary/history:", e);
+        setHistory([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Available keys & helpers
+  const availableKeys = useMemo(
+    () => new Set(history.map((h) => h.dateKey)),
+    [history]
+  );
+  const availableListAsc = useMemo(
+    () => history.map((h) => h.dateKey),
+    [history]
+  );
+  const newestKey = availableListAsc[availableListAsc.length - 1];
+
+  const getPrevKey = (current: string): string | null => {
+    if (isToday || current === "today") {
+      return newestKey ?? null;
+    }
+    const idx = availableListAsc.indexOf(current);
+    if (idx <= 0) return null;
+    return availableListAsc[idx - 1];
+  };
+  const getNextKey = (current: string): string | null => {
+    if (current === "today") return null;
+    const idx = availableListAsc.indexOf(current);
+    if (idx === -1) return null;
+    if (idx === availableListAsc.length - 1) {
+      return "today";
+    }
+    return availableListAsc[idx + 1];
+  };
+
+  // Single declaration of navigation booleans
+  const canGoPrev = !!getPrevKey(selectedKey);
+  const canGoNext = !!getNextKey(selectedKey);
+
+  // Keep date input in sync
+  useEffect(() => {
+    if (isToday) setDateInputISO(todayISO());
+    else setDateInputISO(dateKeyToISO(selectedKey));
+  }, [selectedKey, isToday]);
+
+  // Load summary (today live or by-date) with polling for today
+  useEffect(() => {
+    let isMounted = true;
+    let timer: any = null;
+
+    const loadToday = async () => {
+      try {
+        setSummaryError(null);
+        const r = await api.get("/summary", { params: withUser() });
+        if (isMounted) setSummary(r.data as Summary);
+      } catch (e) {
+        if (isMounted) {
+          console.error("Failed to load /summary:", e);
+          setSummary(null);
+          setSummaryError("Couldn’t load summary.");
+        }
+      }
+    };
+
+    const loadByDate = async (dateKey: string) => {
+      try {
+        setSummaryError(null);
+        const r = await api.get("/summary/by-date", {
+          params: withUser({ dateKey }),
+        });
+        if (isMounted) setSummary(r.data?.data as Summary);
+      } catch (e) {
+        if (isMounted) {
+          console.error("Failed to load /summary/by-date:", e);
+          setSummary(null);
+          setSummaryError("No snapshot found for that date.");
+        }
+      }
+    };
+
+    if (isToday) loadToday();
+    else loadByDate(selectedKey);
+
+    const onFocus = () => isToday && loadToday();
+    window.addEventListener("focus", onFocus);
+
+    if (isToday) {
+      timer = setInterval(() => {
+        if (document.visibilityState === "visible") loadToday();
+      }, 20_000);
+    }
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("focus", onFocus);
+      if (timer) clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey, isToday]);
+
+  // Compute day range (UTC) for strategies
+  const dayFromTo = useMemo(() => {
+    const iso = dateInputISO;
+    const from = `${iso}T00:00:00.000Z`;
+    const to = `${iso}T23:59:59.999Z`;
+    return { from, to };
+  }, [dateInputISO]);
+
+  // Load strategy-wise P&L when day changes
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setStrategiesLoading(true);
+        setStrategiesError(null);
+        const r = await api.get("/strategies/pnl", {
+          params: withUser({ from: dayFromTo.from, to: dayFromTo.to }),
+        });
+        const rows: StrategyPnL[] = Array.isArray(r.data?.data)
+          ? r.data.data
+          : [];
+        if (!cancelled) setStrategies(rows);
+      } catch (e: any) {
+        if (!cancelled) {
+          console.error("Failed to load /strategies/pnl:", e);
+          setStrategies([]);
+          setStrategiesError(e?.message || "Couldn’t load strategies.");
+        }
+      } finally {
+        if (!cancelled) setStrategiesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayFromTo.from, dayFromTo.to]);
+
+  // ---- Products derived state ----
   const ownedKeys = useMemo(
     () => new Set(myProducts.map((p) => p.key)),
     [myProducts]
   );
-
-  // All bundle components owned?
   const hasAllBundle = useMemo(
     () => bundleComponentKeys.every((k) => ownedKeys.has(k)),
     [ownedKeys]
   );
-
   const ownsAlgo = ownedKeys.has("algo_simulator");
-
-  // Show standalone Smart Journaling only when Solo is owned and bundle journaling is NOT
   const hasBundleJournaling = ownedKeys.has("journaling");
   const ownsJournalingSolo = ownedKeys.has("journaling_solo");
   const showSmartJournalingStandalone =
@@ -160,7 +415,6 @@ const Dashboard = () => {
     [myProducts]
   );
 
-  // Collect ALGO variant badges from multiple rows or a grouped row
   const algoVariantBadges = useMemo(() => {
     const list: MyVariant[] = [];
     for (const p of algoEntitlements) {
@@ -197,9 +451,8 @@ const Dashboard = () => {
       const components = bundleComponentKeys.map((key) => ({
         key,
         label: componentLabelMap[key]?.label || key,
-        icon: componentLabelMap[key]?.icon || (
-          <PackageOpen className="h-4 w-4" />
-        ),
+        icon:
+          componentLabelMap[key]?.icon || <PackageOpen className="h-4 w-4" />,
       }));
 
       ui.push({
@@ -328,49 +581,6 @@ const Dashboard = () => {
     },
   ];
 
-  const stats: Stat[] = [
-    {
-      title: "Trade Triggered",
-      value: "0",
-      icon: <Activity className="h-5 w-5" />,
-      trend: "up",
-      change: "0%",
-      gradient: "from-blue-500 to-cyan-400",
-      period: "Today",
-      progress: 85,
-    },
-    {
-      title: "Portfolio Value",
-      value: "₹0.00L",
-      icon: <DollarSign className="h-5 w-5" />,
-      trend: "up",
-      change: "0%",
-      gradient: "from-emerald-500 to-green-400",
-      period: "Total",
-      progress: 72,
-    },
-    {
-      title: "Live Positions",
-      value: "0",
-      icon: <TrendingUp className="h-5 w-5" />,
-      trend: "up",
-      change: "0",
-      gradient: "from-purple-500 to-violet-400",
-      period: "Open",
-      progress: 91,
-    },
-    {
-      title: "Success Rate",
-      value: "0%",
-      icon: <Users className="h-5 w-5" />,
-      trend: "up",
-      change: "0%",
-      gradient: "from-amber-500 to-orange-400",
-      period: "This Month",
-      progress: 78,
-    },
-  ];
-
   const filteredActivities =
     activeFilter === "All"
       ? recentActivity
@@ -426,6 +636,72 @@ const Dashboard = () => {
 
   const algoVariantHref = (key: string) =>
     `${algoLink}?plan=${encodeURIComponent(key)}`;
+
+  // ---- Stat cards derived from live/by-date summary ----
+  const statCards: Stat[] = [
+    {
+      title: "Trade Triggered",
+      value: summary ? String(summary.totalTrades) : "—",
+      icon: <Activity className="h-5 w-5" />,
+      trend: "up",
+      change: "",
+      gradient: "from-blue-500 to-cyan-400",
+      period: isToday ? "Today" : "Archived Day",
+      progress: 85,
+    },
+    {
+      title: "Portfolio Value",
+      value: summary
+        ? prettyINR(summary.totalPnl) ?? String(summary.totalPnl)
+        : "—",
+      icon: <DollarSign className="h-5 w-5" />,
+      trend: summary && summary.totalPnl >= 0 ? "up" : "down",
+      change: "",
+      gradient: "from-emerald-500 to-green-400",
+      period: "Total P&L (ALGO)",
+      progress: 72,
+    },
+    {
+      title: "Live Positions",
+      value: summary ? String(summary.openPositions) : "—",
+      icon: <TrendingUp className="h-5 w-5" />,
+      trend: "up",
+      change: "",
+      gradient: "from-purple-500 to-violet-400",
+      period: isToday ? "Open" : "Closed for Day",
+      progress: 91,
+    },
+    {
+      title: "Success Rate",
+      value: summary ? `${summary.successRatePct.toFixed(1)}%` : "—",
+      icon: <Users className="h-5 w-5" />,
+      trend: "up",
+      change: "",
+      gradient: "from-amber-500 to-orange-400",
+      period: "Closed ALGO Trades",
+      progress: Math.min(100, Math.round(summary ? summary.successRatePct : 0)),
+    },
+    {
+      title: "R:R Ratio",
+      value: summary ? `${summary.riskReward.toFixed(2)}` : "—",
+      icon: <BarChart3 className="h-5 w-5" />,
+      trend: "up",
+      change: "",
+      gradient: "from-pink-500 to-rose-400",
+      period: "Closed ALGO Trades",
+      progress: 60,
+    },
+  ];
+
+  // Navigation actions
+  const goPrev = () => {
+    const prev = getPrevKey(selectedKey);
+    if (prev) setSelectedKey(prev);
+  };
+  const goNext = () => {
+    const next = getNextKey(selectedKey);
+    if (next) setSelectedKey(next);
+  };
 
   return (
     <div className="flex h-screen bg-gray-50/50">
@@ -519,7 +795,7 @@ const Dashboard = () => {
                 </>
               )}
 
-              {/* ALGO Simulator — like bundle (collapsible with submenu) */}
+              {/* ALGO Simulator */}
               {ownsAlgo && (
                 <>
                   <button
@@ -606,7 +882,7 @@ const Dashboard = () => {
             </div>
           </nav>
 
-          {/* ---- BUY PRODUCTS at the absolute bottom of the sidebar ---- */}
+          {/* Buy Products */}
           <div className="px-4 pb-4">
             <a
               href="/pricing"
@@ -749,9 +1025,86 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {stats.map((stat, i) => (
+              {/* Date controls + viewing hint */}
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={goPrev}
+                  disabled={!canGoPrev}
+                  className={`px-3 py-1.5 text-sm rounded-lg border ${
+                    canGoPrev
+                      ? "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                  }`}
+                  title={canGoPrev ? "Previous snapshot day" : "No previous day"}
+                >
+                  〈
+                </button>
+
+                <input
+                  type="date"
+                  value={dateInputISO}
+                  onChange={(e) => {
+                    const iso = e.target.value;
+                    setDateInputISO(iso);
+                    const dk = isoToDateKey(iso);
+                    if (availableKeys.has(dk)) {
+                      setSelectedKey(dk);
+                      setDateInputNoData(null);
+                    } else {
+                      setDateInputNoData("No snapshot stored for this date");
+                      setTimeout(() => setDateInputNoData(null), 2500);
+                    }
+                  }}
+                  className={`px-3 py-1.5 text-sm rounded-lg border ${
+                    dateInputNoData ? "border-rose-300 bg-rose-50" : "border-slate-300"
+                  }`}
+                  min={availableListAsc.length ? dateKeyToISO(availableListAsc[0]) : undefined}
+                  max={todayISO()}
+                  aria-label="Choose a date"
+                />
+
+                <button
+                  onClick={goNext}
+                  disabled={!canGoNext}
+                  className={`px-3 py-1.5 text-sm rounded-lg border ${
+                    canGoNext
+                      ? "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                  }`}
+                  title={canGoNext ? "Next day (or Today)" : "No next day"}
+                >
+                  〉
+                </button>
+
+                <button
+                  onClick={() => setSelectedKey("today")}
+                  disabled={isToday}
+                  className={`ml-2 px-3 py-1.5 text-sm rounded-lg border ${
+                    isToday
+                      ? "bg-indigo-600/20 text-indigo-800/70 border-indigo-200 cursor-not-allowed"
+                      : "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700"
+                  }`}
+                  title={isToday ? "Already on Today" : "Jump to Today"}
+                >
+                  Today
+                </button>
+
+                {dateInputNoData && (
+                  <span className="text-sm text-rose-600 ml-2">{dateInputNoData}</span>
+                )}
+              </div>
+
+              <div className="col-span-full -mt-2 text-sm text-slate-500 mb-2">
+                Viewing: {isToday ? "Today (Live)" : selectedKey}
+              </div>
+
+              {summaryError && (
+                <div className="mb-4 text-sm text-rose-600">{summaryError}</div>
+              )}
+
+              {/* Stats (now dynamic, 5 cards) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+                {statCards.map((stat, i) => (
                   <div
                     key={i}
                     className="bg-white p-6 rounded-2xl border border-gray-100 hover:shadow-lg shadow-xl transition-all duration-200 group"
@@ -765,9 +1118,7 @@ const Dashboard = () => {
                       <div className="text-right">
                         <div
                           className={`flex items-center text-sm font-medium ${
-                            stat.trend === "up"
-                              ? "text-green-600"
-                              : "text-red-600"
+                            stat.trend === "up" ? "text-green-600" : "text-red-600"
                           }`}
                         >
                           {stat.trend === "up" ? (
@@ -777,9 +1128,7 @@ const Dashboard = () => {
                           )}
                           {stat.change}
                         </div>
-                        <span className="text-xs text-gray-500">
-                          {stat.period}
-                        </span>
+                        <span className="text-xs text-gray-500">{stat.period}</span>
                       </div>
                     </div>
 
@@ -787,16 +1136,10 @@ const Dashboard = () => {
                       <h3 className="text-sm font-medium text-gray-600 mb-1">
                         {stat.title}
                       </h3>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {stat.value}
-                      </p>
+                      <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                     </div>
 
-                    {renderProgressBar(
-                      stat.progress,
-                      stat.gradient,
-                      stat.title
-                    )}
+                    {renderProgressBar(stat.progress, stat.gradient, stat.title)}
                   </div>
                 ))}
               </div>
@@ -895,9 +1238,7 @@ const Dashboard = () => {
                                       >
                                         {v.label}
                                         {v.price && (
-                                          <span className="opacity-80">
-                                            · {v.price}
-                                          </span>
+                                          <span className="opacity-80">· {v.price}</span>
                                         )}
                                       </span>
                                     ))}

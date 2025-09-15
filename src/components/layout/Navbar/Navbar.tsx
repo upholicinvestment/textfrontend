@@ -21,11 +21,48 @@ import upholictech from "../../../assets/Upholictech.png";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../../context/AuthContext";
 
+/** ---- Avatar assets + map (new keys) ---- */
+import pinkImg from "../../../assets/pinkgirl.jpg";
+import ponyImg from "../../../assets/ponygirl.jpg";
+import brownImg from "../../../assets/brownboy.jpg";
+import nerdImg from "../../../assets/nerdboy.jpg";
+import redImg from "../../../assets/redhair.jpg";
+import chadImg from "../../../assets/chadboy.jpg";
+
+/** New keys you use in Profile */
+const AVATAR_MAP = {
+  sienna:  brownImg,  // legacy "brown"
+  analyst: nerdImg,   // legacy "nerd"
+  rose:    pinkImg,   // legacy "pink"
+  comet:   ponyImg,   // legacy "pony"
+  crimson: redImg,    // legacy "red"
+  prime:   chadImg,   // legacy "chad"
+} as const;
+
+/** Legacy → New key mapping */
+const LEGACY_KEY_MAP: Record<string, keyof typeof AVATAR_MAP> = {
+  brown:  "sienna",
+  nerd:   "analyst",
+  pink:   "rose",
+  pony:   "comet",
+  red:    "crimson",
+  chad:   "prime",
+};
+
 type SearchItem = {
   label: string;
   path: string;
   group: "Pages" | "Services";
 };
+
+type MeResponse = {
+  name?: string;
+  email?: string;
+  avatarKey?: string;
+  avatarUrl?: string;
+};
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.upholictech.com/api";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -47,19 +84,76 @@ const Navbar = () => {
   // ▼ Auth (context + localStorage fallback)
   const auth = useContext(AuthContext) as any;
   const authUser = auth?.user || null;
-  const storedUser =
-    typeof window !== "undefined"
-      ? (() => {
-          try {
-            return JSON.parse(localStorage.getItem("user") || "null");
-          } catch {
-            return null;
-          }
-        })()
-      : null;
 
+  const getStoredUser = () => {
+    try { return JSON.parse(localStorage.getItem("user") || "null"); }
+    catch { return null; }
+  };
+
+  // ensure we react to other tabs/login events
+  const [userVersion, setUserVersion] = useState(0);
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "user" || e.key === "token") setUserVersion(v => v + 1);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const storedUser = typeof window !== "undefined" ? getStoredUser() : null;
   const currentUser = authUser || storedUser;
   const isLoggedIn = !!currentUser;
+
+  // ---- Hydrate avatar from /users/me if missing on the user object
+  const [me, setMe] = useState<MeResponse | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchMe = async () => {
+      if (!isLoggedIn) { setMe(null); return; }
+
+      const hasAvatarFields =
+        (currentUser && (currentUser.avatarKey || currentUser.avatarUrl)) ||
+        (me && (me.avatarKey || me.avatarUrl));
+
+      if (hasAvatarFields) return;
+
+      try {
+        const token = localStorage.getItem("token") || "";
+        if (!token) return;
+        const res = await fetch(`${API_BASE}/users/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          console.warn("[Navbar] /users/me failed:", res.status, res.statusText);
+          return;
+        }
+        const data: MeResponse = await res.json();
+        if (!cancelled) setMe(data || null);
+      } catch (err) {
+        console.warn("[Navbar] /users/me network error:", err);
+      }
+    };
+    fetchMe();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, userVersion, authUser]);
+
+  // ---- Resolve avatar fields in order: me -> currentUser
+  const rawKey = (
+    (me?.avatarKey ?? currentUser?.avatarKey) as string | undefined
+  )?.toLowerCase();
+
+  const normalizedKey =
+    rawKey && (AVATAR_MAP as any)[rawKey]
+      ? (rawKey as keyof typeof AVATAR_MAP)
+      : rawKey && LEGACY_KEY_MAP[rawKey]
+      ? LEGACY_KEY_MAP[rawKey]
+      : undefined;
+
+  const avatarSrc: string | undefined =
+    (me?.avatarUrl as string | undefined) ||
+    (currentUser?.avatarUrl as string | undefined) ||
+    (normalizedKey ? AVATAR_MAP[normalizedKey] : undefined);
 
   const displayLetter = (
     (currentUser?.name && currentUser.name[0]) ||
@@ -96,6 +190,7 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // ---- Services + Nav ----
   const services = [
     { 
       name: "Technical Scanner", 
@@ -232,9 +327,8 @@ const Navbar = () => {
 
   const handleLogout = () => {
     try {
-      if (auth?.logout) {
-        auth.logout();
-      } else {
+      if (auth?.logout) auth.logout();
+      else {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
       }
@@ -244,6 +338,47 @@ const Navbar = () => {
       navigate("/");
     }
   };
+
+  /* ---------- DIAGNOSTICS ---------- */
+  useEffect(() => {
+    console.groupCollapsed("%c[Navbar AvatarDebug]", "color:#8ab4f8;font-weight:600");
+    console.log("currentUser:", currentUser);
+    console.log("currentUser.avatarKey:", currentUser?.avatarKey);
+    console.log("currentUser.avatarUrl:", currentUser?.avatarUrl);
+    console.log("me (hydrated):", me);
+    console.log("rawKey (lowercased):", rawKey);
+    console.log("normalizedKey (after legacy map):", normalizedKey);
+    console.log("avatarSrc (final):", avatarSrc);
+
+    if (avatarSrc) {
+      const img = new Image();
+      img.onload = () => {
+        console.log("✅ Avatar image loaded:", avatarSrc, `${img.naturalWidth}x${img.naturalHeight}`);
+        console.groupEnd();
+      };
+      img.onerror = (e) => {
+        console.warn("❌ Avatar image failed to load:", avatarSrc, e);
+        console.groupEnd();
+      };
+      img.src = avatarSrc;
+    } else {
+      console.warn("ℹ️ No avatarSrc — will show initial letter");
+      console.groupEnd();
+    }
+
+    (window as any).avatarDiag = () => {
+      const report = {
+        user: currentUser,
+        me,
+        rawKey,
+        normalizedKey,
+        avatarSrc,
+        hasAssetForNormalizedKey: !!(normalizedKey && (AVATAR_MAP as any)[normalizedKey]),
+      };
+      console.info("[avatarDiag]", report);
+      return report;
+    };
+  }, [currentUser, me, rawKey, normalizedKey, avatarSrc]);
 
   return (
     <motion.nav
@@ -276,8 +411,12 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex flex-1 justify-center items-center mx-4 lg:mx-8">
             <div className="flex space-x-1">
-              {navLinks.map((link, index) => {
-                // Insert Services after About
+              {[
+                { name: "Home", path: "/" },
+                { name: "About", path: "/about" },
+                { name: "Pricing", path: "/pricing" },
+                { name: "Contact", path: "/contact-us" },
+              ].map((link, index, arr) => {
                 if (link.name === "About") {
                   return (
                     <div key={link.name} className="flex items-center">
@@ -306,7 +445,7 @@ const Navbar = () => {
                       {/* Services (between About and Pricing) */}
                       <div className="relative" ref={servicesRef}>
                         <motion.button
-                          onHoverStart={() => setHoveredNavItem(navLinks.length)}
+                          onHoverStart={() => setHoveredNavItem(arr.length)}
                           onHoverEnd={() => setHoveredNavItem(null)}
                           onClick={() => setIsServicesOpen(!isServicesOpen)}
                           onMouseEnter={() => setIsServicesOpen(true)}
@@ -323,7 +462,7 @@ const Navbar = () => {
                           >
                             <FiChevronDown/>
                           </motion.span>
-                          {hoveredNavItem === navLinks.length && (
+                          {hoveredNavItem === arr.length && (
                             <motion.span
                               layoutId="navHover"
                               className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-purple-500 to-blue-500"
@@ -391,7 +530,7 @@ const Navbar = () => {
                   );
                 }
 
-                // Render other links normally (Home, Pricing, Contact)
+                // Render others normally
                 return (
                   <motion.a
                     key={link.name}
@@ -442,9 +581,9 @@ const Navbar = () => {
                     className="bg-[#0f1233] rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 w-full text-gray-200 placeholder-gray-500 border border-white/10 shadow-inner"
                     autoFocus={searchOpen}
                   />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                    ⌘K
-                  </span>
+                  {/* <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                    K
+                  </span> */}
                 </motion.div>
               )}
               <motion.button
@@ -452,9 +591,7 @@ const Navbar = () => {
                 whileTap={{ scale: 0.9 }}
                 onClick={() => {
                   setSearchOpen((v) => !v);
-                  setTimeout(() => {
-                    if (searchOpen) setSearchQuery("");
-                  }, 0);
+                  setTimeout(() => { if (searchOpen) setSearchQuery(""); }, 0);
                 }}
                 className={`p-2 rounded-full ${searchOpen ? "ml-2 bg-purple-500/10 text-purple-300" : "bg-transparent text-gray-300 hover:text-white"}`}
                 style={{ backdropFilter: "blur(4px)"}}
@@ -472,7 +609,6 @@ const Navbar = () => {
                     exit={{ opacity: 0, y: 6 }}
                     transition={{ duration: 0.15 }}
                     className="absolute top-full mt-2 left-0 right-0 rounded-xl bg-[#0e102b]/95 backdrop-blur-md border border-white/10 shadow-2xl overflow-hidden z-50"
-                    style={{ boxShadow: "0 10px 30px -10px rgba(98, 70, 234, 0.3)" }}
                   >
                     <div className="max-h-72 overflow-auto py-2">
                       {results.map((r, i) => (
@@ -518,10 +654,23 @@ const Navbar = () => {
               <div className="hidden sm:flex items-center relative" ref={profileRef}>
                 <button
                   onClick={() => setIsProfileOpen((v) => !v)}
-                  className="w-9 h-9 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold shadow-md flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-9 h-9 rounded-full overflow-hidden shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/50 border border-white/10 bg-gradient-to-r from-purple-500 to-blue-500"
                   aria-label="Open profile menu"
                 >
-                  {displayLetter}
+                  {avatarSrc ? (
+                    <img
+                      src={avatarSrc}
+                      alt="Profile avatar"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.warn("❌ <img> onError — failed to display avatar:", (e.target as HTMLImageElement).src);
+                      }}
+                    />
+                  ) : (
+                    <span className="w-full h-full grid place-items-center text-white font-semibold">
+                      {displayLetter}
+                    </span>
+                  )}
                 </button>
 
                 <AnimatePresence>
@@ -636,7 +785,6 @@ const Navbar = () => {
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="lg:hidden bg-[#0e102b]/95 backdrop-blur-md border-t border-white/10 overflow-hidden"
-            style={{ boxShadow: "0 10px 30px -10px rgba(98, 70, 234, 0.3)" }}
           >
             <div className="px-4 pt-4 pb-6 space-y-2">
               {/* Mobile search */}
@@ -733,7 +881,7 @@ const Navbar = () => {
                             {service.icon}
                           </span>
                           {service.name}
-                          <span className="ml-auto text-[10px] bg-white/5 text-purple-200 px-2 py-0.5 rounded-full border border-white/10">
+                          <span className="ml-auto text[10px] bg-white/5 text-purple-200 px-2 py-0.5 rounded-full border border-white/10">
                             New
                           </span>
                         </Link>
@@ -766,8 +914,21 @@ const Navbar = () => {
                 ) : (
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 px-4 py-2 text-gray-200">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold flex items-center justify-center">
-                        {displayLetter}
+                      <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-gradient-to-r from-purple-500 to-blue-500">
+                        {avatarSrc ? (
+                          <img
+                            src={avatarSrc}
+                            alt="Profile avatar"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.warn("❌ <img> onError — failed to display avatar (mobile):", (e.target as HTMLImageElement).src);
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full grid place-items-center text-white font-semibold">
+                            {displayLetter}
+                          </div>
+                        )}
                       </div>
                       <div className="text-sm">
                         <div className="font-medium">

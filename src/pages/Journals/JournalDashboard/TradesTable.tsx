@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { api, getUserId } from "../../../api";
 import { 
   ArrowUp, ArrowDown, BarChart2, Clock, 
   TrendingUp, TrendingDown, DollarSign, 
@@ -149,9 +150,9 @@ const TradesTable = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch("https://api.upholictech.com/api/stats");
-        if (!response.ok) throw new Error('Failed to fetch');
-        const data: StatsData = await response.json();
+        const { data } = await api.get<StatsData>("/stats", {
+         params: { userId: getUserId() || undefined, _: Date.now() },
+      });
         setStats(data.empty ? null : data);
         setError(null);
       } catch (err) {
@@ -890,6 +891,6 @@ const TradesTable = () => {
       </div>
     </ThemeContext.Provider>
   );
-};
+};   
 
-export default TradesTable;
+export default TradesTable;  

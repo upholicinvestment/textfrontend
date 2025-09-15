@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { FiHome, FiBarChart2, FiBookOpen, FiUpload, FiGrid } from "react-icons/fi"; // ← added FiGrid for Dashboard
+import { FiHome, FiBarChart2, FiBookOpen, FiUpload, FiGrid, FiCalendar } from "react-icons/fi"; // ← added FiGrid for Dashboard
 import UpholicLogo from "./Upholictech.png";
 
 type SidebarItem = {
@@ -14,6 +14,7 @@ const sidebar: SidebarItem[] = [
   { label: "Dashboard", icon: <FiGrid />, key: "dashboard" },   // ← different icon for Dashboard
   { label: "Daily Journal", icon: <FiBookOpen />, key: "journal" },
   { label: "Trades", icon: <FiBarChart2 />, key: "trades" },
+  { label: "Trade Calendar", icon: <FiCalendar />, key: "calendar" },
 ];
 
 type Props = {
