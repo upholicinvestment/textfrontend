@@ -1,8 +1,12 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../../api';
 import { FiMail, FiLock, FiArrowRight, FiEye, FiEyeOff, FiX } from 'react-icons/fi';
 import { AuthContext } from '../../../context/AuthContext';
+
+/* ✅ Toastify */
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Login = () => {
   const { login } = useContext(AuthContext);
@@ -12,9 +16,20 @@ const Login = () => {
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+
+  // keep state so your logic is unchanged; we just won't render them as inline banners
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  /* 🔔 Fire toasts when messages change (logic unchanged) */
+  useEffect(() => {
+    if (error) toast.error(error);
+  }, [error]);
+
+  useEffect(() => {
+    if (successMessage) toast.success(successMessage);
+  }, [successMessage]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -52,6 +67,9 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 p-4">
+      {/* 🔔 Toasts only */}
+      <ToastContainer position="top-right" autoClose={3500} newestOnTop />
+
       <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl overflow-hidden flex relative">
         {/* Close button */}
         <Link
@@ -87,17 +105,7 @@ const Login = () => {
               <p className="text-gray-500">Sign in to continue to your account</p>
             </div>
 
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center">
-                {error}
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="mb-4 p-3 bg-green-50 text-green-600 rounded-lg text-sm text-center">
-                {successMessage}
-              </div>
-            )}
+            {/* ⛔️ Removed inline error/success banners so only Toastify shows */}
 
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Email */}

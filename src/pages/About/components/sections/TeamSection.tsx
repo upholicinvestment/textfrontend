@@ -35,7 +35,7 @@ const TeamSection = () => {
       {
         id: 2,
         name: "Shehla Khan",
-        role: "Founder & CBO",
+        role: "Sales Head & CBO",
         img: shehla,
         bio: "Founder and Business head with 12 years of proven expertise in insurance sales, driving growth and building high-performing teams.",
         // skills: ["Strategy", "Markets", "Risk"],

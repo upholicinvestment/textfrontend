@@ -13,6 +13,10 @@ import {
 } from "react-icons/fi";
 import { AuthContext } from "../../../context/AuthContext";
 
+/* ✅ Toastify */
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 declare global {
   interface Window {
     Razorpay: any;
@@ -242,6 +246,21 @@ const Register = () => {
 
   const brokerFields = brokerFieldMap[brokerName] || [];
 
+  // ✅ Toastify listeners (show toast, then clear local state to avoid inline UI)
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      setError("");
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (successMessage) {
+      toast.success(successMessage);
+      setSuccessMessage("");
+    }
+  }, [successMessage]);
+
   // OTP cooldown ticker (guest-only)
   useEffect(() => {
     if (!isLoggedIn && cooldown > 0) {
@@ -303,8 +322,6 @@ const Register = () => {
   }, [searchParams]);
 
   // When product changes:
-  // - If it doesn't support yearly OR has variants → force monthly
-  // - Otherwise keep whatever interval is already selected (incl. the one from URL)
   useEffect(() => {
     if (!selectedProduct) return;
     if (
@@ -427,6 +444,36 @@ const Register = () => {
       setError(message);
     }
   };
+
+  /** ---------- Resend OTP (reuses the same API) ---------- */
+  const handleResendOtp = async () => {
+    if (isLoggedIn) return;
+    if (phone.length !== 10) {
+      setError("Please enter a valid 10-digit phone number");
+      return;
+    }
+    if (cooldown > 0) {
+      setError(`Please wait ${cooldown} seconds before requesting a new OTP`);
+      return;
+    }
+
+    try {
+      setError("");
+      const response = await api.post("/otp/send-otp", { phone });
+      if (response.data.success) {
+        setOtpSent(true);
+        setOtp(""); // clear previous entry
+        setSuccessMessage("OTP resent to your phone number");
+        setCooldown(response.data.retryAfter || OTP_COOLDOWN_DURATION);
+      } else {
+        setError(response.data.message || "Failed to resend OTP");
+      }
+    } catch (err: any) {
+      const { message } = extractServerError(err);
+      setError(message);
+    }
+  };
+  /** ----------------------------------------------------- */
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -760,6 +807,9 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 p-4">
+      {/* Toasts */}
+      <ToastContainer position="top-right" autoClose={3500} newestOnTop />
+
       <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl overflow-hidden flex relative">
         {/* Close */}
         <Link
@@ -798,7 +848,6 @@ const Register = () => {
                   </linearGradient>
                 </defs>
 
-                {/* Soft background rings */}
                 <circle
                   cx="250"
                   cy="250"
@@ -820,8 +869,6 @@ const Register = () => {
                   fill="#FFFFFF"
                   fillOpacity="0.16"
                 />
-
-                {/* Decorative blobs */}
                 <ellipse
                   cx="110"
                   cy="120"
@@ -839,7 +886,6 @@ const Register = () => {
                   fillOpacity="0.08"
                 />
 
-                {/* Credit Card */}
                 <g transform="translate(110 150)">
                   <rect
                     x="0"
@@ -857,9 +903,7 @@ const Register = () => {
                     rx="17.5"
                     stroke="#E7EAFF"
                   />
-                  {/* Stripe */}
                   <rect x="0" y="36" width="280" height="22" fill="#E9ECFF" />
-                  {/* Chip */}
                   <rect
                     x="22"
                     y="72"
@@ -876,7 +920,6 @@ const Register = () => {
                     rx="3"
                     fill="#EEF0FF"
                   />
-                  {/* Numbers */}
                   <rect
                     x="85"
                     y="76"
@@ -893,7 +936,6 @@ const Register = () => {
                     rx="4"
                     fill="#E3E6FF"
                   />
-                  {/* Name + Exp */}
                   <rect
                     x="22"
                     y="120"
@@ -910,8 +952,6 @@ const Register = () => {
                     rx="5"
                     fill="#E6E9FF"
                   />
-
-                  {/* Pay button on card */}
                   <rect
                     x="150"
                     y="130"
@@ -933,7 +973,6 @@ const Register = () => {
                   </text>
                 </g>
 
-                {/* Lock icon (security) */}
                 <g transform="translate(325 145)">
                   <rect
                     x="0"
@@ -952,55 +991,6 @@ const Register = () => {
                   <circle cx="22" cy="43" r="3" fill="#FFFFFF" />
                 </g>
 
-                {/* Receipt / invoice */}
-                {/* <g transform="translate(270 275)">
-                  <path
-                    d="M0 0 h115 v120 l-10 -8 -10 8 -10 -8 -10 8 -10 -8 -10 8 -10 -8 -10 8 -10 -8 -10 8 z"
-                    fill="#FFFFFF"
-                  />
-                  <rect
-                    x="6"
-                    y="12"
-                    width="90"
-                    height="8"
-                    rx="4"
-                    fill="#EDEFFF"
-                  />
-                  <rect
-                    x="6"
-                    y="30"
-                    width="70"
-                    height="8"
-                    rx="4"
-                    fill="#EDF0FF"
-                  />
-                  <rect
-                    x="6"
-                    y="48"
-                    width="98"
-                    height="8"
-                    rx="4"
-                    fill="#E8EBFF"
-                  />
-                  <rect
-                    x="6"
-                    y="66"
-                    width="80"
-                    height="8"
-                    rx="4"
-                    fill="#EDF0FF"
-                  />
-                  <rect
-                    x="6"
-                    y="84"
-                    width="65"
-                    height="8"
-                    rx="4"
-                    fill="#EDEFFF"
-                  />
-                </g> */}
-
-                {/* Shield success */}
                 <g transform="translate(115 320)">
                   <path
                     d="M30 0 L60 12 V34 C60 50 45 62 30 68 C15 62 0 50 0 34 V12 L30 0 Z"
@@ -1015,7 +1005,6 @@ const Register = () => {
                   />
                 </g>
 
-                {/* Cursor clicking the Pay button */}
                 <path
                   d="M360 245 L375 283 L380 272 L394 284 L399 278 L385 266 L396 261 Z"
                   fill="#FFFFFF"
@@ -1024,7 +1013,6 @@ const Register = () => {
                   strokeOpacity="0.15"
                 />
 
-                {/* Sparkles */}
                 <g opacity="0.9">
                   <path
                     d="M95 200 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4 4 -10 Z"
@@ -1043,7 +1031,6 @@ const Register = () => {
                   />
                 </g>
 
-                {/* Gentle bottom wave */}
                 <path
                   d="M120 400 C180 380 320 380 380 400 C440 420 380 440 320 430 C260 420 240 420 180 430 C140 435 100 420 120 400 Z"
                   fill="#FFFFFF"
@@ -1078,7 +1065,6 @@ const Register = () => {
                   </linearGradient>
                 </defs>
 
-                {/* Soft background rings */}
                 <circle
                   cx="250"
                   cy="250"
@@ -1100,8 +1086,6 @@ const Register = () => {
                   fill="#FFFFFF"
                   fillOpacity="0.16"
                 />
-
-                {/* Decorative blobs */}
                 <ellipse
                   cx="115"
                   cy="110"
@@ -1119,7 +1103,6 @@ const Register = () => {
                   fillOpacity="0.08"
                 />
 
-                {/* Signup card */}
                 <g>
                   <rect
                     x="120"
@@ -1138,8 +1121,6 @@ const Register = () => {
                     stroke="#FFFFFF"
                     strokeOpacity="0.35"
                   />
-
-                  {/* Avatar */}
                   <circle cx="170" cy="150" r="20" fill="url(#g-accent)" />
                   <circle cx="170" cy="147" r="7" fill="#FFFFFF" />
                   <path
@@ -1148,8 +1129,6 @@ const Register = () => {
                     strokeWidth="2"
                     strokeLinecap="round"
                   />
-
-                  {/* Title */}
                   <rect
                     x="200"
                     y="138"
@@ -1166,8 +1145,6 @@ const Register = () => {
                     rx="4"
                     fill="#EEF0FF"
                   />
-
-                  {/* Name field */}
                   <rect
                     x="150"
                     y="190"
@@ -1184,8 +1161,6 @@ const Register = () => {
                     rx="6"
                     fill="#DDE2FF"
                   />
-
-                  {/* Email field */}
                   <rect
                     x="150"
                     y="230"
@@ -1202,8 +1177,6 @@ const Register = () => {
                     rx="6"
                     fill="#DDE2FF"
                   />
-
-                  {/* Password field with lock */}
                   <rect
                     x="150"
                     y="270"
@@ -1236,8 +1209,6 @@ const Register = () => {
                     rx="6"
                     fill="#DDE2FF"
                   />
-
-                  {/* Sign Up button */}
                   <rect
                     x="165"
                     y="315"
@@ -1257,8 +1228,6 @@ const Register = () => {
                   >
                     Sign Up
                   </text>
-
-                  {/* Cursor clicking the button */}
                   <path
                     d="M318 300 L333 338 L338 327 L352 339 L357 333 L343 321 L354 316 Z"
                     fill="#FFFFFF"
@@ -1268,7 +1237,6 @@ const Register = () => {
                   />
                 </g>
 
-                {/* Success shield with check (top-right of card) */}
                 <g transform="translate(330 105)">
                   <path
                     d="M30 0 L60 12 V34 C60 50 45 62 30 68 C15 62 0 50 0 34 V12 L30 0 Z"
@@ -1283,7 +1251,6 @@ const Register = () => {
                   />
                 </g>
 
-                {/* Sparkles */}
                 <g opacity="0.9">
                   <path
                     d="M95 200 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4 4 -10 Z"
@@ -1302,7 +1269,6 @@ const Register = () => {
                   />
                 </g>
 
-                {/* Gentle bottom wave for depth */}
                 <path
                   d="M120 385 C180 365 320 365 380 385 C440 405 380 425 320 415 C260 405 240 405 180 415 C140 420 100 405 120 385 Z"
                   fill="#FFFFFF"
@@ -1345,17 +1311,7 @@ const Register = () => {
               </div>
             )}
 
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center">
-                {error}
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="mb-4 p-3 bg-green-50 text-green-600 rounded-lg text-sm text-center">
-                {successMessage}
-              </div>
-            )}
+            {/* Inline message boxes removed to avoid duplication with Toastify */}
 
             <form onSubmit={handleRegister} className="space-y-4">
               {/* Guest account fields */}
@@ -1422,7 +1378,6 @@ const Register = () => {
                           placeholder="Phone Number (10 digits)"
                           value={phone}
                           onChange={handlePhoneChange}
-                          disabled={otpSent}
                           maxLength={10}
                           className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all disabled:bg-gray-50"
                         />
@@ -1461,20 +1416,40 @@ const Register = () => {
                           </span>
                         </button>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={handleVerifyOtp}
-                          disabled={otp.length !== 6}
-                          className={`w-full py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all ${
-                            otp.length !== 6
-                              ? "bg-gray-400 cursor-not-allowed"
-                              : "bg-indigo-600 hover:bg-indigo-700 shadow-sm hover:shadow-md"
-                          }`}
-                        >
-                          <span className="text-white font-medium">
-                            Verify OTP
-                          </span>
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleVerifyOtp}
+                            disabled={otp.length !== 6}
+                            className={`w-full py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all ${
+                              otp.length !== 6
+                                ? "bg-gray-400 cursor-not-allowed"
+                                : "bg-indigo-600 hover:bg-indigo-700 shadow-sm hover:shadow-md"
+                            }`}
+                          >
+                            <span className="text-white font-medium">
+                              Verify OTP
+                            </span>
+                          </button>
+
+                          {/* Resend OTP helper row */}
+                          <div className="text-center text-sm text-gray-500 mt-2">
+                            Didn’t get it?{" "}
+                            {cooldown > 0 ? (
+                              <span className="text-gray-400">
+                                Resend in {cooldown}s
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={handleResendOtp}
+                                className="text-indigo-600 hover:text-indigo-800 font-medium"
+                              >
+                                Resend OTP
+                              </button>
+                            )}
+                          </div>
+                        </>
                       )}
                     </>
                   ) : (
