@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../../api';
-import { FiMail, FiPhone, FiKey, FiLock, FiArrowRight } from 'react-icons/fi';
+import { FiPhone, FiKey, FiLock, FiArrowRight } from 'react-icons/fi';
 import { Link, useNavigate } from 'react-router-dom';
 
 /* ✅ React-Toastify */

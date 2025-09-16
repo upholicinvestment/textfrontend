@@ -124,13 +124,12 @@ const Navbar = () => {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) {
-          console.warn("[Navbar] /users/me failed:", res.status, res.statusText);
           return;
         }
         const data: MeResponse = await res.json();
         if (!cancelled) setMe(data || null);
-      } catch (err) {
-        console.warn("[Navbar] /users/me network error:", err);
+      } catch {
+        // ignore
       }
     };
     fetchMe();
@@ -341,29 +340,18 @@ const Navbar = () => {
 
   /* ---------- DIAGNOSTICS ---------- */
   useEffect(() => {
-    console.groupCollapsed("%c[Navbar AvatarDebug]", "color:#8ab4f8;font-weight:600");
-    console.log("currentUser:", currentUser);
-    console.log("currentUser.avatarKey:", currentUser?.avatarKey);
-    console.log("currentUser.avatarUrl:", currentUser?.avatarUrl);
-    console.log("me (hydrated):", me);
-    console.log("rawKey (lowercased):", rawKey);
-    console.log("normalizedKey (after legacy map):", normalizedKey);
-    console.log("avatarSrc (final):", avatarSrc);
-
     if (avatarSrc) {
       const img = new Image();
       img.onload = () => {
-        console.log("✅ Avatar image loaded:", avatarSrc, `${img.naturalWidth}x${img.naturalHeight}`);
-        console.groupEnd();
+        // avatar loaded
       };
-      img.onerror = (e) => {
-        console.warn("❌ Avatar image failed to load:", avatarSrc, e);
-        console.groupEnd();
+      // ✅ remove unused param to fix TS6133
+      img.onerror = () => {
+        // avatar failed to load
       };
       img.src = avatarSrc;
     } else {
-      console.warn("ℹ️ No avatarSrc — will show initial letter");
-      console.groupEnd();
+      // no avatarSrc — will show initial letter
     }
 
     (window as any).avatarDiag = () => {
@@ -375,7 +363,6 @@ const Navbar = () => {
         avatarSrc,
         hasAssetForNormalizedKey: !!(normalizedKey && (AVATAR_MAP as any)[normalizedKey]),
       };
-      console.info("[avatarDiag]", report);
       return report;
     };
   }, [currentUser, me, rawKey, normalizedKey, avatarSrc]);
@@ -581,9 +568,6 @@ const Navbar = () => {
                     className="bg-[#0f1233] rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 w-full text-gray-200 placeholder-gray-500 border border-white/10 shadow-inner"
                     autoFocus={searchOpen}
                   />
-                  {/* <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                    K
-                  </span> */}
                 </motion.div>
               )}
               <motion.button
@@ -662,8 +646,9 @@ const Navbar = () => {
                       src={avatarSrc}
                       alt="Profile avatar"
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.warn("❌ <img> onError — failed to display avatar:", (e.target as HTMLImageElement).src);
+                      // ✅ remove unused param to fix TS6133
+                      onError={() => {
+                        // failed to display avatar
                       }}
                     />
                   ) : (
@@ -920,8 +905,9 @@ const Navbar = () => {
                             src={avatarSrc}
                             alt="Profile avatar"
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              console.warn("❌ <img> onError — failed to display avatar (mobile):", (e.target as HTMLImageElement).src);
+                            // ✅ remove unused param to fix TS6133
+                            onError={() => {
+                              // failed to display avatar (mobile)
                             }}
                           />
                         ) : (
