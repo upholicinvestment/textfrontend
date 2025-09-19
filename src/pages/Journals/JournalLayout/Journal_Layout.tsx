@@ -7,6 +7,9 @@ import TradesTable from "../JournalDashboard/TradesTable";
 import UploadButton from "../JournalDashboard/UploadButton";
 import TradeCalendar from "../JournalDashboard/TradeCalendar";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+// imports…
+import FeedbackBoard from "../JournalDashboard/FeedbackBoard"; // <-- add this (adjust path if needed)
+
 
 const SIDEBAR_WIDTH = 265;
 const COLLAPSED_WIDTH = 80;
@@ -158,6 +161,8 @@ const Journal_Layout = () => {
           {active === "journal" && <DailyJournal />}
           {active === "trades" && <TradesTable />}
           {active === "calendar" && <TradeCalendar />}
+          {active === "feedback" && <FeedbackBoard />}
+
 
         </div>
       </div>
@@ -166,3 +171,4 @@ const Journal_Layout = () => {
 };
 
 export default Journal_Layout;
+

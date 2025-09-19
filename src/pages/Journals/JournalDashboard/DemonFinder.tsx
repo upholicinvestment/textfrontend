@@ -29,16 +29,51 @@ interface Props {
 
 const round2 = (n: number) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
+const fmtINR = (n: number) =>
+  `₹${Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const chooseLossBucket = (tags?: string[]) => {
+  // Most explanatory first
+  const order = [
+    "MISSED STOP LOSS",
+    "WRONG POSITION SIZE",
+    "OVERTRADING",
+    "REVENGE TRADING",
+    "HELD LOSS TOO LONG",
+    "CHASED ENTRY",
+    "POOR RISK/REWARD TRADE",
+    "PREMATURE EXIT"
+  ];
+  const a = tags ?? [];
+  for (const k of order) if (a.includes(k)) return k;
+  return a[0] ?? "Uncategorized Loss";
+};
+
+const chooseGoodBucket = (tags?: string[]) => {
+  // Prioritize exit/target and quality so you see more variety
+  const order = [
+    "HELD FOR TARGET",
+    "PROPER EXIT",
+    "GOOD RISK/REWARD",
+    "PROPER ENTRY",
+    "DISCIPLINED",
+    "FOLLOWED PLAN"
+    // Note: "STOP LOSS RESPECTED" is typically for controlled losses
+  ];
+  const a = tags ?? [];
+  for (const k of order) if (a.includes(k)) return k;
+  return a[0] ?? "Uncategorized Profit";
+};
+
 export default function DemonFinder({ trades = [], netPnl }: Props) {
   const [modal, setModal] = useState<{ title: string; list: Trade[] } | null>(null);
-
   const filtered = trades;
 
   // ---- Time-series for chart (Good/Bad counts per date) ----
   const dateStats = useMemo(() => {
     const map: Record<string, { date: string; Bad: number; Good: number }> = {};
     filtered.forEach(t => {
-      const d = t.exit.Date;
+      const d = t.exit?.Date ?? "";
       if (!map[d]) map[d] = { date: d, Bad: 0, Good: 0 };
       if (t.PnL < 0) map[d].Bad++;
       if (t.PnL > 0) map[d].Good++;
@@ -48,113 +83,73 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
     );
   }, [filtered]);
 
-  // Helper to dedupe trades when summing
-  function uniqueTradePnLSum(tradesArr: Trade[], filter: (t: Trade) => boolean, sign: "neg" | "pos") {
-    const seen = new Set();
-    let sum = 0;
-    tradesArr.forEach((t) => {
-      if (!filter(t)) return;
-      const key = `${t.symbol}-${t.entry.Date}-${t.entry.Time || ""}-${t.exit.Date}-${t.exit.Time || ""}`;
-      if (seen.has(key)) return;
-      if (sign === "neg" && t.PnL < 0) sum += Math.abs(t.PnL);
-      if (sign === "pos" && t.PnL > 0) sum += t.PnL;
-      seen.add(key);
-    });
-    return sum;
-  }
-
-  // ---- Tag-based metrics ----
-  const badMetrics = useMemo(() => {
-    const tagMap: Record<string, { count: number; trades: Trade[] }> = {};
-    filtered.forEach(t => {
-      t.DemonArr?.forEach(d => {
-        if (!tagMap[d]) tagMap[d] = { count: 0, trades: [] };
-        tagMap[d].count++;
-        tagMap[d].trades.push(t);
-      });
-    });
-    return Object.entries(tagMap).map(([name, v]) => {
-      const unique = Array.from(new Set(v.trades));
-      const seen = new Set();
-      let cost = 0;
-      unique.forEach(t => {
-        const key = `${t.symbol}-${t.entry.Date}-${t.entry.Time || ""}-${t.exit.Date}-${t.exit.Time || ""}`;
-        if (seen.has(key)) return;
-        if (t.PnL < 0) cost += Math.abs(t.PnL);
-        seen.add(key);
-      });
-      return { name, count: v.count, trades: unique, cost };
-    });
+  // ---- One-bucket-per-trade grouping ----
+  const lossMetrics = useMemo(() => {
+    const map: Record<string, { count: number; trades: Trade[]; cost: number }> = {};
+    for (const t of filtered) {
+      if (t.PnL >= 0) continue;
+      const bucket = chooseLossBucket(t.DemonArr);
+      if (!map[bucket]) map[bucket] = { count: 0, trades: [], cost: 0 };
+      map[bucket].count += 1;
+      map[bucket].trades.push(t);
+      map[bucket].cost += Math.abs(t.PnL);
+    }
+    return Object.entries(map)
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.cost - a.cost || b.count - a.count);
   }, [filtered]);
 
-  const goodMetrics = useMemo(() => {
-    const tagMap: Record<string, { count: number; trades: Trade[] }> = {};
-    filtered.forEach(t => {
-      t.GoodPracticeArr?.forEach(g => {
-        if (!tagMap[g]) tagMap[g] = { count: 0, trades: [] };
-        tagMap[g].count++;
-        tagMap[g].trades.push(t);
-      });
-    });
-    return Object.entries(tagMap).map(([name, v]) => {
-      const unique = Array.from(new Set(v.trades));
-      const seen = new Set();
-      let profit = 0;
-      unique.forEach(t => {
-        const key = `${t.symbol}-${t.entry.Date}-${t.entry.Time || ""}-${t.exit.Date}-${t.exit.Time || ""}`;
-        if (seen.has(key)) return;
-        if (t.PnL > 0) profit += t.PnL;
-        seen.add(key);
-      });
-      return { name, count: v.count, trades: unique, profit };
-    });
+  const profitMetrics = useMemo(() => {
+    const map: Record<string, { count: number; trades: Trade[]; profit: number }> = {};
+    for (const t of filtered) {
+      if (t.PnL <= 0) continue;
+      const bucket = chooseGoodBucket(t.GoodPracticeArr);
+      if (!map[bucket]) map[bucket] = { count: 0, trades: [], profit: 0 };
+      map[bucket].count += 1;
+      map[bucket].trades.push(t);
+      map[bucket].profit += t.PnL;
+    }
+    return Object.entries(map)
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.profit - a.profit || b.count - a.count);
   }, [filtered]);
 
   // ---- Totals ----
-  // Use broker-exact net if provided; otherwise fall back to sum of paired trades.
   const sumOfPairs = useMemo(() => filtered.reduce((sum, t) => sum + t.PnL, 0), [filtered]);
   const actualNetPnL = useMemo(
     () => (typeof netPnl === "number" && !Number.isNaN(netPnl) ? round2(netPnl) : round2(sumOfPairs)),
     [netPnl, sumOfPairs]
   );
-  const badCost = useMemo(() => round2(uniqueTradePnLSum(filtered, t => t.isBadTrade, "neg")), [filtered]);
+
+  const losingTrades = useMemo(() => filtered.filter(t => t.PnL < 0), [filtered]);
+  const winningTrades = useMemo(() => filtered.filter(t => t.PnL > 0), [filtered]);
+
+  const badCost = useMemo(
+    () => round2(losingTrades.reduce((s, t) => s + Math.abs(t.PnL), 0)),
+    [losingTrades]
+  );
   const potentialPnL = useMemo(() => round2(actualNetPnL + badCost), [actualNetPnL, badCost]);
 
-  // ---- Best/Worst trades ----
-  const bestTrade = useMemo(() => {
-    let best: Trade | null = null;
-    for (const t of filtered) if (best === null || t.PnL > best.PnL) best = t;
-    return best;
-  }, [filtered]);
+  // ---- Best/Worst drivers ----
+  const topLoss = lossMetrics[0];
+  const topProfit = profitMetrics[0];
 
-  const topDemon = useMemo(() => {
-    const sorted = [...badMetrics].sort((a, b) => b.cost - a.cost || b.count - a.count);
-    return sorted[0];
-  }, [badMetrics]);
-
-  const topGood = useMemo(() => {
-    const sorted = [...goodMetrics].sort((a, b) => b.profit - a.profit || b.count - a.count);
-    return sorted[0];
-  }, [goodMetrics]);
-
-  // ---- Single-session quality metrics (realistic for a single day) ----
-  const wins = useMemo(() => filtered.filter(t => t.PnL > 0), [filtered]);
-  const losses = useMemo(() => filtered.filter(t => t.PnL < 0), [filtered]);
+  // ---- Session quality metrics ----
   const hitRate = useMemo(
-    () => (filtered.length ? (wins.length / filtered.length) * 100 : 0),
-    [filtered.length, wins.length]
+    () => (filtered.length ? (winningTrades.length / filtered.length) * 100 : 0),
+    [filtered.length, winningTrades.length]
   );
-  const grossProfit = useMemo(() => wins.reduce((s, t) => s + t.PnL, 0), [wins]);
-  const grossLoss = useMemo(() => losses.reduce((s, t) => s + Math.abs(t.PnL), 0), [losses]);
+  const grossProfit = useMemo(() => winningTrades.reduce((s, t) => s + t.PnL, 0), [winningTrades]);
+  const grossLoss = useMemo(() => losingTrades.reduce((s, t) => s + Math.abs(t.PnL), 0), [losingTrades]);
   const profitFactor = useMemo(
     () => (grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? Infinity : 0)),
     [grossProfit, grossLoss]
   );
 
-  // Max drawdown over the session (sort by exit time)
+  // Max drawdown (cum P&L by exit time)
   const maxDD = useMemo(() => {
     const chron = [...filtered].sort((a, b) => {
-      const toTs = (t: Trade) => new Date(`${t.exit.Date}T${t.exit.Time || "00:00"}`).getTime();
+      const toTs = (t: Trade) => new Date(`${t.exit?.Date ?? ""}T${t.exit?.Time || "00:00"}`).getTime();
       return toTs(a) - toTs(b);
     });
     let run = 0, peak = 0, dd = 0;
@@ -167,9 +162,8 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
   }, [filtered]);
 
   // Layout
-  const panelHeight = 320; // ⬅️ increased height
+  const panelHeight = 320;
 
-  // Small presentational pieces
   const StatRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="flex items-center justify-between">
       <span className="text-[10px] text-gray-400">{label}</span>
@@ -185,87 +179,48 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
           .classic-shadow { box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
           .classic-shadow-lg { box-shadow: 0 8px 22px rgba(0,0,0,0.43); }
           .classic-border { border: 1px solid #21263b; }
-          .classic-hover:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.45); transform: translateY(-1px);}
-          .classic-transition { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);}
+          .classic-hover:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.45); transform: translateY(-1px); }
+          .classic-transition { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
           .thin-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
           .thin-scrollbar::-webkit-scrollbar-track { background: #1c2130; border-radius: 2px; }
           .thin-scrollbar::-webkit-scrollbar-thumb { background: #333a56; border-radius: 2px; }
           .thin-scrollbar::-webkit-scrollbar-thumb:hover { background: #5e6686; }
           .thin-scrollbar { scrollbar-width: thin; scrollbar-color: #333a56 #1c2130; }
           .elegant-card {
-            background: bg-[#0a0d13];
+            background: #0a0d13;
             border: 1px solid #21263b;
             box-shadow: 0 2px 9px rgba(0,0,0,0.18);
           }
           .metric-card {
-            background: bg-[#0a0d13];
+            background: #0a0d13;
             border: 1px solid #21263b;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
           }
-          .gradient-red { background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%);}
-          .gradient-green { background: linear-gradient(135deg, #22c55e 0%, #14532d 100%);}
-          .gradient-blue { background: linear-gradient(135deg, #6366f1 0%, #312e81 100%);}
-          .gradient-purple { background: linear-gradient(135deg, #a78bfa 0%, #6d28d9 100%);}
-          
-          /* Responsive additions */
+          .gradient-red { background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%); }
+          .gradient-green { background: linear-gradient(135deg, #22c55e 0%, #14532d 100%); }
+          .gradient-blue { background: linear-gradient(135deg, #6366f1 0%, #312e81 100%); }
+          .gradient-purple { background: linear-gradient(135deg, #a78bfa 0%, #6d28d9 100%); }
+
           @media (max-width: 768px) {
-            .daily-trend-section {
-              flex-direction: column;
-            }
-            
-            .daily-trend-left, .daily-trend-right {
-              width: 100% !important;
-            }
-            
-            .daily-trend-grid {
-              grid-template-columns: 1fr;
-              gap: 1rem;
-            }
-            
-            .impact-summary {
-              flex-direction: column;
-            }
-            
-            .impact-item {
-              margin-bottom: 0.5rem;
-            }
-            
-            .metrics-panels {
-              grid-template-columns: 1fr;
-            }
+            .daily-trend-section { flex-direction: column; }
+            .daily-trend-left, .daily-trend-right { width: 100% !important; }
+            .daily-trend-grid { grid-template-columns: 1fr; gap: 1rem; }
+            .impact-summary { flex-direction: column; }
+            .impact-item { margin-bottom: 0.5rem; }
+            .metrics-panels { grid-template-columns: 1fr; }
           }
-          
           @media (max-width: 640px) {
-            .modal-grid-header, .modal-grid-row {
-              grid-template-columns: 1fr 1fr;
-            }
-            
+            .modal-grid-header, .modal-grid-row { grid-template-columns: 1fr 1fr; }
             .modal-grid-header div:nth-child(2),
             .modal-grid-header div:nth-child(3),
             .modal-grid-row div:nth-child(2),
-            .modal-grid-row div:nth-child(3) {
-              display: none;
-            }
-            
-            .daily-trend-grid {
-              grid-template-columns: 1fr 1fr;
-              gap: 0.75rem;
-            }
-            
-            .daily-trend-grid > div {
-              min-height: 140px;
-            }
+            .modal-grid-row div:nth-child(3) { display: none; }
+            .daily-trend-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+            .daily-trend-grid > div { min-height: 140px; }
           }
-          
           @media (max-width: 480px) {
-            .chart-container {
-              height: 250px !important;
-            }
-            
-            .daily-trend-grid {
-              grid-template-columns: 1fr;
-              gap: 0.75rem;
-            }
+            .chart-container { height: 250px !important; }
+            .daily-trend-grid { grid-template-columns: 1fr; gap: 0.75rem; }
           }
         `}
       </style>
@@ -273,7 +228,7 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
       <div className="max-w-full bg-[#0a0d13] min-h-screen text-gray-100 text-[0.85rem]">
         {/* Metrics Panels */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mb-5 metrics-panels">
-          {/* Bad Trades Panel */}
+          {/* Loss Analysis Panel */}
           <div className="metric-card rounded-md p-4 classic-transition classic-hover">
             <div className="flex items-center space-x-1 mb-3">
               <div className="w-6 h-6 gradient-red rounded-sm flex items-center justify-center">
@@ -282,12 +237,12 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                 </svg>
               </div>
               <div>
-                <h2 className="text-base font-bold text-gray-100">Risk Analysis</h2>
-                <p className="text-gray-400 font-medium text-[10px]">Problematic Trade Patterns</p>
+                <h2 className="text-base font-bold text-gray-100">Loss Analysis</h2>
+                <p className="text-gray-400 font-medium text-[10px]">Primary reasons behind losing trades</p>
               </div>
             </div>
             <div className="thin-scrollbar overflow-y-auto max-h-56 space-y-3">
-              {badMetrics.map((m) => (
+              {lossMetrics.map((m) => (
                 <div
                   key={m.name}
                   className="group p-4 bg-[#191e27] border border-[#23283d] hover:border-red-400 hover:bg-[#2c2027] rounded-sm cursor-pointer classic-transition"
@@ -304,7 +259,7 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-red-400 text-xs">
-                        ₹{m.cost.toFixed(2)}
+                        {fmtINR(m.cost)}
                       </div>
                     </div>
                   </div>
@@ -313,7 +268,7 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
             </div>
           </div>
 
-          {/* Good Trades Panel */}
+          {/* Profit Analysis Panel */}
           <div className="metric-card rounded-md p-4 classic-transition classic-hover">
             <div className="flex items-center space-x-1 mb-3">
               <div className="w-6 h-6 gradient-green rounded-sm flex items-center justify-center">
@@ -322,12 +277,12 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                 </svg>
               </div>
               <div>
-                <h2 className="text-base font-bold text-gray-100">Success Analysis</h2>
-                <p className="text-gray-400 font-medium text-[10px]">Profitable Trade Patterns</p>
+                <h2 className="text-base font-bold text-gray-100">Profit Analysis</h2>
+                <p className="text-gray-400 font-medium text-[10px]">Primary edges behind winning trades</p>
               </div>
             </div>
             <div className="thin-scrollbar overflow-y-auto max-h-56 space-y-3">
-              {goodMetrics.map((m) => (
+              {profitMetrics.map((m) => (
                 <div
                   key={m.name}
                   className="group p-4 bg-[#191e27] border border-[#23283d] hover:border-green-400 hover:bg-[#1a2c20] rounded-sm cursor-pointer classic-transition"
@@ -344,7 +299,7 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-green-400 text-xs">
-                        ₹{m.profit.toFixed(2)}
+                        {fmtINR(m.profit)}
                       </div>
                     </div>
                   </div>
@@ -363,33 +318,34 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
               <div className="flex-1 flex flex-col items-center p-4 bg-[#161a22] rounded-sm border border-[#23283d] impact-item">
                 <div className="uppercase text-[10px] font-bold text-gray-400 mb-1 tracking-wider">Actual Net P&L</div>
                 <div className={`text-base font-bold ${actualNetPnL >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  ₹{actualNetPnL.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  {fmtINR(actualNetPnL)}
                 </div>
               </div>
               {/* Cost from Poor Decisions */}
               <div className="flex-1 flex flex-col items-center p-4 bg-[#161a22] rounded-sm border border-[#23283d] impact-item">
                 <div className="uppercase text-[10px] font-bold text-gray-400 mb-1 tracking-wider">Cost from Poor Decisions</div>
                 <div className="text-base font-bold text-red-400">
-                  ₹{badCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  {fmtINR(badCost)}
                 </div>
               </div>
               {/* Potential P&L */}
               <div className="flex-1 flex flex-col items-center p-4 bg-[#161a22] rounded-sm border border-[#23283d] impact-item">
                 <div className="uppercase text-[10px] font-bold text-gray-400 mb-1 tracking-wider">Potential P&L (Optimized)</div>
                 <div className={`text-base font-bold ${potentialPnL >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  ₹{potentialPnL.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  {fmtINR(potentialPnL)}
                 </div>
               </div>
             </div>
             <div className="mt-2 text-center bg-[#23283d] p-3 rounded-sm border border-indigo-800">
               <p className="text-indigo-300 text-xs font-semibold">
-                By eliminating poor trading decisions, your P&L could have been <span className="font-bold text-indigo-200">₹{potentialPnL.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                By eliminating poor trading decisions, your P&L could have been{" "}
+                <span className="font-bold text-indigo-200">{fmtINR(potentialPnL)}</span>
               </p>
             </div>
           </div>
         </div>
 
-        {/* INSIGHTS LEFT (updated single-day) + NARROW LINE CHART RIGHT */}
+        {/* INSIGHTS LEFT + NARROW LINE CHART RIGHT */}
         <div className="elegant-card rounded-md p-4 mb-3 classic-shadow-lg daily-trend-section">
           <div className="flex items-center space-x-1 mb-2">
             <div className="w-6 h-6 gradient-purple rounded-sm flex items-center justify-center">
@@ -404,7 +360,7 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
           </div>
 
           <div className="flex gap-3 flex-col md:flex-row">
-            {/* LEFT: Updated, realistic single-day insights */}
+            {/* LEFT: Single-day insights */}
             <div className="daily-trend-left min-w-[260px] w-full md:w-6/12">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 daily-trend-grid" style={{ minHeight: panelHeight }}>
                 {/* Top Drag */}
@@ -419,16 +375,16 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                       <h4 className="text-[11px] font-bold tracking-wide text-gray-200 uppercase">Top Drag</h4>
                     </div>
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold bg-red-500/10 text-red-300 border-red-500/30">
-                      {topDemon?.name ?? "—"}
+                      {topLoss?.name ?? "—"}
                     </span>
                   </div>
                   <div className="space-y-1">
-                    <StatRow label="Cost" value={<span className="text-red-400 font-bold">₹{(topDemon?.cost ?? 0).toFixed(2)}</span>} />
-                    <StatRow label="Hits" value={topDemon?.count ?? 0} />
-                    {topDemon?.trades?.length ? (
+                    <StatRow label="Cost" value={<span className="text-red-400 font-bold">{fmtINR(topLoss?.cost ?? 0)}</span>} />
+                    <StatRow label="Hits" value={topLoss?.count ?? 0} />
+                    {topLoss?.trades?.length ? (
                       <button
                         className="mt-1 text-[10px] px-2 py-1 rounded border border-red-400/40 text-red-200 hover:bg-red-500/10 transition"
-                        onClick={() => setModal({ title: topDemon.name, list: topDemon.trades })}
+                        onClick={() => setModal({ title: topLoss.name, list: topLoss.trades })}
                       >
                         Review trades
                       </button>
@@ -448,16 +404,16 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                       <h4 className="text-[11px] font-bold tracking-wide text-gray-200 uppercase">Top Edge</h4>
                     </div>
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold bg-green-500/10 text-green-300 border-green-500/30">
-                      {topGood?.name ?? "—"}
+                      {topProfit?.name ?? "—"}
                     </span>
                   </div>
                   <div className="space-y-1">
-                    <StatRow label="Profit" value={<span className="text-green-400 font-bold">₹{(topGood?.profit ?? 0).toFixed(2)}</span>} />
-                    <StatRow label="Hits" value={topGood?.count ?? 0} />
-                    {topGood?.trades?.length ? (
+                    <StatRow label="Profit" value={<span className="text-green-400 font-bold">{fmtINR(topProfit?.profit ?? 0)}</span>} />
+                    <StatRow label="Hits" value={topProfit?.count ?? 0} />
+                    {topProfit?.trades?.length ? (
                       <button
                         className="mt-1 text-[10px] px-2 py-1 rounded border border-green-400/40 text-green-200 hover:bg-green-500/10 transition"
-                        onClick={() => setModal({ title: topGood.name, list: topGood.trades })}
+                        onClick={() => setModal({ title: topProfit.name, list: topProfit.trades })}
                       >
                         Review trades
                       </button>
@@ -477,14 +433,23 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                       <h4 className="text-[11px] font-bold tracking-wide text-gray-200 uppercase">Best Trade</h4>
                     </div>
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border-indigo-500/30 truncate max-w-[150px]">
-                      {bestTrade?.symbol ?? "—"}
+                      {(() => {
+                        const best = filtered.reduce<Trade | null>((acc, t) => (acc === null || t.PnL > acc.PnL ? t : acc), null);
+                        return best?.symbol ?? "—";
+                      })()}
                     </span>
                   </div>
                   <div className="space-y-1">
-                    <StatRow label="Exit" value={bestTrade?.exit.Date ?? "—"} />
+                    <StatRow label="Exit" value={(() => {
+                      const best = filtered.reduce<Trade | null>((acc, t) => (acc === null || t.PnL > acc.PnL ? t : acc), null);
+                      return best?.exit.Date ?? "—";
+                    })()} />
                     <StatRow
                       label="P&L"
-                      value={<span className="text-green-400 font-bold">{bestTrade ? `+₹${bestTrade.PnL.toFixed(2)}` : "—"}</span>}
+                      value={<span className="text-green-400 font-bold">{(() => {
+                        const best = filtered.reduce<Trade | null>((acc, t) => (acc === null || t.PnL > acc.PnL ? t : acc), null);
+                        return best ? `+${fmtINR(best.PnL)}` : "—";
+                      })()}</span>}
                     />
                   </div>
                 </div>
@@ -514,19 +479,19 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                         </span>
                       }
                     />
-                    <StatRow label="Max drawdown" value={<span className="text-red-300">₹{maxDD.toFixed(2)}</span>} />
+                    <StatRow label="Max drawdown" value={<span className="text-red-300">{fmtINR(maxDD)}</span>} />
                     <div className="mt-1 flex gap-1 flex-wrap">
                       <button
                         className="text-[10px] px-2 py-1 rounded border border-green-400/40 text-green-200 hover:bg-green-500/10 transition"
-                        onClick={() => setModal({ title: "Winning trades", list: wins })}
+                        onClick={() => setModal({ title: "Winning trades", list: winningTrades })}
                       >
-                        View wins ({wins.length})
+                        View wins ({winningTrades.length})
                       </button>
                       <button
                         className="text-[10px] px-2 py-1 rounded border border-red-400/40 text-red-200 hover:bg-red-500/10 transition"
-                        onClick={() => setModal({ title: "Losing trades", list: losses })}
+                        onClick={() => setModal({ title: "Losing trades", list: losingTrades })}
                       >
-                        View losses ({losses.length})
+                        View losses ({losingTrades.length})
                       </button>
                     </div>
                   </div>
@@ -548,9 +513,11 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                     height={40}
                     angle={-40}
                     textAnchor="end"
-                    tickFormatter={date => {
-                      const d = new Date(date as string);
-                      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    tickFormatter={(date) => {
+                      const d = new Date(String(date));
+                      return Number.isNaN(d.getTime())
+                        ? String(date)
+                        : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
                     }}
                   />
                   <YAxis
@@ -569,15 +536,17 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                       boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
                     }}
                     labelFormatter={(label) => {
-                      const d = new Date(label as string);
-                      return d.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" });
+                      const d = new Date(String(label));
+                      return Number.isNaN(d.getTime())
+                        ? String(label)
+                        : d.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" });
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: 10, color: "#c7d2fe", fontWeight: 500 }} />
                   <Line
                     type="monotone"
                     dataKey="Bad"
-                    name="Risk Trades"
+                    name="Loss Trades"
                     stroke="#ef4444"
                     strokeWidth={1.5}
                     dot={{ r: 2, fill: "#ef4444", strokeWidth: 1, stroke: "#23283d" }}
@@ -586,7 +555,7 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                   <Line
                     type="monotone"
                     dataKey="Good"
-                    name="Success Trades"
+                    name="Profit Trades"
                     stroke="#22c55e"
                     strokeWidth={1.5}
                     dot={{ r: 2, fill: "#22c55e", strokeWidth: 1, stroke: "#23283d" }}
@@ -641,7 +610,7 @@ export default function DemonFinder({ trades = [], netPnl }: Props) {
                           {t.exit.Time && <div className="text-[9px] text-gray-400 font-normal truncate">{t.exit.Time}</div>}
                         </div>
                         <div className={`text-right font-bold text-xs ${t.PnL >= 0 ? "text-green-400" : "text-red-400"} truncate`}>
-                          {t.PnL >= 0 ? "+" : ""}₹{t.PnL.toFixed(2)}
+                          {t.PnL >= 0 ? "+" : ""}{fmtINR(t.PnL)}
                         </div>
                       </div>
                     ))}

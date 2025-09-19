@@ -30,8 +30,8 @@ type DayCell = {
 type MonthSummary = {
   totalTrades: number;
   netPnl: number;
-  winRate: number; // 0..1 (day win-rate)
-  profitFactor: number;
+  winRate: number; // 0..1 (trade-level win-rate from backend)
+  profitFactor: number; // trade-level PF from backend (Infinity if GL=0 & GP>0)
   bestDay: { date: string | null; netPnl: number };
 };
 type MonthResponse = { days: DayCell[]; monthSummary: MonthSummary };
@@ -74,8 +74,12 @@ function buildMonthMatrix(year: number, month1to12: number): (string | null)[][]
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
   return weeks;
 }
-const pct = (x: number | null | undefined) =>
-  x == null ? "—" : (x * 100).toFixed(1) + "%";
+// Replace your pct helper with this:
+const pct = (x: number | null | undefined, dp = 2) =>
+  x == null || !Number.isFinite(Number(x))
+    ? "—"
+    : `${(Number(x) * 100).toFixed(dp)}%`;
+
 const pf = (x: number | null | undefined) =>
   x === Infinity ? "∞" : x == null ? "—" : Number.isFinite(x) ? x.toFixed(2) : "—";
 const money = (x: number | null | undefined) =>
@@ -328,8 +332,31 @@ export default function TradeCalendar(): JSX.Element {
     return map;
   }, [filteredDays]);
 
-  // summary incl. best/worst day
+  // ---- Summary (uses backend monthSummary when single month is selected) ----
   const summaryLocal = useMemo(() => {
+    // Prefer backend summary for single-month view to match dashboard PF/win-rate
+    if (mode === "months" && usingSingleView && single.summary) {
+      let best = { date: null as string | null, netPnl: 0 };
+      let worst = { date: null as string | null, netPnl: 0 };
+      if (filteredDays.length) {
+        best = { date: filteredDays[0].tradingDate, netPnl: filteredDays[0].netPnl };
+        worst = { date: filteredDays[0].tradingDate, netPnl: filteredDays[0].netPnl };
+        for (const d of filteredDays) {
+          if (d.netPnl > best.netPnl) best = { date: d.tradingDate, netPnl: d.netPnl };
+          if (d.netPnl < worst.netPnl) worst = { date: d.tradingDate, netPnl: d.netPnl };
+        }
+      }
+      return {
+        totalTrades: single.summary.totalTrades,
+        netPnl: single.summary.netPnl,
+        winRate: single.summary.winRate,
+        profitFactor: single.summary.profitFactor,
+        bestDay: best,
+        worstDay: worst,
+      };
+    }
+
+    // Fallback for multi-month/range (approx via day nets)
     if (!filteredDays.length) {
       return {
         totalTrades: 0,
@@ -368,7 +395,7 @@ export default function TradeCalendar(): JSX.Element {
       bestDay: best,
       worstDay: worst,
     };
-  }, [filteredDays]);
+  }, [mode, usingSingleView, single.summary, filteredDays]);
 
   const gotoPrev = () => {
     const nm = month - 1;
@@ -853,7 +880,7 @@ function DayDrawer({
             <div className="grid grid-cols-2 gap-3">
               <StatCard label="Net P&L" value={money(state.snapshot.netPnl)} />
               <StatCard label="Trades" value={String(state.snapshot.tradeCount)} />
-              <StatCard label="Win Rate" value={pct(state.snapshot.winRate)} />
+              <StatCard label="Trade Win Rate" value={pct(state.snapshot.winRate)} />
               <StatCard label="Profit Factor" value={pf(state.snapshot.profitFactor)} />
               <StatCard label="Gross Profit" value={money(state.snapshot.grossProfit)} />
               <StatCard label="Gross Loss" value={money(state.snapshot.grossLoss)} />

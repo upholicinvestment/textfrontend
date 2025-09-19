@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { FiHome, FiBarChart2, FiBookOpen, FiUpload, FiGrid, FiCalendar } from "react-icons/fi"; // ← added FiGrid for Dashboard
+import { FiHome, FiBarChart2, FiBookOpen, FiUpload, FiGrid, FiCalendar, FiMessageSquare } from "react-icons/fi"; // ← added FiGrid for Dashboard
 import UpholicLogo from "./Upholictech.png";
 
 type SidebarItem = {
@@ -15,6 +15,7 @@ const sidebar: SidebarItem[] = [
   { label: "Daily Journal", icon: <FiBookOpen />, key: "journal" },
   { label: "Trades", icon: <FiBarChart2 />, key: "trades" },
   { label: "Trade Calendar", icon: <FiCalendar />, key: "calendar" },
+  { label: "Feedback", icon: <FiMessageSquare />, key: "feedback" },
 ];
 
 type Props = {
@@ -141,7 +142,7 @@ export const SidebarLayout = ({
           )}
 
           {/* Nav */}
-          <nav className="relative z-10 flex flex-col gap-2 px-3">
+          <nav className="relative z-10 flex flex-col gap-3 px-5">
             {sidebar.map((item) => {
               const commonClasses = `
                 group flex items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium

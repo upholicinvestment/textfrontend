@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../../api';
-import { FiPhone, FiKey, FiLock, FiArrowRight } from 'react-icons/fi';
+import { FiPhone, FiKey, FiLock, FiArrowRight, FiX } from 'react-icons/fi';
 import { Link, useNavigate } from 'react-router-dom';
 
 /* ✅ React-Toastify */
@@ -72,7 +72,17 @@ const ForgetPassword = () => {
       {/* 🔔 Toast container (toasts only; inline banners removed) */}
       <ToastContainer position="top-right" autoClose={3500} newestOnTop />
 
-      <div className="w-full max-w-xl bg-white rounded-2xl shadow-xl overflow-hidden">
+      <div className="w-full max-w-xl bg-white rounded-2xl shadow-xl overflow-hidden relative">
+        {/* ❌ Close (X) button — takes you to "/" */}
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          aria-label="Close and go to home"
+          className="absolute top-3 right-3 p-2 rounded-lg hover:bg-gray-100 transition"
+        >
+          <FiX className="w-5 h-5 text-gray-500" />
+        </button>
+
         <div className="p-8">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-800">
@@ -85,12 +95,9 @@ const ForgetPassword = () => {
             </p>
           </div>
 
-          {/* ⛔️ Removed inline {msg} banner — Toastify handles messages */}
-
           {step === 'request' ? (
             <form onSubmit={onRequest} className="space-y-4">
               <div className="relative">
-                {/* <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /> */}
                 <FiPhone className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" />
                 <input
                   type="text"

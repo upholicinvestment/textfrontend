@@ -262,7 +262,7 @@ const TradesTable = () => {
   const avgLoss = avgWinLoss?.avgLoss || 0;
   
   const winRate = trades.length > 0 
-    ? Math.round((profitableTrades.length / trades.length) * 100)
+    ? ((profitableTrades.length / trades.length) * 100)
     : 0;
 
   const riskRewardRatio = avgLoss !== 0 ? Math.abs(avgWin / avgLoss) : 0;
@@ -282,6 +282,9 @@ const TradesTable = () => {
     
     return matchesSearch && matchesFilter;
   });
+    // put near your helpers
+  const pct = (n: number, dp = 2) =>
+    Number.isFinite(n) ? n.toFixed(dp) : "0.00";
 
   // =========================
   // Export helpers (CSV / Print-to-PDF)
@@ -489,22 +492,21 @@ const TradesTable = () => {
             />
             
             <StatCard
-              icon={<Target className={`w-5 h-5 ${
-                darkMode ? "text-green-400" : "text-green-600"
-              }`} />}
-              label="Win Rate"
-              value={
-                <span className={
-                  winRate >= 60 ? "text-green-600" : 
-                  winRate >= 50 ? "text-green-400" : 
-                  "text-red-500"
-                }>
-                  {winRate}%
-                </span>
-              }
-              subtext={`${profitableTrades.length} wins • ${lossTrades.length} losses`}
-              trend={winRate - 50}
-            />
+  icon={<Target className={`w-5 h-5 ${darkMode ? "text-green-400" : "text-green-600"}`} />}
+  label="Win Rate"
+  value={
+    <span className={
+      winRate >= 60 ? "text-green-600" :
+      winRate >= 50 ? "text-green-400" :
+      "text-red-500"
+    }>
+      {pct(winRate, 2)}%
+    </span>
+  }
+  subtext={`${profitableTrades.length} wins • ${lossTrades.length} losses`}
+  trend={winRate - 50}
+/>
+
             
             <StatCard
               icon={<Trophy className={`w-5 h-5 ${
