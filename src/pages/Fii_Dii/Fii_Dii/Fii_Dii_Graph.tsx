@@ -76,6 +76,7 @@ const Fii_Dii_Graph: React.FC = () => {
     const fetchData = async () => {
       try {
         const response = await axios.get<InvestmentData[]>(
+          // "http://localhost:8000/api/fii-dii-data"
           "https://api.upholictech.com/api/fii-dii-data"
         );
         setData(response.data);

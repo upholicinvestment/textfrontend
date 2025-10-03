@@ -1,26 +1,27 @@
-import {  useEffect } from 'react';
+// import {  useEffect } from 'react';
 // import Highcharts from 'highcharts';
 // import HighchartsReact from 'highcharts-react-official';
-import axios from 'axios';
+// import axios from 'axios';
 import InvestmentBarChart from '../../Fii_Dii/Fii_Dii/Fii_Dii_Graph';
 // import FIIIndexChart from '../../Fii_Dii/Fii_Dii/Fii_Dii_Fno';
 
 function Fii_Dii_Activity() {
   // const [data, setData] = useState([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get('https://api.upholictech.com/api/fii-dii-data');
-        // setData(response.data);
-        console.log(response.data);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    };
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     try {
+  //       const response = await axios.get('https://api.upholictech.com/api/fii-dii-data');
+  //       // const response = await axios.get('http://localhost:8000/api/fii-dii-data');
+  //       // setData(response.data);
+  //       // console.log(response.data);
+  //     } catch (error) {
+  //       console.error('Error fetching data:', error);
+  //     }
+  //   };
 
-    fetchData();
-  }, []);
+  //   fetchData();
+  // }, []);
 
   // const categories = data.map((item) => item['Date']);
   // const fiiNetData = data.map((item) => Number(item['FII Net Purchase/Sales']) || 0);

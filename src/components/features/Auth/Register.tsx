@@ -157,18 +157,6 @@ async function getUserSnapshot(authUser: any): Promise<any> {
 }
 
 /* ---------- Broker map ---------- */
-const brokerFieldMap: Record<string, string[]> = {
-  angelone: [
-    "ANGEL_API_KEY",
-    "ANGEL_CLIENT_CODE",
-    "ANGEL_PASSWORD",
-    "ANGEL_TOTP_SECRET",
-  ],
-  zerodha: ["ZERODHA_API_KEY", "ZERODHA_API_SECRET", "ZERODHA_ACCESS_TOKEN"],
-  upstox: ["UPSTOX_API_KEY", "UPSTOX_API_SECRET", "UPSTOX_ACCESS_TOKEN"],
-  dhan: ["DHAN_CLIENT_ID", "DHAN_ACCESS_TOKEN"],
-  others: [],
-};
 
 const Register = () => {
   const { login, user } = useContext(AuthContext);
@@ -226,8 +214,8 @@ const Register = () => {
   );
 
   // Broker state (optional)
-  const [brokerName, setBrokerName] = useState("");
-  const [brokerConfig, setBrokerConfig] = useState<Record<string, string>>({});
+  const [brokerName] = useState("");
+  const [brokerConfig] = useState<Record<string, string>>({});
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
@@ -244,7 +232,6 @@ const Register = () => {
     [products, initialProductId]
   );
 
-  const brokerFields = brokerFieldMap[brokerName] || [];
 
   // ✅ Toastify listeners (show toast, then clear local state to avoid inline UI)
   useEffect(() => {
@@ -321,7 +308,7 @@ const Register = () => {
     }
   }, [searchParams]);
 
-  // When product changes:
+  // When product changes, normalize interval
   useEffect(() => {
     if (!selectedProduct) return;
     if (
@@ -398,10 +385,6 @@ const Register = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleBrokerInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.currentTarget;
-    setBrokerConfig((prev) => ({ ...prev, [name]: value }));
-  };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(e.target.value.replace(/\D/g, ""));
@@ -643,7 +626,7 @@ const Register = () => {
         handler: async (rsp: any) => {
           try {
             await api.post("/payments/verify", {
-              intentId: ord.intentId, // server always returns intentId
+              intentId: ord.intentId, // server returns intentId
               razorpay_order_id: rsp.razorpay_order_id,
               razorpay_payment_id: rsp.razorpay_payment_id,
               razorpay_signature: rsp.razorpay_signature,
@@ -708,7 +691,7 @@ const Register = () => {
         ...(initialVariantId && { variantId: initialVariantId }),
         ...(selectedProduct &&
           YEARLY_ELIGIBLE.has(selectedProduct.key) &&
-          !selectedProduct.hasVariants && { billingInterval }),
+          !selectedProduct.hasVariants && { billingInterval: billingInterval }),
       };
 
       if (selectedProduct?.key === "algo_simulator" && initialVariantId) {
@@ -1572,7 +1555,7 @@ const Register = () => {
               )}
 
               {/* Broker Config (conditional for ALGO) */}
-              {selectedProduct?.key === "algo_simulator" &&
+              {/* {selectedProduct?.key === "algo_simulator" &&
                 initialVariantId && (
                   <>
                     <div>
@@ -1616,7 +1599,7 @@ const Register = () => {
                       />
                     ))}
                   </>
-                )}
+                )} */}
 
               {/* Submit */}
               <button

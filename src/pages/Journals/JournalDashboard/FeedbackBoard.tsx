@@ -1,4 +1,4 @@
-// src/components/JournalDashboard/FeedbackBoard.tsx
+
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { API_BASE, getUserId } from "../../../api";
@@ -66,6 +66,7 @@ const FeedbackBoard: React.FC = () => {
   const [details, setDetails] = useState("");
   const [tags, setTags] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const uid = useMemo(() => getUserId?.() || null, []);
 
@@ -98,10 +99,17 @@ const FeedbackBoard: React.FC = () => {
   }, [sort, tag, q, page]);
 
   async function submit() {
+    setFormError(null);
+
     if (!title.trim()) {
-      alert("Please enter a title.");
+      setFormError("Title is required.");
       return;
     }
+    if (!tags.trim()) {
+      setFormError("Please select a tag.");
+      return;
+    }
+
     try {
       const postUrl = new URL(`${API_BASE}/feedback`);
       if (uid) postUrl.searchParams.set("userId", uid);
@@ -117,7 +125,7 @@ const FeedbackBoard: React.FC = () => {
       setPage(1);
       await load();
     } catch (e: any) {
-      alert(e?.message || "Failed to submit");
+      setFormError(e?.message || "Failed to submit");
     }
   }
 
@@ -131,7 +139,11 @@ const FeedbackBoard: React.FC = () => {
           headers: authHeaders(),
         });
       } else {
-        await axios.put(url.toString(), {}, { withCredentials: true, headers: authHeaders() });
+        await axios.put(
+          url.toString(),
+          {},
+          { withCredentials: true, headers: authHeaders() }
+        );
       }
       await load();
     } catch (e: any) {
@@ -147,6 +159,9 @@ const FeedbackBoard: React.FC = () => {
     { value: "export", label: "Export" },
     { value: "other", label: "Other" },
   ];
+
+  // ---- Null-safe items array for rendering ----
+  const items: Item[] = Array.isArray(list?.items) ? list!.items : [];
 
   return (
     <div className="bg-slate-900 text-slate-200 rounded-xl border border-slate-700 shadow-xl">
@@ -175,7 +190,7 @@ const FeedbackBoard: React.FC = () => {
           </select>
 
           {/* Tag Dropdown */}
-          <div className="relative w-full sm:w-auto">
+          <div className="relative w/full sm:w-auto">
             <select
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-700 bg-slate-800 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none pr-8"
               value={tag}
@@ -271,7 +286,7 @@ const FeedbackBoard: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Tags</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Tags *</label>
                 <div className="relative">
                   <select
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none pr-8"
@@ -311,6 +326,12 @@ const FeedbackBoard: React.FC = () => {
                   Submit Feedback
                 </button>
               </div>
+
+              {formError && (
+                <div className="mt-3 text-sm text-amber-300 bg-amber-500/10 border border-amber-400/30 rounded-lg px-3 py-2">
+                  {formError}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -321,7 +342,7 @@ const FeedbackBoard: React.FC = () => {
             <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
             <p className="text-slate-400">Loading feedback...</p>
           </div>
-        ) : !list || list.items.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="py-12 text-center">
             <svg className="w-16 h-16 mx-auto text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -331,9 +352,17 @@ const FeedbackBoard: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {list.items.map((it) => {
-              const created = new Date(it.createdAt).toLocaleDateString();
+            {items.map((it) => {
+              const created = it.createdAt ? new Date(it.createdAt).toLocaleDateString() : "";
               const hasVoted = false;
+
+              // ---- Null-safe tags (handles array | string | null | undefined) ----
+              const safeTags =
+                Array.isArray(it.tags)
+                  ? it.tags
+                  : typeof (it as any).tags === "string" && (it as any).tags.trim()
+                    ? (it as any).tags.split(",").map((s: string) => s.trim()).filter(Boolean)
+                    : [];
 
               return (
                 <div
@@ -354,7 +383,7 @@ const FeedbackBoard: React.FC = () => {
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                       </svg>
-                      <span className="text-xs sm:text-sm font-semibold mt-0.5">{it.votes}</span>
+                      <span className="text-xs sm:text-sm font-semibold mt-0.5">{it.votes ?? 0}</span>
                     </button>
 
                     <div className="flex-1 min-w-0">
@@ -372,8 +401,8 @@ const FeedbackBoard: React.FC = () => {
                       )}
 
                       <div className="flex flex-wrap gap-2 mb-2">
-                        {it.tags.map((tag) => (
-                          <Chip key={tag} tag={tag} />
+                        {safeTags.map((tg: string) => (
+                          <Chip key={tg} tag={tg} />
                         ))}
                       </div>
 
@@ -385,10 +414,10 @@ const FeedbackBoard: React.FC = () => {
             })}
 
             {/* Pager */}
-            {list.pages > 1 && (
+            {(list?.pages ?? 1) > 1 && (
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-6 pt-4 border-t border-slate-800/80">
                 <div className="text-sm text-slate-400">
-                  Showing {list.items.length} of {list.total} items • Page {list.page} of {list.pages}
+                  Showing {items.length} of {list?.total ?? 0} items • Page {list?.page ?? 1} of {list?.pages ?? 1}
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -400,8 +429,8 @@ const FeedbackBoard: React.FC = () => {
                   </button>
                   <button
                     className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    onClick={() => setPage((p) => Math.min(list.pages, p + 1))}
-                    disabled={page >= list.pages}
+                    onClick={() => setPage((p) => Math.min(list?.pages ?? 1, p + 1))}
+                    disabled={page >= (list?.pages ?? 1)}
                   >
                     Next
                   </button>

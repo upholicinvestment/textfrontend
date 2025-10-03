@@ -1,7 +1,8 @@
+// src/pages/Price/Price.tsx
 import { JSX, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiX } from "react-icons/fi";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import api from "../../api";
 import {
   CheckCircle2,
@@ -163,6 +164,12 @@ const Price = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const navigate = useNavigate();
 
+  // read renew intent from query params
+  const { search } = useLocation();
+  const qs = useMemo(() => new URLSearchParams(search), [search]);
+  const wantsRenew = qs.get("renew") === "1";
+  const renewProductKey = (qs.get("productKey") || "").toLowerCase();
+
   // 🔗 helper to build /signup?productKey=...&variantKey=...&interval=...
   const toRegister = (
     productKey?: string | null,
@@ -225,6 +232,14 @@ const Price = () => {
   const algo = useMemo(() => products.find((p) => p.key === "algo_simulator"), [products]);
   const journaling = useMemo(() => products.find((p) => p.key === "journaling_solo"), [products]);
 
+  // open relevant tab when arriving from renew URL
+  useEffect(() => {
+    if (!wantsRenew) return;
+    if (renewProductKey === "algo_simulator") setActiveTab("algo");
+    else if (renewProductKey === "journaling" || renewProductKey === "journaling_solo") setActiveTab("journaling");
+    else if (renewProductKey === "essentials_bundle") setActiveTab("bundle");
+  }, [wantsRenew, renewProductKey]);
+
   // ---------- Pricing helpers ----------
   const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -251,7 +266,6 @@ const Price = () => {
   const displayJournalPrice =
     journalBilling === "monthly" ? fmtINR(journalingMonthlyNum) : fmtINR(journalingAnnualNum);
   const journalingPeriod = journalBilling === "monthly" ? "month" : "year";
-
 
   const bundleTools = [
     {
@@ -311,7 +325,46 @@ const Price = () => {
     return found?._id || null;
   };
 
-  const openCheckout = async (normVariant: "starter" | "pro" | "swing") => {
+  // --- expiry window helpers (0..7 days) ---
+  const daysUntil = (iso?: string) => {
+    if (!iso) return Infinity;
+    const t = new Date(); t.setHours(0,0,0,0);
+    const e = new Date(iso); e.setHours(0,0,0,0);
+    return Math.ceil((e.getTime() - t.getTime()) / 86400000);
+  };
+
+  const isExpiringSoon = (key: string, win = 7, variantKey?: string) => {
+    for (const it of entitlements || []) {
+      const k = String((it as any)?.key || "").toLowerCase();
+      if (k !== key) continue;
+      const status = String((it as any)?.status || "active").toLowerCase();
+      if (status !== "active") continue;
+      if (variantKey) {
+        const vkey = normalizeVariantKey((it as any)?.variant?.key || "");
+        if (vkey && vkey !== normalizeVariantKey(variantKey)) continue;
+      }
+      const endsAt =
+        (it as any)?.endsAt ||
+        (it as any)?.subscription?.endsAt ||
+        (it as any)?.license?.endsAt ||
+        (it as any)?.meta?.endsAt ||
+        (it as any)?.variant?.endsAt;
+      const d = daysUntil(endsAt);
+      if (Number.isFinite(d) && d >= 0 && d <= win) return true;
+    }
+    return false;
+  };
+
+  const expiringBundle     = isExpiringSoon("essentials_bundle");
+  const expiringJournaling = isExpiringSoon("journaling") || isExpiringSoon("journaling_solo");
+  const expiringStarter    = isExpiringSoon("algo_simulator", 7, "starter");
+  const expiringPro        = isExpiringSoon("algo_simulator", 7, "pro");
+  const expiringSwing      = isExpiringSoon("algo_simulator", 7, "swing");
+
+  const openCheckout = async (
+    normVariant: "starter" | "pro" | "swing",
+    renew = false
+  ) => {
     try {
       if (!algo) {
         navigate(toRegister("algo_simulator", normVariant));
@@ -326,6 +379,7 @@ const Price = () => {
       const orderRes = await api.post("/payments/create-order", {
         productId: algo._id,
         variantId: vId,
+        renew: renew || undefined,
       });
 
       if (orderRes.status === 204) {
@@ -375,6 +429,60 @@ const Price = () => {
     }
   };
 
+  // generic product renewal (bundle/journaling)
+  const openProductRenewal = async (
+    product: Product,
+    interval: "monthly" | "yearly"
+  ) => {
+    try {
+      const orderRes = await api.post("/payments/create-order", {
+        productId: product._id,
+        interval,
+        renew: true,
+      });
+
+      if (orderRes.status === 204) {
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+
+      const ord = orderRes.data;
+      const ok = await loadRazorpay();
+      if (!ok || !(window as any).Razorpay) {
+        navigate("/dashboard");
+        return;
+      }
+
+      const rz = new (window as any).Razorpay({
+        key: ord.key,
+        amount: ord.amount,
+        currency: ord.currency,
+        name: ord.name,
+        description: ord.description,
+        order_id: ord.orderId,
+        prefill: {
+          name: ord.user?.name,
+          email: ord.user?.email,
+          contact: ord.user?.contact,
+        },
+        theme: { color: "#4f46e5" },
+        handler: async (rsp: any) => {
+          await api.post("/payments/verify", {
+            intentId: ord.intentId,
+            razorpay_order_id: rsp.razorpay_order_id,
+            razorpay_payment_id: rsp.razorpay_payment_id,
+            razorpay_signature: rsp.razorpay_signature,
+          });
+          navigate("/dashboard", { replace: true });
+        },
+      });
+
+      rz.open();
+    } catch {
+      // stay on pricing if anything fails
+    }
+  };
+
   const onAlgoCtaClick =
     (variantKey: "starter" | "pro" | "swing") =>
     async (e: React.MouseEvent) => {
@@ -383,8 +491,15 @@ const Price = () => {
 
       const token = localStorage.getItem("token");
       const isOwned = ownedExactVariant(variantKey);
+      const isExpiring =
+        (variantKey === "starter" && expiringStarter) ||
+        (variantKey === "pro" && expiringPro) ||
+        (variantKey === "swing" && expiringSwing);
 
-      if (isOwned) {
+      if (isOwned && isExpiring && token) {
+        await openCheckout(variantKey, true); // direct renewal
+        return;
+      } else if (isOwned) {
         navigate("/dashboard");
         return;
       }
@@ -561,7 +676,7 @@ const Price = () => {
 
   const journalingStatus = getSingleStatus(
     entitlements as any,
-    ["journaling", "journaling_solo", "trading_journal_pro"] // include all aliases you use
+    ["journaling", "journaling_solo", "trading_journal_pro"]
   );
 
   /** Journaling CTA label (mirrors bundle behavior & your requirement) */
@@ -839,21 +954,40 @@ const Price = () => {
                     <div className="flex flex-col sm:flex-row justify-between items-center pt-5 border-t border-gray-700">
                       <div className="mb-4 sm:mb-0 text-gray-300 text-sm">Unlock all tools + future updates</div>
 
-                      <Link
-                        to={toRegister(bundle?.key || "essentials_bundle", null, bundleBilling)}
-                        aria-label="Get Complete Bundle"
-                        onClick={handleBundleCta}
-                      >
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="group inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg"
-                          disabled={userLoading || entLoading}
+                      <div className="flex items-center">
+                        <Link
+                          to={toRegister(bundle?.key || "essentials_bundle", null, bundleBilling)}
+                          aria-label="Get Complete Bundle"
+                          onClick={handleBundleCta}
                         >
-                          {bundleCtaLabel}
-                          <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                        </motion.button>
-                      </Link>
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="group inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg"
+                            disabled={userLoading || entLoading}
+                          >
+                            {bundleCtaLabel}
+                            <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                          </motion.button>
+                        </Link>
+
+                        {/* Renew button only if bundle entitlement is expiring */}
+                        {bundle && expiringBundle && (
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (!localStorage.getItem("token")) {
+                                navigate(toRegister(bundle.key, null, bundleBilling) + "&renew=1");
+                                return;
+                              }
+                              openProductRenewal(bundle, bundleBilling);
+                            }}
+                            className="ml-3 inline-flex items-center gap-2 border border-emerald-500 text-emerald-400 hover:bg-emerald-900/30 font-semibold py-3 px-6 rounded-xl transition-all"
+                          >
+                            Renew now
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -895,6 +1029,12 @@ const Price = () => {
                     const label =
                       userLoading || entLoading
                         ? "Checking..."
+                        : isOwned && (
+                            (plan.key === "starter" && expiringStarter) ||
+                            (plan.key === "pro" && expiringPro) ||
+                            (plan.key === "swing" && expiringSwing)
+                          )
+                        ? "Renew Now"
                         : isOwned
                         ? "Open Dashboard"
                         : token
@@ -1171,7 +1311,7 @@ const Price = () => {
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-4">
-                          {/* Bundle CTA (unchanged) */}
+                          {/* Bundle CTA */}
                           <Link
                             to={toRegister("essentials_bundle", null, bundleBilling)}
                             aria-label="Get Complete Bundle"
@@ -1203,7 +1343,7 @@ const Price = () => {
                             </motion.button>
                           </Link>
 
-                          {/* Journaling-only CTA: respects journaling ownership */}
+                          {/* Journaling-only CTA */}
                           {!bundleStatus.owned && (
                             <Link
                               to={
@@ -1227,6 +1367,23 @@ const Price = () => {
                                 {journalingCtaLabel}
                               </motion.button>
                             </Link>
+                          )}
+
+                          {/* Renew now (journaling) — only when expiring */}
+                          {journaling && expiringJournaling && (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (!localStorage.getItem("token")) {
+                                  navigate(toRegister(journaling.key || "journaling_solo", null, journalBilling) + "&renew=1");
+                                  return;
+                                }
+                                openProductRenewal(journaling, journalBilling);
+                              }}
+                              className="border border-emerald-500 text-emerald-400 hover:bg-emerald-900/30 font-semibold py-3 px-6 rounded-lg transition-all"
+                            >
+                              Renew now
+                            </button>
                           )}
                         </div>
                       </div>

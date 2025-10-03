@@ -1,3 +1,4 @@
+// src/context/AuthContext.tsx
 import { createContext, useState, useEffect, ReactNode } from 'react';
 
 interface User {
@@ -34,13 +35,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (savedToken && savedUser) {
         setToken(savedToken);
         setUser(JSON.parse(savedUser));
-        // ✅ Console the token loaded from storage
-        // console.log('[AuthContext] Loaded token from storage:', savedToken);
       }
     } catch (error) {
       console.error("Failed to load auth data:", error);
     } finally {
-      // Ensure loading state ends
       setIsLoading(false);
     }
   }, []);
@@ -50,8 +48,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(user);
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
-    // ✅ Console the token on login
-    // console.log('[AuthContext] Login token:', token);
+    // 👇 mark that we just logged in (Dashboard will use this once to show popup immediately)
+    sessionStorage.setItem('__justLoggedIn', '1');
   };
 
   const logout = () => {
@@ -59,7 +57,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // console.log('[AuthContext] Logged out');
   };
 
   return (

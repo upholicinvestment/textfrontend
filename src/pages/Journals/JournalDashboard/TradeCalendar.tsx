@@ -74,7 +74,7 @@ function buildMonthMatrix(year: number, month1to12: number): (string | null)[][]
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
   return weeks;
 }
-// Replace your pct helper with this:
+
 const pct = (x: number | null | undefined, dp = 2) =>
   x == null || !Number.isFinite(Number(x))
     ? "—"
@@ -82,6 +82,7 @@ const pct = (x: number | null | undefined, dp = 2) =>
 
 const pf = (x: number | null | undefined) =>
   x === Infinity ? "∞" : x == null ? "—" : Number.isFinite(x) ? x.toFixed(2) : "—";
+
 const money = (x: number | null | undefined) =>
   x == null ? "—" : INR.format(Number(x));
 
@@ -123,6 +124,41 @@ function monthsBetweenInclusive(fromISO: string, toISO: string): Array<{year:num
     if (m > 12) { m = 1; y++; }
   }
   return out;
+}
+
+/**
+ * Reconstruct day-level Gross Profit/Loss from (net, PF).
+ * - PF = GP/GL, Net = GP - GL
+ * - GL = Net / (PF - 1), GP = PF * GL
+ * Handles PF edge cases (0, 1, Infinity, null/NaN).
+ */
+function deriveGrossFromNetAndPF(
+  net: number | null | undefined,
+  pfVal: number | null | undefined
+): { gp: number; gl: number } {
+  const netNum = Number(net ?? 0);
+  const pfNum = pfVal as number | undefined;
+
+  if (pfNum == null || Number.isNaN(pfNum)) {
+    return { gp: Math.max(0, netNum), gl: Math.max(0, -netNum) };
+  }
+  if (pfNum === Infinity) {
+    return { gp: Math.max(0, netNum), gl: 0 };
+  }
+  if (pfNum === 0) {
+    return { gp: 0, gl: Math.max(0, -netNum) };
+  }
+  if (pfNum === 1) {
+    // Net==0 when PF==1 (GP==GL). Unknown magnitude → contribute nothing to avoid bias.
+    return { gp: 0, gl: 0 };
+  }
+
+  const glRaw = netNum / (pfNum - 1);
+  const gpRaw = pfNum * glRaw;
+
+  const gp = Math.max(0, +gpRaw.toFixed(2));
+  const gl = Math.max(0, +glRaw.toFixed(2));
+  return { gp, gl };
 }
 
 /* ================= Data hooks ================= */
@@ -356,7 +392,7 @@ export default function TradeCalendar(): JSX.Element {
       };
     }
 
-    // Fallback for multi-month/range (approx via day nets)
+    // Accurate multi-month/date-range summary via ΣGP/ΣGL reconstructed from each day’s (net, PF)
     if (!filteredDays.length) {
       return {
         totalTrades: 0,
@@ -367,25 +403,34 @@ export default function TradeCalendar(): JSX.Element {
         worstDay: { date: null, netPnl: 0 },
       };
     }
-    let totalTrades = 0, netPnl = 0, gp = 0, gl = 0;
+
+    let totalTrades = 0, netPnl = 0;
     let tradedDays = 0, positiveDays = 0;
     let best = { date: filteredDays[0].tradingDate, netPnl: filteredDays[0].netPnl };
     let worst = { date: filteredDays[0].tradingDate, netPnl: filteredDays[0].netPnl };
 
+    let aggGP = 0, aggGL = 0;
+
     for (const d of filteredDays) {
+      const net = d.netPnl || 0;
       totalTrades += d.tradeCount || 0;
-      netPnl += d.netPnl || 0;
+      netPnl += net;
+
       if (d.tradeCount > 0) {
         tradedDays += 1;
-        if (d.netPnl > 0) positiveDays += 1;
+        if (net > 0) positiveDays += 1;
       }
-      if ((d.netPnl || 0) > 0) gp += d.netPnl;
-      if ((d.netPnl || 0) < 0) gl += Math.abs(d.netPnl);
-      if (d.netPnl > best.netPnl) best = { date: d.tradingDate, netPnl: d.netPnl };
-      if (d.netPnl < worst.netPnl) worst = { date: d.tradingDate, netPnl: d.netPnl };
+
+      const { gp, gl } = deriveGrossFromNetAndPF(net, d.profitFactor);
+      aggGP += gp;
+      aggGL += gl;
+
+      if (net > best.netPnl) best = { date: d.tradingDate, netPnl: net };
+      if (net < worst.netPnl) worst = { date: d.tradingDate, netPnl: net };
     }
+
     const winRate = tradedDays ? positiveDays / tradedDays : 0;
-    const profitFactor = gl ? gp / gl : gp > 0 ? Infinity : 0;
+    const profitFactor = aggGL > 0 ? aggGP / aggGL : (aggGP > 0 ? Infinity : 0);
 
     return {
       totalTrades,

@@ -17,7 +17,7 @@ type FormState = {
   lastName: string;
   email: string;
   company: string; // mobile number
-  persona: string; // selected product
+  persona: string; // selected product (UI label)
   message: string;
   agree: boolean;
   website?: string; // honeypot (anti-spam)
@@ -33,8 +33,26 @@ const personas = [
   { label: "Both / Not sure", value: "Both / Not sure" },
 ];
 
-const API_BASE =
+// --- API base (strip trailing slash to avoid //api) ---
+const RAW_API_BASE =
   (import.meta as any).env?.VITE_API_BASE || "https://api.upholictech.com";
+const API_BASE = String(RAW_API_BASE).replace(/\/+$/, "");
+
+/** Canonicalize persona to EXACT backend enum */
+const canonicalizePersona = (p: string) => {
+  if (!p) return p;
+  let v = p
+    .replace(/[\u2018\u2019\u2032]/g, "'") // smart -> straight apostrophe
+    .replace(/[\u2010-\u2015]/g, "-") // any dash -> hyphen-minus
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Force canonical 2-in-1 spelling with hyphens + possessive
+  if (/^2\s*-?\s*in\s*-?\s*1\s+trader'?s?\s+essential\s+bundle$/i.test(v)) {
+    return "2-in-1 Trader's Essential Bundle";
+  }
+  return v;
+};
 
 const ContactUs: React.FC = () => {
   const navigate = useNavigate();
@@ -54,7 +72,7 @@ const ContactUs: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const isEmail = (x: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x);
-  const isPhoneLike = (x: string) => x.replace(/\D/g, "").length === 10; // Updated to require exactly 10 digits
+  const isPhoneLike = (x: string) => x.replace(/\D/g, "").length === 10; // exactly 10 digits
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -63,7 +81,7 @@ const ContactUs: React.FC = () => {
     if (!form.email.trim() || !isEmail(form.email))
       e.email = "Valid email is required";
     if (form.company && !isPhoneLike(form.company))
-      e.company = "Please enter a valid 10-digit mobile number"; // Updated error message
+      e.company = "Please enter a valid 10-digit mobile number";
     if (!form.persona) e.persona = "Please select a product";
     if (!form.agree) e.agree = "You must agree to Terms & Privacy";
     if (form.website && form.website.trim().length > 0)
@@ -71,7 +89,6 @@ const ContactUs: React.FC = () => {
     setErrors(e);
 
     if (Object.keys(e).length > 0) {
-      // Surface the first error via toast (inline messages still render)
       const first = Object.values(e)[0];
       toast.error(first || "Please fix the highlighted fields.", {
         autoClose: 3000,
@@ -87,6 +104,10 @@ const ContactUs: React.FC = () => {
 
     try {
       setLoading(true);
+
+      // Always send canonical persona that matches backend enum
+      const personaCanonical = canonicalizePersona(form.persona);
+
       const res = await fetch(`${API_BASE}/api/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,19 +116,19 @@ const ContactUs: React.FC = () => {
           lastName: form.lastName,
           email: form.email,
           company: form.company, // mobile
-          persona: form.persona,
+          persona: personaCanonical, // canonical value for server validation
+          personaLabel: form.persona, // optional: keep original label for CRM/email
           message: form.message,
           agree: form.agree,
           website: form.website, // honeypot
         }),
       });
 
-      // Try to parse JSON, but don't crash on non-JSON responses
       let data: any = {};
       try {
         data = await res.json();
       } catch {
-        /* ignore */
+        /* non-JSON reply */
       }
 
       if (!res.ok) {
@@ -119,7 +140,6 @@ const ContactUs: React.FC = () => {
 
       toast.success("Thanks! We received your message.", { autoClose: 2500 });
 
-      // Optional reset
       setForm({
         firstName: "",
         lastName: "",
@@ -142,10 +162,9 @@ const ContactUs: React.FC = () => {
     }
   };
 
-  // Function to handle mobile number input with validation
+  // Mobile number: allow only numbers and limit to 10 digits
   const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value;
-    // Allow only numbers and limit to 10 digits
     const numbersOnly = input.replace(/\D/g, "");
     if (numbersOnly.length <= 10) {
       setForm((s) => ({ ...s, company: numbersOnly }));

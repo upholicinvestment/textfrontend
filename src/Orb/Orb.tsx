@@ -18,7 +18,7 @@ type OrbProps = {
   railBreakpointPx?: number;
 };
 
-export default function Orb({ height = 610, railBreakpointPx = 1024 }: OrbProps) {
+export default function Orb({ height = 680, railBreakpointPx = 1024 }: OrbProps) {
   // ---- SSR-safe window refs ----
   const WIN = typeof window !== "undefined" ? window : ({} as any);
 
