@@ -43,7 +43,8 @@ function normalizeVariantKey(k: string) {
   const s = (k || "").toLowerCase().trim();
   if (["starter", "starter_scalping"].includes(s)) return "starter";
   if (["pro", "option_scalper_pro", "option-scalper-pro"].includes(s)) return "pro";
-  if (["swing", "sniper_algo", "swing_trader_master", "swing-trader-master"].includes(s)) return "swing";
+  if (["swing", "sniper_algo", "swing_trader_master", "swing-trader-master"].includes(s))
+    return "swing";
   return s as any;
 }
 
@@ -237,7 +238,6 @@ const PricingSection = () => {
       if (single) keys.add(single);
 
       // Some backends return a grouped "variants" array; read it with a permissive cast.
-      // This keeps TS happy with your current EntitlementItem type.
       const maybeArray = (it as any)?.variants as Array<{ key?: string }> | undefined;
       if (Array.isArray(maybeArray)) {
         for (const v of maybeArray) {
@@ -356,8 +356,52 @@ const PricingSection = () => {
 
   const plans = livePlans ?? fallbackPlans;
 
-  // --- Direct checkout / already-owned short-circuit ---
-  const openCheckout = async (normVariant: Plan["key"]) => {
+  /* -------------------- Renew helpers (per-variant) -------------------- */
+  const startOfDay = (d: Date) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
+  const daysUntil = (iso?: string) => {
+    if (!iso) return Infinity;
+    const t = startOfDay(new Date());
+    const e = startOfDay(new Date(iso));
+    return Math.ceil((e.getTime() - t.getTime()) / 86400000);
+  };
+  const ACTIVE = (x: any) =>
+    String(x?.status || "inactive").toLowerCase() === "active" &&
+    (!x?.endsAt || new Date(x.endsAt).getTime() > Date.now());
+
+  const endDateFor = (it: any): string | undefined =>
+    it?.endsAt ||
+    it?.subscription?.endsAt ||
+    it?.license?.endsAt ||
+    it?.meta?.endsAt ||
+    it?.variant?.endsAt;
+
+  /** Check if a specific product/variant is expiring within `win` days. */
+  const isExpiringSoon = (key: string, win = 7, variantKey?: string) => {
+    for (const it of entitlements || []) {
+      const k = String((it as any)?.key || "").toLowerCase();
+      if (k !== key) continue;
+      if (!ACTIVE(it)) continue;
+
+      if (variantKey) {
+        const vkey = normalizeVariantKey((it as any)?.variant?.key || "");
+        if (vkey && vkey !== normalizeVariantKey(variantKey)) continue;
+      }
+      const d = daysUntil(endDateFor(it));
+      if (Number.isFinite(d) && d >= 0 && d <= win) return true;
+    }
+    return false;
+  };
+
+  const expiringStarter = isExpiringSoon("algo_simulator", 7, "starter");
+  const expiringPro = isExpiringSoon("algo_simulator", 7, "pro");
+  const expiringSwing = isExpiringSoon("algo_simulator", 7, "swing");
+
+  // --- Direct checkout / already-owned short-circuit (with renew) ---
+  const openCheckout = async (normVariant: Plan["key"], renew?: boolean) => {
     try {
       if (!algoProduct) {
         navigate(toRegister("algo_simulator", normVariant));
@@ -372,6 +416,7 @@ const PricingSection = () => {
       const orderRes = await api.post("/payments/create-order", {
         productId: algoProduct._id,
         variantId: vId,
+        ...(renew ? { renew: true } : {}),
       });
 
       if (orderRes.status === 204) {
@@ -422,24 +467,38 @@ const PricingSection = () => {
   };
 
   // Click handler decides final action (prevents <Link> default routing)
-  const onPayClick = (variantKey: Plan["key"]) => async (e: React.MouseEvent) => {
-    e.preventDefault();
+  const onPayClick =
+    (variantKey: Plan["key"]) => async (e: React.MouseEvent) => {
+      e.preventDefault();
 
-    const token = localStorage.getItem("token");
-    const isOwned = ownedExactVariant(variantKey);
+      const token = localStorage.getItem("token");
+      const isOwned = ownedExactVariant(variantKey);
+      const isExpiring =
+        (variantKey === "starter" && expiringStarter) ||
+        (variantKey === "pro" && expiringPro) ||
+        (variantKey === "swing" && expiringSwing);
 
-    if (isOwned) {
-      navigate("/dashboard");
-      return;
-    }
+      // Owned + expiring → direct renew (if logged in)
+      if (isOwned && isExpiring && token) {
+        await openCheckout(variantKey, true);
+        return;
+      }
 
-    if (!token) {
-      navigate(toRegister("algo_simulator", variantKey));
-      return;
-    }
+      // Owned (not expiring / not renewing) → dashboard
+      if (isOwned) {
+        navigate("/dashboard");
+        return;
+      }
 
-    await openCheckout(variantKey);
-  };
+      // Not logged in → go to signup with intended variant
+      if (!token) {
+        navigate(toRegister("algo_simulator", variantKey));
+        return;
+      }
+
+      // Fresh purchase
+      await openCheckout(variantKey);
+    };
 
   return (
     <section
@@ -468,9 +527,16 @@ const PricingSection = () => {
             const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
             const isOwned = ownedExactVariant(plan.key);
 
+            const expiring =
+              (plan.key === "starter" && expiringStarter) ||
+              (plan.key === "pro" && expiringPro) ||
+              (plan.key === "swing" && expiringSwing);
+
             const label =
               userLoading || entLoading
                 ? "Checking..."
+                : isOwned && expiring
+                ? "Renew Now"
                 : isOwned
                 ? "Open Dashboard"
                 : token

@@ -327,7 +327,7 @@ export default function Orb({ height = 680, railBreakpointPx = 1024 }: OrbProps)
         </div>
 
         <div className="w-[92vw] max-w-[520px] mt-6 md:mt-8 flex items-center space-x-4 mx-auto lg:mx-0 justify-center lg:justify-start">
-          <button className="w-10 h-10 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-white transition-all duration-300 shadow-lg hover:shadow-amber-500/20">
+          {/* <button className="w-10 h-10 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-white transition-all duration-300 shadow-lg hover:shadow-amber-500/20">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
               <path
                 fillRule="evenodd"
@@ -335,7 +335,7 @@ export default function Orb({ height = 680, railBreakpointPx = 1024 }: OrbProps)
                 clipRule="evenodd"
               />
             </svg>
-          </button>
+          </button> */}
 
           {/* Explore button now routes to active card */}
           <Link to={data[currentIndex].href}>

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useEntitlements } from "../../hooks/useEntitlements";
 
+/* ================= Types ================= */
 type Variant = {
   _id: string;
   name: string;
@@ -31,25 +32,19 @@ type Product = {
   variants?: Variant[];
 };
 
+/* =============== Helpers =============== */
 const normalizeVariantKey = (k: string) => {
   const s = (k || "").toLowerCase().trim();
   if (["starter", "starter_scalping"].includes(s)) return "starter";
-  if (["pro", "option_scalper_pro", "option-scalper-pro"].includes(s))
-    return "pro";
-  if (
-    [
-      "swing",
-      "sniper_algo",
-      "swing_trader_master",
-      "swing-trader-master",
-    ].includes(s)
-  )
+  if (["pro", "option_scalper_pro", "option-scalper-pro"].includes(s)) return "pro";
+  if (["swing", "sniper_algo", "swing_trader_master", "swing-trader-master"].includes(s))
     return "swing";
   return s;
 };
 
 const variantDescription = (k: string) => {
-  if (k === "starter") return "Perfect for beginners starting with algorithmic trading";
+  if (k === "starter")
+    return "Perfect for beginners starting with algorithmic trading";
   if (k === "pro") return "Advanced scalping with real-time execution";
   if (k === "swing") return "Comprehensive swing trading with advanced analytics";
   return "Premium trading solution";
@@ -152,10 +147,13 @@ function extractKeys(payload: any): string[] {
   return out.filter(Boolean).map((s) => String(s).toLowerCase());
 }
 
+/* ================= Component ================= */
 const Price = () => {
   const [selectedBundle, setSelectedBundle] = useState(1);
   const [selectedAlgo, setSelectedAlgo] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"bundle" | "algo" | "journaling">("bundle");
+  const [activeTab, setActiveTab] = useState<"bundle" | "algo" | "journaling">(
+    "bundle"
+  );
 
   // Billing toggles
   const [bundleBilling, setBundleBilling] = useState<"monthly" | "yearly">("monthly");
@@ -228,15 +226,28 @@ const Price = () => {
     })();
   }, []);
 
-  const bundle = useMemo(() => products.find((p) => p.key === "essentials_bundle"), [products]);
-  const algo = useMemo(() => products.find((p) => p.key === "algo_simulator"), [products]);
-  const journaling = useMemo(() => products.find((p) => p.key === "journaling_solo"), [products]);
+  const bundle = useMemo(
+    () => products.find((p) => p.key === "essentials_bundle"),
+    [products]
+  );
+  const algo = useMemo(
+    () => products.find((p) => p.key === "algo_simulator"),
+    [products]
+  );
+  const journaling = useMemo(
+    () => products.find((p) => p.key === "journaling_solo"),
+    [products]
+  );
 
   // open relevant tab when arriving from renew URL
   useEffect(() => {
     if (!wantsRenew) return;
     if (renewProductKey === "algo_simulator") setActiveTab("algo");
-    else if (renewProductKey === "journaling" || renewProductKey === "journaling_solo") setActiveTab("journaling");
+    else if (
+      renewProductKey === "journaling" ||
+      renewProductKey === "journaling_solo"
+    )
+      setActiveTab("journaling");
     else if (renewProductKey === "essentials_bundle") setActiveTab("bundle");
   }, [wantsRenew, renewProductKey]);
 
@@ -244,27 +255,36 @@ const Price = () => {
   const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
   // Fallback sample numbers (replace with real ones or keep env-backed)
-  const BUNDLE_MONTHLY = 499;   //499
-  const BUNDLE_ANNUAL = 4999;   //4999
-  const JOURNAL_MONTHLY = 299;  //299
-  const JOURNAL_ANNUAL = 2499;  //2499
+  const BUNDLE_MONTHLY = 499; // 499
+  const BUNDLE_ANNUAL = 4999; // 4999
+  const JOURNAL_MONTHLY = 299; // 299
+  const JOURNAL_ANNUAL = 2499; // 2499
 
   const bundleMonthlyNum =
     typeof bundle?.priceMonthly === "number" ? bundle.priceMonthly : BUNDLE_MONTHLY;
   const bundleAnnualNum = BUNDLE_ANNUAL;
 
   const journalingMonthlyNum =
-    typeof journaling?.priceMonthly === "number" ? journaling.priceMonthly : JOURNAL_MONTHLY;
+    typeof journaling?.priceMonthly === "number"
+      ? journaling.priceMonthly
+      : JOURNAL_MONTHLY;
   const journalingAnnualNum = JOURNAL_ANNUAL;
 
-  const bundleSavePct = Math.round((1 - bundleAnnualNum / (bundleMonthlyNum * 12)) * 100);
-  const journalingSavePct = Math.round((1 - journalingAnnualNum / (journalingMonthlyNum * 12)) * 100);
+  const bundleSavePct = Math.round(
+    (1 - bundleAnnualNum / (bundleMonthlyNum * 12)) * 100
+  );
+  const journalingSavePct = Math.round(
+    (1 - journalingAnnualNum / (journalingMonthlyNum * 12)) * 100
+  );
 
-  const displayBundlePrice = bundleBilling === "monthly" ? fmtINR(bundleMonthlyNum) : fmtINR(bundleAnnualNum);
+  const displayBundlePrice =
+    bundleBilling === "monthly" ? fmtINR(bundleMonthlyNum) : fmtINR(bundleAnnualNum);
   const bundlePeriod = bundleBilling === "monthly" ? "month" : "year";
 
   const displayJournalPrice =
-    journalBilling === "monthly" ? fmtINR(journalingMonthlyNum) : fmtINR(journalingAnnualNum);
+    journalBilling === "monthly"
+      ? fmtINR(journalingMonthlyNum)
+      : fmtINR(journalingAnnualNum);
   const journalingPeriod = journalBilling === "monthly" ? "month" : "year";
 
   const bundleTools = [
@@ -284,7 +304,8 @@ const Price = () => {
     },
   ];
 
-  const selectedBundleTool = bundleTools.find((t) => t.id === selectedBundle) || bundleTools[0];
+  const selectedBundleTool =
+    bundleTools.find((t) => t.id === selectedBundle) || bundleTools[0];
 
   // ========= ALGO OWNERSHIP + CHECKOUT =========
   const OWN_KEYS_BY_VARIANT: Record<"starter" | "pro" | "swing", string[]> = {
@@ -296,7 +317,8 @@ const Price = () => {
   const collectEntitlementVariantKeys = () => {
     const keys = new Set<string>();
     for (const it of entitlements || []) {
-      const single = (it as any)?.variant?.key && normalizeVariantKey((it as any).variant.key);
+      const single =
+        (it as any)?.variant?.key && normalizeVariantKey((it as any).variant.key);
       if (single) keys.add(single);
       const maybeArray = (it as any)?.variants as Array<{ key?: string }> | undefined;
       if (Array.isArray(maybeArray)) {
@@ -310,9 +332,13 @@ const Price = () => {
   };
 
   const ownedExactVariant = (normVariant: "starter" | "pro" | "swing") => {
-    const desired = new Set(OWN_KEYS_BY_VARIANT[normVariant].map((k) => normalizeVariantKey(k)));
+    const desired = new Set(
+      OWN_KEYS_BY_VARIANT[normVariant].map((k) => normalizeVariantKey(k))
+    );
     const entKeys = collectEntitlementVariantKeys();
-    const snapKeys = new Set(extractKeys(userSnapshot).map((k) => normalizeVariantKey(k)));
+    const snapKeys = new Set(
+      extractKeys(userSnapshot).map((k) => normalizeVariantKey(k))
+    );
     for (const k of desired) {
       if (entKeys.has(k) || snapKeys.has(k)) return true;
     }
@@ -321,47 +347,143 @@ const Price = () => {
 
   const variantIdFor = (norm: "starter" | "pro" | "swing") => {
     const wanted = OWN_KEYS_BY_VARIANT[norm].map((k) => normalizeVariantKey(k));
-    const found = algo?.variants?.find((v) => wanted.includes(normalizeVariantKey(v.key)));
+    const found = algo?.variants?.find((v) =>
+      wanted.includes(normalizeVariantKey(v.key))
+    );
     return found?._id || null;
   };
 
-  // --- expiry window helpers (0..7 days) ---
+  // --- expiry helpers ---
+  const startOfDay = (d: Date) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
   const daysUntil = (iso?: string) => {
     if (!iso) return Infinity;
-    const t = new Date(); t.setHours(0,0,0,0);
-    const e = new Date(iso); e.setHours(0,0,0,0);
+    const t = startOfDay(new Date());
+    const e = startOfDay(new Date(iso));
     return Math.ceil((e.getTime() - t.getTime()) / 86400000);
   };
+  const ACTIVE = (x: any) =>
+    String(x?.status || "inactive").toLowerCase() === "active" &&
+    (!x?.endsAt || new Date(x.endsAt).getTime() > Date.now());
+
+  const endDateFor = (it: any): string | undefined =>
+    it?.endsAt ||
+    it?.subscription?.endsAt ||
+    it?.license?.endsAt ||
+    it?.meta?.endsAt ||
+    it?.variant?.endsAt;
 
   const isExpiringSoon = (key: string, win = 7, variantKey?: string) => {
     for (const it of entitlements || []) {
       const k = String((it as any)?.key || "").toLowerCase();
       if (k !== key) continue;
-      const status = String((it as any)?.status || "active").toLowerCase();
-      if (status !== "active") continue;
+      if (!ACTIVE(it)) continue;
       if (variantKey) {
         const vkey = normalizeVariantKey((it as any)?.variant?.key || "");
         if (vkey && vkey !== normalizeVariantKey(variantKey)) continue;
       }
-      const endsAt =
-        (it as any)?.endsAt ||
-        (it as any)?.subscription?.endsAt ||
-        (it as any)?.license?.endsAt ||
-        (it as any)?.meta?.endsAt ||
-        (it as any)?.variant?.endsAt;
-      const d = daysUntil(endsAt);
+      const d = daysUntil(endDateFor(it));
       if (Number.isFinite(d) && d >= 0 && d <= win) return true;
     }
     return false;
   };
 
-  const expiringBundle     = isExpiringSoon("essentials_bundle");
-  const expiringJournaling = isExpiringSoon("journaling") || isExpiringSoon("journaling_solo");
-  const expiringStarter    = isExpiringSoon("algo_simulator", 7, "starter");
-  const expiringPro        = isExpiringSoon("algo_simulator", 7, "pro");
-  const expiringSwing      = isExpiringSoon("algo_simulator", 7, "swing");
+  // Bundle expiry via bundled components
+  const expiringBundle = useMemo(() => {
+    const comps = (entitlements || []).filter((it: any) => {
+      const k = String(it?.key || "").toLowerCase();
+      const fromBundle = String(it?.meta?.source || "")
+        .toLowerCase()
+        .includes("bundle");
+      return ACTIVE(it) && fromBundle && (k === "journaling" || k === "fii_dii_data");
+    });
+    if (!comps.length) return false;
+    const soonest = Math.min(
+      ...comps
+        .map((it: any) => daysUntil(endDateFor(it)))
+        .filter((n: number) => Number.isFinite(n))
+    );
+    return Number.isFinite(soonest) && soonest >= 0 && soonest <= 7;
+  }, [entitlements]);
 
-  const openCheckout = async (
+  // Journaling expiring (solo only; if bundle covers it, don't show renew)
+  const expiringJournalingSolo = useMemo(() => {
+    const ownsBundleViaComponents = (entitlements || []).some((it: any) => {
+      const k = String(it?.key || "").toLowerCase();
+      const fromBundle = String(it?.meta?.source || "")
+        .toLowerCase()
+        .includes("bundle");
+      return ACTIVE(it) && fromBundle && (k === "journaling" || k === "fii_dii_data");
+    });
+    if (ownsBundleViaComponents) return false;
+    return (
+      isExpiringSoon("journaling", 7) || isExpiringSoon("journaling_solo", 7)
+    );
+  }, [entitlements]);
+
+  const expiringStarter = isExpiringSoon("algo_simulator", 7, "starter");
+  const expiringPro = isExpiringSoon("algo_simulator", 7, "pro");
+  const expiringSwing = isExpiringSoon("algo_simulator", 7, "swing");
+
+  /* ---------- Checkout helpers (purchase/upgrade/renew) ---------- */
+  const openProductCheckout = async (
+    product: Product,
+    interval: "monthly" | "yearly",
+    renew = false
+  ) => {
+    try {
+      const orderRes = await api.post("/payments/create-order", {
+        productId: product._id,
+        billingInterval: interval,
+        ...(renew ? { renew: true } : {}),
+      });
+
+      if (orderRes.status === 204) {
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+
+      const ord = orderRes.data;
+      const ok = await loadRazorpay();
+      if (!ok || !(window as any).Razorpay) {
+        navigate("/dashboard");
+        return;
+      }
+
+      const rz = new (window as any).Razorpay({
+        key: ord.key,
+        amount: ord.amount,
+        currency: ord.currency,
+        name: ord.name,
+        description: ord.description,
+        order_id: ord.orderId,
+        prefill: {
+          name: ord.user?.name,
+          email: ord.user?.email,
+          contact: ord.user?.contact,
+        },
+        theme: { color: "#4f46e5" },
+        handler: async (rsp: any) => {
+          await api.post("/payments/verify", {
+            intentId: ord.intentId,
+            razorpay_order_id: rsp.razorpay_order_id,
+            razorpay_payment_id: rsp.razorpay_payment_id,
+            razorpay_signature: rsp.razorpay_signature,
+          });
+          navigate("/dashboard", { replace: true });
+        },
+      });
+
+      rz.open();
+    } catch {
+      // keep user on page
+    }
+  };
+
+  const openAlgoCheckout = async (
     normVariant: "starter" | "pro" | "swing",
     renew = false
   ) => {
@@ -379,7 +501,7 @@ const Price = () => {
       const orderRes = await api.post("/payments/create-order", {
         productId: algo._id,
         variantId: vId,
-        renew: renew || undefined,
+        ...(renew ? { renew: true } : {}),
       });
 
       if (orderRes.status === 204) {
@@ -429,60 +551,6 @@ const Price = () => {
     }
   };
 
-  // generic product renewal (bundle/journaling)
-  const openProductRenewal = async (
-    product: Product,
-    interval: "monthly" | "yearly"
-  ) => {
-    try {
-      const orderRes = await api.post("/payments/create-order", {
-        productId: product._id,
-        interval,
-        renew: true,
-      });
-
-      if (orderRes.status === 204) {
-        navigate("/dashboard", { replace: true });
-        return;
-      }
-
-      const ord = orderRes.data;
-      const ok = await loadRazorpay();
-      if (!ok || !(window as any).Razorpay) {
-        navigate("/dashboard");
-        return;
-      }
-
-      const rz = new (window as any).Razorpay({
-        key: ord.key,
-        amount: ord.amount,
-        currency: ord.currency,
-        name: ord.name,
-        description: ord.description,
-        order_id: ord.orderId,
-        prefill: {
-          name: ord.user?.name,
-          email: ord.user?.email,
-          contact: ord.user?.contact,
-        },
-        theme: { color: "#4f46e5" },
-        handler: async (rsp: any) => {
-          await api.post("/payments/verify", {
-            intentId: ord.intentId,
-            razorpay_order_id: rsp.razorpay_order_id,
-            razorpay_payment_id: rsp.razorpay_payment_id,
-            razorpay_signature: rsp.razorpay_signature,
-          });
-          navigate("/dashboard", { replace: true });
-        },
-      });
-
-      rz.open();
-    } catch {
-      // stay on pricing if anything fails
-    }
-  };
-
   const onAlgoCtaClick =
     (variantKey: "starter" | "pro" | "swing") =>
     async (e: React.MouseEvent) => {
@@ -497,7 +565,7 @@ const Price = () => {
         (variantKey === "swing" && expiringSwing);
 
       if (isOwned && isExpiring && token) {
-        await openCheckout(variantKey, true); // direct renewal
+        await openAlgoCheckout(variantKey, true); // direct renewal
         return;
       } else if (isOwned) {
         navigate("/dashboard");
@@ -507,7 +575,7 @@ const Price = () => {
         navigate(toRegister("algo_simulator", variantKey));
         return;
       }
-      await openCheckout(variantKey);
+      await openAlgoCheckout(variantKey);
     };
 
   // ---------- ALGO plans ----------
@@ -530,7 +598,8 @@ const Price = () => {
     const rank = (k: "starter" | "pro" | "swing") => ({ starter: 1, pro: 2, swing: 3 }[k]);
     vs.sort((a, b) => rank(a.key) - rank(b.key));
 
-    if (vs.length && selectedAlgo === null) setSelectedAlgo(vs.find((x) => x.popular)?.id ?? vs[0].id);
+    if (vs.length && selectedAlgo === null)
+      setSelectedAlgo(vs.find((x) => x.popular)?.id ?? vs[0].id);
     return vs;
   }, [algo, selectedAlgo]);
 
@@ -538,16 +607,14 @@ const Price = () => {
   type BundleStatus = { owned: boolean; interval: "monthly" | "yearly" | null };
 
   const getBundleStatus = (items: any[]): BundleStatus => {
-    const ACTIVE = (x: any) =>
-      String(x?.status || "inactive").toLowerCase() === "active" &&
-      (x?.endsAt === null || new Date(x.endsAt).getTime() > Date.now());
-
     const byKey = (k: string) =>
       (items || []).find(
-        (it) => String(it?.key || "").toLowerCase() === k && ACTIVE(it)
+        (it) =>
+          String(it?.key || "").toLowerCase() === k &&
+          ACTIVE(it)
       );
 
-    // 1) Direct bundle entitlement
+    // Direct bundle entitlement (if you store one)
     const bundleEnt = byKey("essentials_bundle");
     if (bundleEnt) {
       const rawInterval =
@@ -568,32 +635,28 @@ const Price = () => {
       return { owned: true, interval: iv };
     }
 
-    // 2) Infer bundle from components (journaling + fii_dii_data)
-    const journ = byKey("journaling");
-    const fii = byKey("fii_dii_data");
-    if (journ && fii) {
+    // Infer bundle from components granted via bundle
+    const comps = (items || []).filter((it: any) => {
+      const k = String(it?.key || "").toLowerCase();
+      const fromBundle = String(it?.meta?.source || "")
+        .toLowerCase()
+        .includes("bundle");
+      return ACTIVE(it) && fromBundle && (k === "journaling" || k === "fii_dii_data");
+    });
+
+    if (comps.length) {
       const durDays = (it: any) => {
         const s = it?.startedAt ? new Date(it.startedAt).getTime() : NaN;
         const e = it?.endsAt ? new Date(it.endsAt).getTime() : NaN;
         if (!isFinite(s) || !isFinite(e) || e <= s) return NaN;
         return (e - s) / 86400000;
       };
-
-      const jd = durDays(journ);
-      const fd = durDays(fii);
-
-      let d =
-        isFinite(jd) && isFinite(fd)
-          ? (jd + fd) / 2
-          : isFinite(jd)
-          ? jd
-          : isFinite(fd)
-          ? fd
-          : NaN;
-
+      const days = comps
+        .map((c) => durDays(c))
+        .filter((n) => Number.isFinite(n)) as number[];
+      const avg = days.length ? days.reduce((a, b) => a + b, 0) / days.length : NaN;
       const interval: "monthly" | "yearly" =
-        isFinite(d) && d >= 300 ? "yearly" : "monthly";
-
+        Number.isFinite(avg) && avg >= 300 ? "yearly" : "monthly";
       return { owned: true, interval };
     }
 
@@ -602,7 +665,7 @@ const Price = () => {
 
   const bundleStatus = getBundleStatus(entitlements as any);
 
-  /** Bundle CTA label (reflects toggle + ownership) */
+  /** Bundle CTA label */
   const bundleCtaLabel = (() => {
     if (userLoading || entLoading) return "Checking...";
     if (!bundleStatus.owned) {
@@ -617,12 +680,21 @@ const Price = () => {
     return `Get Complete Bundle - ${fmtINR(bundleAnnualNum)}/year`;
   })();
 
-  /** Bundle CTA click behavior */
-  const handleBundleCta = (e: React.MouseEvent) => {
+  /** Bundle CTA click behavior (now opens Razorpay when logged-in) */
+  const handleBundleCta = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (userLoading || entLoading) return;
+    if (userLoading || entLoading || !bundle) return;
 
+    const token = localStorage.getItem("token");
+
+    // Not logged-in → go to signup
+    if (!token) {
+      navigate(toRegister("essentials_bundle", null, bundleBilling));
+      return;
+    }
+
+    // Logged-in
     if (bundleStatus.owned) {
       if (bundleStatus.interval === "yearly") {
         navigate("/dashboard");
@@ -632,23 +704,22 @@ const Price = () => {
         navigate("/dashboard");
         return;
       }
-      navigate(toRegister("essentials_bundle", null, "yearly"));
+      // Own monthly, toggled yearly → upgrade via Razorpay
+      await openProductCheckout(bundle, "yearly");
       return;
     }
-    navigate(toRegister("essentials_bundle", null, bundleBilling));
+
+    // Fresh purchase → Razorpay
+    await openProductCheckout(bundle, bundleBilling);
   };
 
-  // ======== JOURNALING OWNERSHIP DECISION (NEW) ========
+  // ======== JOURNALING OWNERSHIP (SOLO) ========
   type SingleStatus = { owned: boolean; interval: "monthly" | "yearly" | null };
 
-  /** Check ownership & interval for one product using a set of keys (e.g. journaling_solo, journaling) */
   const getSingleStatus = (items: any[], keys: string[]): SingleStatus => {
-    const ACTIVE = (x: any) =>
-      String(x?.status || "inactive").toLowerCase() === "active" &&
-      (x?.endsAt === null || new Date(x.endsAt).getTime() > Date.now());
-
-    const ent = (items || []).find((it: any) =>
-      keys.includes(String(it?.key || "").toLowerCase()) && ACTIVE(it)
+    const ent = (items || []).find(
+      (it: any) =>
+        keys.includes(String(it?.key || "").toLowerCase()) && ACTIVE(it)
     );
 
     if (!ent) return { owned: false, interval: null };
@@ -661,11 +732,16 @@ const Price = () => {
         : null) ||
       null;
 
-    if (rawInterval === "yearly" || rawInterval === "monthly") {
-      return { owned: true, interval: rawInterval };
+    if (rawInterval === "yearly" || "monthly") {
+      const iv =
+        rawInterval === "yearly"
+          ? "yearly"
+          : rawInterval === "monthly"
+          ? "monthly"
+          : null;
+      if (iv) return { owned: true, interval: iv };
     }
 
-    // Fallback: infer via duration
     const s = ent?.startedAt ? new Date(ent.startedAt).getTime() : NaN;
     const e = ent?.endsAt ? new Date(ent.endsAt).getTime() : NaN;
     const days = isFinite(s) && isFinite(e) && e > s ? (e - s) / 86400000 : NaN;
@@ -679,29 +755,28 @@ const Price = () => {
     ["journaling", "journaling_solo", "trading_journal_pro"]
   );
 
-  /** Journaling CTA label (mirrors bundle behavior & your requirement) */
+  /** Journaling CTA label */
   const journalingCtaLabel = (() => {
     if (userLoading || entLoading) return "Checking...";
     if (!journalingStatus.owned) {
       return `Get Journaling Only - ${displayJournalPrice}/${journalingPeriod}`;
     }
     if (journalingStatus.interval === "yearly") {
-      // yearly owners see Go to Dashboard on BOTH toggles
       return "Go to Dashboard";
     }
-    // monthly owner
     if (journalBilling === "monthly") {
       return "Go to Dashboard";
     }
-    // monthly owner on yearly toggle → show upgrade CTA
     return `Get Journaling Only - ${fmtINR(journalingAnnualNum)}/year`;
   })();
 
-  /** Journaling CTA click behavior */
-  const handleJournalingCta = (e: React.MouseEvent) => {
+  /** Journaling CTA click behavior (opens Razorpay if logged-in) */
+  const handleJournalingCta = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (userLoading || entLoading) return;
+    if (userLoading || entLoading || !journaling) return;
+
+    const token = localStorage.getItem("token");
 
     if (journalingStatus.owned) {
       if (journalingStatus.interval === "yearly") {
@@ -712,15 +787,24 @@ const Price = () => {
         navigate("/dashboard");
         return;
       }
-      // Owns monthly but toggle is yearly → upgrade flow
-      navigate(toRegister(journaling?.key || "journaling_solo", null, "yearly"));
+      // Own monthly, toggled yearly → upgrade
+      if (!token) {
+        navigate(toRegister(journaling.key || "journaling_solo", null, "yearly"));
+        return;
+      }
+      await openProductCheckout(journaling, "yearly");
       return;
     }
 
-    // Not owned → normal purchase
-    navigate(toRegister(journaling?.key || "journaling_solo", null, journalBilling));
+    // Not owned
+    if (!token) {
+      navigate(toRegister(journaling.key || "journaling_solo", null, journalBilling));
+      return;
+    }
+    await openProductCheckout(journaling, journalBilling);
   };
 
+  /* ================= RENDER ================= */
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
@@ -733,28 +817,28 @@ const Price = () => {
         </button>
 
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-          {/* Header */}
+          {/* ===== Hero Heading ===== */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-16"
+            transition={{ duration: 0.45 }}
+            className="text-center mb-10 md:mb-14"
           >
-            <div className="text-lg font-semibold text-blue-400 mb-4 tracking-wider">
-              TRADER'S TOOLKIT
+            <div className="text-xs md:text-sm font-semibold tracking-[0.25em] text-sky-400/90 uppercase mb-3">
+              Trader&apos;s Toolkit
             </div>
-            <h1 className="text-4xl font-bold sm:text-5xl lg:text-6xl mb-6">
-              Professional{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
+            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight">
+              <span className="text-white">Professional </span>
+              <span className="bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
                 Trading Tools
               </span>
             </h1>
-            <p className="max-w-xl mx-auto text-lg text-gray-400">
+            <p className="mt-3 md:mt-4 text-gray-300 md:text-lg">
               Advanced analytics and automation for serious traders
             </p>
           </motion.div>
 
-          {/* Tabs */}
+          {/* Header Tabs */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -820,9 +904,11 @@ const Price = () => {
                             BEST VALUE
                           </div>
                           <h2 className="text-2xl md:text-3xl font-bold">
-                            Trader's Essential Bundle
+                            Trader&apos;s Essential Bundle
                           </h2>
-                          <p className="text-blue-100 mt-1">All 2 premium tools for the price of one</p>
+                          <p className="text-blue-100 mt-1">
+                            All 2 premium tools for the price of one
+                          </p>
                         </div>
 
                         <div className="text-right">
@@ -832,7 +918,9 @@ const Price = () => {
                               <button
                                 onClick={() => setBundleBilling("monthly")}
                                 className={`px-3 py-1.5 text-sm rounded-lg ${
-                                  bundleBilling === "monthly" ? "bg-white/30 text-white" : "text-blue-100"
+                                  bundleBilling === "monthly"
+                                    ? "bg-white/30 text-white"
+                                    : "text-blue-100"
                                 }`}
                               >
                                 Monthly
@@ -840,7 +928,9 @@ const Price = () => {
                               <button
                                 onClick={() => setBundleBilling("yearly")}
                                 className={`px-3 py-1.5 text-sm rounded-lg relative ${
-                                  bundleBilling === "yearly" ? "bg-white/30 text-white" : "text-blue-100"
+                                  bundleBilling === "yearly"
+                                    ? "bg-white/30 text-white"
+                                    : "text-blue-100"
                                 }`}
                               >
                                 Yearly
@@ -858,21 +948,25 @@ const Price = () => {
                             {displayBundlePrice}
                             <span className="text-lg font-normal">/{bundlePeriod}</span>
                           </div>
-                          <div className="text-xs md:text-sm text-blue-100 mt-1">No hidden fees • Cancel anytime</div>
+                          <div className="text-xs md:text-sm text-blue-100 mt-1">
+                            No hidden fees • Cancel anytime
+                          </div>
                         </div>
                       </div>
 
                       {/* Highlights */}
                       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {["2 tools included", "Save up to 60%", "Priority support"].map((h) => (
-                          <div
-                            key={h}
-                            className="flex items-center gap-2 bg-black/15 border border-white/15 rounded-xl px-3 py-2"
-                          >
-                            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                            <span className="text-sm text-blue-50">{h}</span>
-                          </div>
-                        ))}
+                        {["2 tools included", "Save up to 60%", "Priority support"].map(
+                          (h) => (
+                            <div
+                              key={h}
+                              className="flex items-center gap-2 bg-black/15 border border-white/15 rounded-xl px-3 py-2"
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                              <span className="text-sm text-blue-50">{h}</span>
+                            </div>
+                          )
+                        )}
                       </div>
                     </div>
                   </div>
@@ -881,7 +975,9 @@ const Price = () => {
                   <div className="relative p-6 md:p-8">
                     {/* What's inside */}
                     <div className="mb-5">
-                      <div className="text-xs tracking-wider text-blue-300/80 mb-2">WHAT'S INSIDE</div>
+                      <div className="text-xs tracking-wider text-blue-300/80 mb-2">
+                        WHAT'S INSIDE
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {bundleTools.map((t) => (
                           <div
@@ -910,11 +1006,17 @@ const Price = () => {
                                 : "border-gray-700 bg-gray-800/30 hover:border-gray-600"
                             }`}
                           >
-                            {selected && <div className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-600/10 blur" />}
+                            {selected && (
+                              <div className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-600/10 blur" />
+                            )}
                             <div className="relative">
                               <div className="text-3xl mb-2">{tool.icon}</div>
-                              <h3 className="font-semibold mb-1 text-sm text-white">{tool.name}</h3>
-                              <p className="text-xs text-gray-400 mb-3">{tool.description}</p>
+                              <h3 className="font-semibold mb-1 text-sm text-white">
+                                {tool.name}
+                              </h3>
+                              <p className="text-xs text-gray-400 mb-3">
+                                {tool.description}
+                              </p>
                               <ul className="space-y-1.5">
                                 {tool.features.map((f, i) => (
                                   <li key={i} className="flex items-start gap-2">
@@ -934,12 +1036,17 @@ const Price = () => {
                       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                         <div className="text-sm text-blue-200">
                           Selected tool:{" "}
-                          <strong className="text-white">{selectedBundleTool.name}</strong>
+                          <strong className="text-white">
+                            {selectedBundleTool.name}
+                          </strong>
                           <span className="hidden md:inline"> • </span>
                           <span className="block md:inline text-blue-200/90">
                             Included with the bundle along with{" "}
                             <span className="text-white">
-                              {bundleTools.filter((t) => t.id !== selectedBundleTool.id).map((t) => t.name).join(", ")}
+                              {bundleTools
+                                .filter((t) => t.id !== selectedBundleTool.id)
+                                .map((t) => t.name)
+                                .join(", ")}
                             </span>
                           </span>
                         </div>
@@ -952,35 +1059,35 @@ const Price = () => {
 
                     {/* CTA row */}
                     <div className="flex flex-col sm:flex-row justify-between items-center pt-5 border-t border-gray-700">
-                      <div className="mb-4 sm:mb-0 text-gray-300 text-sm">Unlock all tools + future updates</div>
+                      <div className="mb-4 sm:mb-0 text-gray-300 text-sm">
+                        Unlock all tools + future updates
+                      </div>
 
                       <div className="flex items-center">
-                        <Link
-                          to={toRegister(bundle?.key || "essentials_bundle", null, bundleBilling)}
+                        {/* Use a button so we can intercept and open Razorpay when logged-in */}
+                        <button
                           aria-label="Get Complete Bundle"
                           onClick={handleBundleCta}
+                          className="group inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg disabled:opacity-60"
+                          disabled={userLoading || entLoading || !bundle}
                         >
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="group inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg"
-                            disabled={userLoading || entLoading}
-                          >
-                            {bundleCtaLabel}
-                            <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                          </motion.button>
-                        </Link>
+                          {bundleCtaLabel}
+                          <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                        </button>
 
-                        {/* Renew button only if bundle entitlement is expiring */}
-                        {bundle && expiringBundle && (
+                        {/* Renew now for Bundle — based on component entitlements */}
+                        {bundle && bundleStatus.owned && expiringBundle && (
                           <button
                             onClick={(e) => {
                               e.preventDefault();
+                              e.stopPropagation();
                               if (!localStorage.getItem("token")) {
-                                navigate(toRegister(bundle.key, null, bundleBilling) + "&renew=1");
+                                navigate(
+                                  toRegister(bundle.key, null, bundleBilling) + "&renew=1"
+                                );
                                 return;
                               }
-                              openProductRenewal(bundle, bundleBilling);
+                              openProductCheckout(bundle, bundleBilling, true);
                             }}
                             className="ml-3 inline-flex items-center gap-2 border border-emerald-500 text-emerald-400 hover:bg-emerald-900/30 font-semibold py-3 px-6 rounded-xl transition-all"
                           >
@@ -1005,9 +1112,12 @@ const Price = () => {
                 className="mb-20"
               >
                 <div className="text-center mb-12">
-                  <h2 className="text-3xl font-bold mb-2">Algorithmic Trading Solutions</h2>
+                  <h2 className="text-3xl font-bold mb-2">
+                    Algorithmic Trading Solutions
+                  </h2>
                   <p className="text-gray-400 max-w-2xl mx-auto">
-                    Advanced automation for scalping & swing strategies. Connect your broker & run tested systems.
+                    Advanced automation for scalping & swing strategies. Connect your
+                    broker & run tested systems.
                   </p>
                 </div>
 
@@ -1017,7 +1127,9 @@ const Price = () => {
                     const popular = plan.popular;
 
                     const token =
-                      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+                      typeof window !== "undefined"
+                        ? localStorage.getItem("token")
+                        : null;
 
                     const isOwned =
                       plan.key === "starter"
@@ -1029,11 +1141,10 @@ const Price = () => {
                     const label =
                       userLoading || entLoading
                         ? "Checking..."
-                        : isOwned && (
-                            (plan.key === "starter" && expiringStarter) ||
+                        : isOwned &&
+                          ((plan.key === "starter" && expiringStarter) ||
                             (plan.key === "pro" && expiringPro) ||
-                            (plan.key === "swing" && expiringSwing)
-                          )
+                            (plan.key === "swing" && expiringSwing))
                         ? "Renew Now"
                         : isOwned
                         ? "Open Dashboard"
@@ -1073,7 +1184,9 @@ const Price = () => {
 
                           <div
                             className={`pointer-events-none absolute -inset-0.5 bg-gradient-to-r ${
-                              popular ? "from-yellow-400 to-amber-500" : "from-purple-600 to-indigo-500"
+                              popular
+                                ? "from-yellow-400 to-amber-500"
+                                : "from-purple-600 to-indigo-500"
                             } rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300`}
                           />
 
@@ -1090,10 +1203,14 @@ const Price = () => {
                               </h3>
                             </div>
 
-                            <p className="text-gray-400 text-sm mb-4">{plan.description}</p>
+                            <p className="text-gray-400 text-sm mb-4">
+                              {plan.description}
+                            </p>
 
                             <div className="mb-6">
-                              <div className="text-4xl font-bold mb-1">{plan.price}</div>
+                              <div className="text-4xl font-bold mb-1">
+                                {plan.price}
+                              </div>
                               <div className="text-gray-400 text-sm">per month</div>
                             </div>
 
@@ -1113,13 +1230,17 @@ const Price = () => {
 
                           <Link
                             to={linkTo}
-                            onClick={(e) => onAlgoCtaClick(plan.key as "starter" | "pro" | "swing")(e)}
+                            onClick={(e) =>
+                              onAlgoCtaClick(plan.key as "starter" | "pro" | "swing")(e)
+                            }
                             className={`relative z-10 w-full mt-auto py-3 rounded-xl font-semibold transition-all duration-300 text-center ${
                               popular
                                 ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-black hover:shadow-lg hover:shadow-yellow-500/30"
                                 : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg hover:shadow-purple-500/30"
                             } flex items-center justify-center gap-2 ${
-                              userLoading || entLoading ? "opacity-70 cursor-not-allowed" : ""
+                              userLoading || entLoading
+                                ? "opacity-70 cursor-not-allowed"
+                                : ""
                             }`}
                             aria-disabled={userLoading || entLoading}
                             aria-label={`${label} for ${plan.name}`}
@@ -1154,29 +1275,34 @@ const Price = () => {
                 <div className="text-center mb-12">
                   <h2 className="text-3xl font-bold mb-2">Advanced Trading Journal</h2>
                   <p className="text-gray-400 max-w-2xl mx-auto">
-                    Transform your trading performance with detailed analytics, psychological insights, and actionable feedback
+                    Transform your trading performance with detailed analytics, psychological
+                    insights, and actionable feedback
                   </p>
                 </div>
 
                 <div className="rounded-2xl overflow-hidden shadow-xl bg-gray-800 border border-gray-700 max-w-5xl mx-auto">
+                  {/* Header band with toggle & price */}
                   <div className="relative">
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-10 md:px-12 text-white">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
                         <div className="mb-6 md:mb-0">
                           <h2 className="text-2xl font-bold mb-2">Trading Journal Pro</h2>
                           <p className="text-blue-100">
-                            Comprehensive trade analysis with psychological insights and performance tracking
+                            Comprehensive trade analysis with psychological insights and
+                            performance tracking
                           </p>
                         </div>
 
                         <div className="text-right">
-                          {/* Billing toggle remains visible; CTA below respects ownership */}
+                          {/* Billing toggle */}
                           <div className="flex items-center justify-end mb-3">
                             <div className="inline-flex rounded-xl bg-white/10 border border-white/20 p-1">
                               <button
                                 onClick={() => setJournalBilling("monthly")}
                                 className={`px-3 py-1.5 text-sm rounded-lg ${
-                                  journalBilling === "monthly" ? "bg-white/30 text-white" : "text-blue-100"
+                                  journalBilling === "monthly"
+                                    ? "bg-white/30 text-white"
+                                    : "text-blue-100"
                                 }`}
                               >
                                 Monthly
@@ -1184,12 +1310,14 @@ const Price = () => {
                               <button
                                 onClick={() => setJournalBilling("yearly")}
                                 className={`px-3 py-1.5 text-sm rounded-lg relative ${
-                                  journalBilling === "yearly" ? "bg-white/30 text-white" : "text-blue-100"
+                                  journalBilling === "yearly"
+                                    ? "bg-white/30 text-white"
+                                    : "text-blue-100"
                                 }`}
                               >
                                 Yearly
                                 {journalBilling === "yearly" && (
-                                  <span className="ml-2 inline-flex items-center gap-1 text-green-400 text-xl font-semibold">
+                                  <span className="ml-2 inline-flex items-center gap-1 text-green-300 text-xl font-semibold">
                                     Save {journalingSavePct}%
                                   </span>
                                 )}
@@ -1201,13 +1329,17 @@ const Price = () => {
                             {displayJournalPrice}
                             <span className="text-lg font-normal">/{journalingPeriod}</span>
                           </div>
-                          <div className="text-sm text-blue-200 mt-1">No hidden fees • Cancel anytime</div>
+                          <div className="text-sm text-blue-200 mt-1">
+                            No hidden fees • Cancel anytime
+                          </div>
                         </div>
                       </div>
                     </div>
 
+                    {/* Content: two feature cards */}
                     <div className="p-8">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        {/* Performance Analytics card */}
                         <div className="bg-gray-700/30 p-6 rounded-xl border border-gray-600">
                           <div className="flex items-center mb-4">
                             <div className="bg-blue-700 p-3 rounded-lg mr-4">
@@ -1242,6 +1374,7 @@ const Price = () => {
                           </ul>
                         </div>
 
+                        {/* Psychological Insights card */}
                         <div className="bg-gray-700/30 p-6 rounded-xl border border-gray-600">
                           <div className="flex items-center mb-4">
                             <div className="bg-purple-700 p-3 rounded-lg mr-4">
@@ -1277,6 +1410,7 @@ const Price = () => {
                         </div>
                       </div>
 
+                      {/* Features grid */}
                       <div className="bg-black/20 rounded-lg p-6 mb-8 border border-gray-700">
                         <div className="text-center text-lg font-semibold mb-4 text-blue-300">COMPREHENSIVE FEATURES</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
@@ -1297,6 +1431,7 @@ const Price = () => {
                         </div>
                       </div>
 
+                      {/* CTA row */}
                       <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-gray-700">
                         <div className="mb-4 sm:mb-0">
                           <div className="text-gray-400 text-sm mb-1">
@@ -1312,79 +1447,59 @@ const Price = () => {
 
                         <div className="flex flex-col sm:flex-row gap-4">
                           {/* Bundle CTA */}
-                          <Link
-                            to={toRegister("essentials_bundle", null, bundleBilling)}
+                          <button
                             aria-label="Get Complete Bundle"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (userLoading || entLoading) return;
-                              if (bundleStatus.owned) {
-                                if (bundleStatus.interval === "yearly" || bundleBilling === "monthly") {
-                                  navigate("/dashboard");
-                                } else {
-                                  navigate(toRegister("essentials_bundle", null, "yearly"));
-                                }
-                              } else {
-                                navigate(toRegister("essentials_bundle", null, bundleBilling));
-                              }
-                            }}
+                            onClick={handleBundleCta}
+                            className="bg-gradient-to-r from-blue-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-md mb-2 sm:mb-0 disabled:opacity-60"
+                            disabled={userLoading || entLoading || !bundle}
                           >
-                            <motion.button
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              className="bg-gradient-to-r from-blue-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-md mb-2 sm:mb-0"
-                              disabled={userLoading || entLoading}
-                            >
-                              {bundleStatus.owned
-                                ? bundleStatus.interval === "yearly" || bundleBilling === "monthly"
-                                  ? "Go to Dashboard"
-                                  : `Get Complete Bundle - ${fmtINR(BUNDLE_ANNUAL)}/year`
-                                : `Get Complete Bundle - ${displayBundlePrice}/${bundlePeriod}`}
-                            </motion.button>
-                          </Link>
+                            {bundleStatus.owned
+                              ? bundleStatus.interval === "yearly" || bundleBilling === "monthly"
+                                ? "Go to Dashboard"
+                                : `Get Complete Bundle - ${fmtINR(BUNDLE_ANNUAL)}/year`
+                              : `Get Complete Bundle - ${displayBundlePrice}/${bundlePeriod}`}
+                          </button>
 
-                          {/* Journaling-only CTA */}
+                          {/* Journaling-only CTA (hidden if bundle owned) */}
                           {!bundleStatus.owned && (
-                            <Link
-                              to={
-                                journalingStatus.owned
-                                  ? "/dashboard"
-                                  : toRegister(journaling?.key || "journaling_solo", null, journalBilling)
-                              }
-                              aria-label={journalingCtaLabel}
-                              onClick={handleJournalingCta}
-                            >
-                              <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                className={`border font-semibold py-3 px-6 rounded-lg transition-all ${
-                                  journalingStatus.owned
-                                    ? "border-emerald-500 text-emerald-400 hover:bg-emerald-900/30"
-                                    : "border-blue-500 text-blue-400 hover:bg-blue-900/30"
-                                }`}
-                                disabled={userLoading || entLoading}
-                              >
-                                {journalingCtaLabel}
-                              </motion.button>
-                            </Link>
-                          )}
-
-                          {/* Renew now (journaling) — only when expiring */}
-                          {journaling && expiringJournaling && (
                             <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                if (!localStorage.getItem("token")) {
-                                  navigate(toRegister(journaling.key || "journaling_solo", null, journalBilling) + "&renew=1");
-                                  return;
-                                }
-                                openProductRenewal(journaling, journalBilling);
-                              }}
-                              className="border border-emerald-500 text-emerald-400 hover:bg-emerald-900/30 font-semibold py-3 px-6 rounded-lg transition-all"
+                              onClick={handleJournalingCta}
+                              aria-label={journalingCtaLabel}
+                              className={`border font-semibold py-3 px-6 rounded-lg transition-all ${
+                                journalingStatus.owned
+                                  ? "border-emerald-500 text-emerald-400 hover:bg-emerald-900/30"
+                                  : "border-blue-500 text-blue-400 hover:bg-blue-900/30"
+                              } disabled:opacity-60`}
+                              disabled={userLoading || entLoading || !journaling}
                             >
-                              Renew now
+                              {journalingCtaLabel}
                             </button>
                           )}
+
+                          {/* Renew now (journaling SOLO) */}
+                          {journaling &&
+                            expiringJournalingSolo && (
+                              <button
+                                onClick={async (e) => {
+                                  e.preventDefault();
+                                  const token = localStorage.getItem("token");
+                                  if (!token) {
+                                    navigate(
+                                      toRegister(
+                                        journaling.key || "journaling_solo",
+                                        null,
+                                        journalBilling
+                                      ) + "&renew=1"
+                                    );
+                                    return;
+                                  }
+                                  await openProductCheckout(journaling, journalBilling, true);
+                                }}
+                                className="border border-emerald-500 text-emerald-400 hover:bg-emerald-900/30 font-semibold py-3 px-6 rounded-lg transition-all"
+                              >
+                                Renew now
+                              </button>
+                            )}
                         </div>
                       </div>
                     </div>
