@@ -136,13 +136,12 @@ import nerdImg from "../../assets/nerdboy.jpg";
 import redImg from "../../assets/redhair.jpg";
 import chadImg from "../../assets/chadboy.jpg"
 const AVATAR_MAP = {
-  
-  sienna:  brownImg,  // was "brown"
-  analyst: nerdImg,   // was "nerd"
-  rose:   pinkImg,   // was "pink"
-  comet:   ponyImg,   // was "pony"
-  crimson: redImg,    // was "red"
-  prime:   chadImg,   // was "chad"
+  sienna:  brownImg,
+  analyst: nerdImg,
+  rose:   pinkImg,
+  comet:   ponyImg,
+  crimson: redImg,
+  prime:   chadImg,
 } as const;
 const AVATAR_KEYS = Object.keys(AVATAR_MAP) as (keyof typeof AVATAR_MAP)[];
 
@@ -155,6 +154,7 @@ type ProductItem = {
   status: string;
   endsAt: string | null;
   variant?: { name: string } | null;
+  variantId?: string | null;            // ← NEW
 };
 type ProfileDto = {
   _id: string;
@@ -184,6 +184,76 @@ const daysUntil = (iso?: string | null) => {
   if (!iso) return Infinity;
   const ms = new Date(iso).getTime() - Date.now();
   return Math.ceil(ms / (1000 * 60 * 60 * 24));
+};
+
+// Robust id extraction (ObjectId-like friendly)
+const toStrId = (v: any): string | null => {
+  if (!v) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "object") {
+    if (typeof (v as any).$oid === "string") return (v as any).$oid;
+    if (typeof (v as any)._id === "string") return (v as any)._id;
+  }
+  return null;
+};
+
+/** Flatten grouped /users/me/products items into one row per variant.
+ *  rawUP is the list from /users/me/products?debug=1 (for precise endsAt per variant).
+ */
+const flattenProducts = (items: any[] = [], rawUP: any[] = []): ProductItem[] => {
+  const rawByVariant = new Map<string, { endsAt?: string | null; status?: string }>();
+  for (const r of rawUP) {
+    const vid = toStrId(r?.variantId);
+    if (vid) rawByVariant.set(vid, { endsAt: r?.endsAt ?? null, status: String(r?.status || "active") });
+  }
+
+  const out: ProductItem[] = [];
+
+  for (const it of items) {
+    const base = {
+      productId: String(it?.productId ?? it?._id ?? it?.id ?? it?.key ?? ""),
+      key: String(it?.key ?? "").toLowerCase(),
+      name: String(it?.name ?? ""),
+      route: it?.route ?? it?.links?.dashboard ?? undefined,
+    };
+
+    const vs = Array.isArray(it?.variants) ? it.variants : [];
+    if (vs.length) {
+      for (const v of vs) {
+        const vid = toStrId(v?._id ?? v?.variantId);
+        const raw = vid ? rawByVariant.get(vid) : undefined;
+        out.push({
+          ...base,
+          status: String(v?.status ?? raw?.status ?? it?.status ?? "active"),
+          endsAt: (v?.endsAt ?? raw?.endsAt ?? it?.endsAt ?? null) as string | null,
+          variant: { name: String(v?.name ?? v?.key ?? "Variant") },
+          variantId: vid,
+        });
+      }
+      continue;
+    }
+
+    // Fallback: single-variant or non-variant products
+    out.push({
+      ...base,
+      status: String(it?.status ?? "active"),
+      endsAt: (it?.endsAt ?? null) as string | null,
+      variant: it?.variant?.name ? { name: it.variant.name } : null,
+      variantId: toStrId(it?.variant?._id),
+    });
+  }
+
+  // keep actives first, then by nearest end date
+  out.sort((a, b) => {
+    const ax = a.status === "active" ? 0 : 1;
+    const bx = b.status === "active" ? 0 : 1;
+    if (ax !== bx) return ax - bx;
+    const at = a.endsAt ? new Date(a.endsAt).getTime() : Number.POSITIVE_INFINITY;
+    const bt = b.endsAt ? new Date(b.endsAt).getTime() : Number.POSITIVE_INFINITY;
+    return at - bt;
+  });
+
+  return out;
 };
 
 /** ---------- In-site Reminders ---------- **/
@@ -250,26 +320,34 @@ export default function Myprofile() {
     [token]
   );
 
-  /** Load data */
+  /** Load data (now pulls debug entitlements & flattens variants) */
   useEffect(() => {
     (async () => {
       try {
         setLoading(true); setError(""); setMsg("");
-        const [meRes, prodRes, avRes] = await Promise.all([
+        const [meRes, prodRes, avRes, debugRes] = await Promise.all([
           fetch(`${API_BASE}/users/me`, { headers: authHeaders }),
           fetch(`${API_BASE}/users/me/products`, { headers: authHeaders }),
           fetch(`${API_BASE}/users/me/avatar-options`, { headers: authHeaders }),
+          fetch(`${API_BASE}/users/me/products?debug=1`, { headers: authHeaders }),
         ]);
-        const me = await meRes.json(); const prod = await prodRes.json(); const av = await avRes.json();
+        const me = await meRes.json();
+        const prod = await prodRes.json();
+        const av = await avRes.json();
+        const debug = await debugRes.json();
 
         setProfile(me);
-        setProducts(prod?.items || []);
+
+        // ⬇️ Flatten into one card per variant with precise endsAt/status
+        const flat = flattenProducts(prod?.items || [], debug?.debug?.entitlements || []);
+        setProducts(flat);
+
         setAvatarKeys(Array.isArray(av?.avatars) && av.avatars.length ? av.avatars : AVATAR_KEYS);
 
         setForm({
           name: me?.name || "", email: me?.email || "", phone: me?.phone || "",
           broker: me?.broker || "", location: me?.location || "", bio: me?.bio || "",
-          avatarKey: me?.avatarKey && AVATAR_MAP[me.avatarKey as keyof typeof AVATAR_MAP] ? me.avatarKey as keyof typeof AVATAR_MAP : "sienna",
+          avatarKey: me?.avatarKey && AVATAR_MAP[me.avatarKey as keyof typeof AVATAR_MAP] ? (me.avatarKey as keyof typeof AVATAR_MAP) : "sienna",
           tradingStyle: me?.tradingStyle || "", experienceYears: me?.experienceYears || "", riskProfile: me?.riskProfile || "",
           instruments: Array.isArray(me?.instruments) ? me.instruments : [],
           timezone: me?.timezone || "Asia/Kolkata",
@@ -305,7 +383,7 @@ export default function Myprofile() {
     return {
       name: profile.name || "", email: profile.email || "", phone: profile.phone || "",
       broker: profile.broker || "", location: profile.location || "", bio: profile.bio || "",
-      avatarKey: (profile.avatarKey && AVATAR_MAP[profile.avatarKey] ? profile.avatarKey : "astro") as keyof typeof AVATAR_MAP,
+      avatarKey: (profile.avatarKey && AVATAR_MAP[profile.avatarKey] ? profile.avatarKey : "sienna") as keyof typeof AVATAR_MAP, // ← fixed default
       tradingStyle: profile.tradingStyle || "", experienceYears: profile.experienceYears || "", riskProfile: profile.riskProfile || "",
       instruments: Array.isArray(profile.instruments) ? profile.instruments : [],
       timezone: profile.timezone || "Asia/Kolkata",
@@ -694,7 +772,7 @@ export default function Myprofile() {
               ) : (
                 <div className="space-y-4 mb-6">
                   {products.map((p) => (
-                    <div key={String(p.productId)} className="rounded-xl border border-[var(--border)] p-4 bg-[var(--card-2)] hover:bg-[var(--hover)] hover:shadow-md transition-all group">
+                    <div key={`${p.productId}|${p.variantId ?? p.variant?.name ?? "base"}`} className="rounded-xl border border-[var(--border)] p-4 bg-[var(--card-2)] hover:bg-[var(--hover)] hover:shadow-md transition-all group">
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="font-medium group-hover:text-[var(--accent)] transition-colors">{p.name}</h4>
                         <span className="px-2 py-1 bg-[var(--success-bg)] text-[var(--success-fg)] rounded-full text-xs font-medium">

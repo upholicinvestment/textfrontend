@@ -17,12 +17,18 @@ import {
   Stat,
   ProductUI,
 } from "../types";
+import { Link } from "react-router-dom";
 
 type SortBy = "pnl" | "winRate" | "trades";
 type SortDir = "asc" | "desc";
+type SearchScope = "all" | "strategies" | "products" | "activity";
 
 interface Props {
   userName?: string | null;
+
+  /** NEW: search */
+  searchQuery: string;
+  searchScope: SearchScope;
 
   // date selection state
   isToday: boolean;
@@ -48,7 +54,7 @@ interface Props {
   summaryError: string | null;
   statCards: Stat[];
 
-  // strategies list
+  // strategies list (already filtered/sorted by parent)
   strategiesLoading: boolean;
   strategiesError: string | null;
   strategiesView: StrategyPnL[];
@@ -57,7 +63,7 @@ interface Props {
   setSortBy: (v: SortBy) => void;
   setSortDir: (v: SortDir) => void;
 
-  // products grid
+  // products grid (already filtered by parent)
   productsUI: ProductUI[];
   loadingEntitlements: boolean;
 
@@ -135,6 +141,10 @@ const priorityChip = (p?: Priority) =>
 
 const AlgoDashboardBody: React.FC<Props> = ({
   userName,
+
+  /** search */
+  searchQuery,
+  searchScope,
 
   isToday,
   selectedKey,
@@ -260,7 +270,7 @@ const AlgoDashboardBody: React.FC<Props> = ({
     .map((t) => ({
       id: `trade-${t.id}`,
       ts: Number(t.ts) || Date.now(),
-      category: "trades",
+      category: "trades" as const,
       source: "ALGO Simulator",
       title: t.strategy || "ALGO Trade",
       message: `${t.side} ${t.qty} ${t.symbol} @ ${prettyINR(t.price) || t.price}`,
@@ -291,7 +301,28 @@ const AlgoDashboardBody: React.FC<Props> = ({
 
   type Tab = "all" | "scans" | "trades" | "alerts";
   const [tab, setTab] = useState<Tab>("all");
-  const filteredEvents = tab === "all" ? allEvents : allEvents.filter((e) => e.category === tab);
+
+  const eventsByTab = tab === "all" ? allEvents : allEvents.filter((e) => e.category === tab);
+
+  // 🔎 Apply search to activity only when scope is "all" or "activity"
+  const activityQuery =
+    searchScope === "all" || searchScope === "activity" ? searchQuery.trim().toLowerCase() : "";
+  const filteredEvents = activityQuery
+    ? eventsByTab.filter((e) => {
+        const hay = `${e.title} ${e.message} ${e.source}`.toLowerCase();
+        return hay.includes(activityQuery);
+      })
+    : eventsByTab;
+
+  // Normalize product links so bundle/algo cards always route to the in-app dashboards
+  const normalizeProductLink = (p: ProductUI) => {
+    if (p.bundleComponents && p.bundleComponents.length > 0) return "/dashboard?view=bundle";
+    if (p.algoVariants && p.algoVariants.length > 0) return "/dashboard?view=algo";
+    // if you still pass "/bundle" from API, this keeps it SPA-routed too:
+    if (p.link === "/bundle") return "/dashboard?view=bundle";
+    if (p.link === "/algo" || p.link === "/algo-simulator") return "/dashboard?view=algo";
+    return p.link || "#";
+  };
 
   return (
     <>
@@ -311,14 +342,15 @@ const AlgoDashboardBody: React.FC<Props> = ({
             </p>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <button
+          {/* <div className="flex items-center space-x-3">
+            <Link
+              to="/lauching-soon"
               className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium"
               aria-label="Export data"
             >
               Export Data
-            </button>
-          </div>
+            </Link>
+          </div> */}
         </div>
       </div>
 
@@ -656,13 +688,13 @@ const AlgoDashboardBody: React.FC<Props> = ({
               {loadingEntitlements ? (
                 <div className="text-sm text-slate-500">Loading your products…</div>
               ) : productsUI.length === 0 ? (
-                <div className="text-slate-600 text-sm">You don’t have any products yet.</div>
+                <div className="text-slate-600 text-sm">No products match your search.</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {productsUI.map((product) => (
-                    <a
+                    <Link
                       key={product.id}
-                      href={product.link}
+                      to={normalizeProductLink(product)}
                       className="group relative p-5 rounded-xl border border-indigo-100 shadow-sm transition-all duration-200 overflow-hidden bg-gradient-to-br from-indigo-50 to-white"
                       aria-label={`Access ${product.name}`}
                     >
@@ -731,7 +763,7 @@ const AlgoDashboardBody: React.FC<Props> = ({
                           </div>
                         </div>
                       </div>
-                    </a>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -754,7 +786,7 @@ const AlgoDashboardBody: React.FC<Props> = ({
             <p className="text-sm text-slate-500">Real-time trading updates</p>
 
             <div className="mt-3 flex items-center gap-2">
-              {(["all", "scans", "trades", "alerts"] as Tab[]).map((t) => (
+              {(["all", "scans", "trades", "alerts"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -770,7 +802,7 @@ const AlgoDashboardBody: React.FC<Props> = ({
 
           <div className="p-6 space-y-4">
             {filteredEvents.length === 0 ? (
-              <div className="text-sm text-slate-500">No live activity yet.</div>
+              <div className="text-sm text-slate-500">No live activity{activityQuery ? " matching your search" : ""}.</div>
             ) : (
               filteredEvents.map((ev) => {
                 const Icon =

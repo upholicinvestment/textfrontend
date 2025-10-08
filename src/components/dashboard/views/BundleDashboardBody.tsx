@@ -1,3 +1,4 @@
+// src/components/dashboard/views/BundleDashboardBody.tsx
 import React from "react";
 import { BookOpen, Building2, ChevronRight, Lock, ArrowUpRight } from "lucide-react";
 import { ProductUI } from "../types";
@@ -27,13 +28,16 @@ const BundleDashboardBody: React.FC<Props> = ({
           <div>
             <h1 className="text-left text-3xl font-bold text-gray-900 mb-2">
               Trader’s Essentials{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Dashboard</span>
+              <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                Dashboard
+              </span>
             </h1>
             <p className="text-gray-600 text-lg">
               Jump into <span className="text-indigo-600 font-semibold">Smart Journaling</span>
               {showFiiDiiInQuickAccess && (
                 <>
-                  {" "}and <span className="text-emerald-600 font-semibold">FII/DII Data</span> tools.
+                  {" "}
+                  and <span className="text-emerald-600 font-semibold">FII/DII Data</span> tools.
                 </>
               )}
             </p>
@@ -154,7 +158,10 @@ const BundleDashboardBody: React.FC<Props> = ({
                     {product.bundleComponents && (
                       <div className="flex flex-wrap gap-2 mb-3">
                         {product.bundleComponents.map((c) => (
-                          <span key={c.key} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] bg-indigo-100 text-indigo-700">
+                          <span
+                            key={c.key}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] bg-indigo-100 text-indigo-700"
+                          >
                             {c.icon}
                             {c.label}
                           </span>
@@ -164,7 +171,11 @@ const BundleDashboardBody: React.FC<Props> = ({
 
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-slate-400">{product.stats}</span>
-                      <div className={`flex items-center text-sm font-medium ${product.trend === "up" ? "text-emerald-600" : "text-rose-600"}`}>
+                      <div
+                        className={`flex items-center text-sm font-medium ${
+                          product.trend === "up" ? "text-emerald-600" : "text-rose-600"
+                        }`}
+                      >
                         <ArrowUpRight className="h-3 w-3" />
                         {product.change}
                       </div>

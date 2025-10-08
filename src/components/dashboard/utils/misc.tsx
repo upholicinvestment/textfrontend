@@ -1,3 +1,4 @@
+// frontend/utils/misc.tsx
 import React from "react";
 import { BookOpen, Building2 } from "lucide-react";
 

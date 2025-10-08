@@ -36,8 +36,16 @@ type Product = {
 const normalizeVariantKey = (k: string) => {
   const s = (k || "").toLowerCase().trim();
   if (["starter", "starter_scalping"].includes(s)) return "starter";
-  if (["pro", "option_scalper_pro", "option-scalper-pro"].includes(s)) return "pro";
-  if (["swing", "sniper_algo", "swing_trader_master", "swing-trader-master"].includes(s))
+  if (["pro", "option_scalper_pro", "option-scalper-pro"].includes(s))
+    return "pro";
+  if (
+    [
+      "swing",
+      "sniper_algo",
+      "swing_trader_master",
+      "swing-trader-master",
+    ].includes(s)
+  )
     return "swing";
   return s;
 };
@@ -46,7 +54,8 @@ const variantDescription = (k: string) => {
   if (k === "starter")
     return "Perfect for beginners starting with algorithmic trading";
   if (k === "pro") return "Advanced scalping with real-time execution";
-  if (k === "swing") return "Comprehensive swing trading with advanced analytics";
+  if (k === "swing")
+    return "Comprehensive swing trading with advanced analytics";
   return "Premium trading solution";
 };
 
@@ -109,7 +118,7 @@ const loadRazorpay = (): Promise<boolean> =>
     document.body.appendChild(script);
   });
 
-/* ------------ robust key extractor (for /users/me snapshot) ------------- */
+/** Extract many possible keys from a user snapshot */
 function extractKeys(payload: any): string[] {
   const out: string[] = [];
   const push = (x: any) => {
@@ -156,8 +165,12 @@ const Price = () => {
   );
 
   // Billing toggles
-  const [bundleBilling, setBundleBilling] = useState<"monthly" | "yearly">("monthly");
-  const [journalBilling, setJournalBilling] = useState<"monthly" | "yearly">("monthly");
+  const [bundleBilling, setBundleBilling] = useState<"monthly" | "yearly">(
+    "monthly"
+  );
+  const [journalBilling, setJournalBilling] = useState<"monthly" | "yearly">(
+    "monthly"
+  );
 
   const [products, setProducts] = useState<Product[]>([]);
   const navigate = useNavigate();
@@ -168,7 +181,7 @@ const Price = () => {
   const wantsRenew = qs.get("renew") === "1";
   const renewProductKey = (qs.get("productKey") || "").toLowerCase();
 
-  // 🔗 helper to build /signup?productKey=...&variantKey=...&interval=...
+  // 🔗 /signup helper
   const toRegister = (
     productKey?: string | null,
     variantKey?: string | null,
@@ -178,14 +191,30 @@ const Price = () => {
     if (productKey) params.set("productKey", productKey);
     if (variantKey) params.set("variantKey", variantKey);
     if (interval) params.set("interval", interval);
-    const qs = params.toString();
-    return `/signup${qs ? `?${qs}` : ""}`;
+    const q = params.toString();
+    return `/signup${q ? `?${q}` : ""}`;
   };
 
-  // ========= ownership sources (entitlements + snapshot) =========
+  // ========= ownership sources =========
   const { items: entitlements, loading: entLoading } = useEntitlements();
   const [userSnapshot, setUserSnapshot] = useState<any>(null);
   const [userLoading, setUserLoading] = useState<boolean>(false);
+
+  // Raw user_products for accurate per-variant/product endsAt (only if logged-in)
+  const [rawUP, setRawUP] = useState<any[]>([]);
+  useEffect(() => {
+    (async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const r = await api.get("/users/me/products?debug=1");
+        const arr = r?.data?.debug?.entitlements || [];
+        setRawUP(Array.isArray(arr) ? arr : []);
+      } catch {
+        setRawUP([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -198,16 +227,13 @@ const Price = () => {
             return null;
           }
         })();
-        if (local) {
-          setUserSnapshot(local);
-        } else {
+        if (local) setUserSnapshot(local);
+        else {
           const token = localStorage.getItem("token");
           if (token) {
             const r = await api.get("/users/me");
             setUserSnapshot(r?.data ?? null);
-          } else {
-            setUserSnapshot(null);
-          }
+          } else setUserSnapshot(null);
         }
       } finally {
         setUserLoading(false);
@@ -239,7 +265,7 @@ const Price = () => {
     [products]
   );
 
-  // open relevant tab when arriving from renew URL
+  // open tab from renew intent
   useEffect(() => {
     if (!wantsRenew) return;
     if (renewProductKey === "algo_simulator") setActiveTab("algo");
@@ -254,14 +280,16 @@ const Price = () => {
   // ---------- Pricing helpers ----------
   const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
-  // Fallback sample numbers (replace with real ones or keep env-backed)
-  const BUNDLE_MONTHLY = 499; // 499
-  const BUNDLE_ANNUAL = 4999; // 4999
-  const JOURNAL_MONTHLY = 299; // 299
-  const JOURNAL_ANNUAL = 2499; // 2499
+  // fallback price numbers
+  const BUNDLE_MONTHLY = 499;     //499
+  const BUNDLE_ANNUAL = 4999;     //4999
+  const JOURNAL_MONTHLY = 299;    //299
+  const JOURNAL_ANNUAL = 2499;    //2499
 
   const bundleMonthlyNum =
-    typeof bundle?.priceMonthly === "number" ? bundle.priceMonthly : BUNDLE_MONTHLY;
+    typeof bundle?.priceMonthly === "number"
+      ? bundle.priceMonthly
+      : BUNDLE_MONTHLY;
   const bundleAnnualNum = BUNDLE_ANNUAL;
 
   const journalingMonthlyNum =
@@ -278,7 +306,9 @@ const Price = () => {
   );
 
   const displayBundlePrice =
-    bundleBilling === "monthly" ? fmtINR(bundleMonthlyNum) : fmtINR(bundleAnnualNum);
+    bundleBilling === "monthly"
+      ? fmtINR(bundleMonthlyNum)
+      : fmtINR(bundleAnnualNum);
   const bundlePeriod = bundleBilling === "monthly" ? "month" : "year";
 
   const displayJournalPrice =
@@ -293,17 +323,26 @@ const Price = () => {
       name: "Journaling",
       description: "Trade journal with performance analytics and insights",
       icon: "📝",
-      features: ["Trade tracking", "Performance metrics", "Psychology markers", "Export reports"],
+      features: [
+        "Trade tracking",
+        "Performance metrics",
+        "Psychology markers",
+        "Export reports",
+      ],
     },
     {
       id: 2,
       name: "FII/DII Data",
       description: "Institutional flow tracking with advanced analytics",
       icon: "🏛️",
-      features: ["Real-time flows", "Historical data", "Sector-wise analysis", "Correlation tools"],
+      features: [
+        "Real-time flows",
+        "Historical data",
+        "Sector-wise analysis",
+        "Correlation tools",
+      ],
     },
   ];
-
   const selectedBundleTool =
     bundleTools.find((t) => t.id === selectedBundle) || bundleTools[0];
 
@@ -311,49 +350,21 @@ const Price = () => {
   const OWN_KEYS_BY_VARIANT: Record<"starter" | "pro" | "swing", string[]> = {
     starter: ["starter", "starter_scalping"],
     pro: ["pro", "option_scalper_pro", "option-scalper-pro"],
-    swing: ["swing", "sniper_algo", "swing_trader_master", "swing-trader-master"],
+    swing: [
+      "swing",
+      "sniper_algo",
+      "swing_trader_master",
+      "swing-trader-master",
+    ],
   };
 
-  const collectEntitlementVariantKeys = () => {
-    const keys = new Set<string>();
-    for (const it of entitlements || []) {
-      const single =
-        (it as any)?.variant?.key && normalizeVariantKey((it as any).variant.key);
-      if (single) keys.add(single);
-      const maybeArray = (it as any)?.variants as Array<{ key?: string }> | undefined;
-      if (Array.isArray(maybeArray)) {
-        for (const v of maybeArray) {
-          const kk = v?.key && normalizeVariantKey(v.key);
-          if (kk) keys.add(kk);
-        }
-      }
-    }
-    return keys;
-  };
+  const variantKeyById = useMemo(() => {
+    const m = new Map<string, "starter" | "pro" | "swing">();
+    for (const v of algo?.variants || [])
+      m.set(String(v._id), normalizeVariantKey(v.key) as any);
+    return m;
+  }, [algo]);
 
-  const ownedExactVariant = (normVariant: "starter" | "pro" | "swing") => {
-    const desired = new Set(
-      OWN_KEYS_BY_VARIANT[normVariant].map((k) => normalizeVariantKey(k))
-    );
-    const entKeys = collectEntitlementVariantKeys();
-    const snapKeys = new Set(
-      extractKeys(userSnapshot).map((k) => normalizeVariantKey(k))
-    );
-    for (const k of desired) {
-      if (entKeys.has(k) || snapKeys.has(k)) return true;
-    }
-    return false;
-  };
-
-  const variantIdFor = (norm: "starter" | "pro" | "swing") => {
-    const wanted = OWN_KEYS_BY_VARIANT[norm].map((k) => normalizeVariantKey(k));
-    const found = algo?.variants?.find((v) =>
-      wanted.includes(normalizeVariantKey(v.key))
-    );
-    return found?._id || null;
-  };
-
-  // --- expiry helpers ---
   const startOfDay = (d: Date) => {
     const x = new Date(d);
     x.setHours(0, 0, 0, 0);
@@ -365,70 +376,98 @@ const Price = () => {
     const e = startOfDay(new Date(iso));
     return Math.ceil((e.getTime() - t.getTime()) / 86400000);
   };
-  const ACTIVE = (x: any) =>
+  const isActiveRow = (x: any) =>
     String(x?.status || "inactive").toLowerCase() === "active" &&
     (!x?.endsAt || new Date(x.endsAt).getTime() > Date.now());
 
-  const endDateFor = (it: any): string | undefined =>
-    it?.endsAt ||
-    it?.subscription?.endsAt ||
-    it?.license?.endsAt ||
-    it?.meta?.endsAt ||
-    it?.variant?.endsAt;
+  const toStrId = (v: any): string | null => {
+    if (!v) return null;
+    if (typeof v === "string") return v;
+    if (typeof v === "object") {
+      if (typeof (v as any).$oid === "string") return (v as any).$oid;
+      if (typeof (v as any)._id === "string") return (v as any)._id;
+      if (typeof (v as any).toString === "function")
+        return (v as any).toString();
+    }
+    return null;
+  };
 
-  const isExpiringSoon = (key: string, win = 7, variantKey?: string) => {
+  const variantIdFor = (norm: "starter" | "pro" | "swing") => {
+    const wanted = OWN_KEYS_BY_VARIANT[norm].map((k) => normalizeVariantKey(k));
+    const found = algo?.variants?.find((v) =>
+      wanted.includes(normalizeVariantKey(v.key))
+    );
+    return found?._id || null;
+  };
+
+  const ownedByRaw = (norm: "starter" | "pro" | "swing") => {
+    const vid = variantIdFor(norm);
+    if (!vid) return false;
+    return rawUP.some(
+      (row) => toStrId(row.variantId) === String(vid) && isActiveRow(row)
+    );
+  };
+
+  const ownedByGrouped = (normVariant: "starter" | "pro" | "swing") => {
+    const desired = new Set(
+      OWN_KEYS_BY_VARIANT[normVariant].map((k) => normalizeVariantKey(k))
+    );
     for (const it of entitlements || []) {
-      const k = String((it as any)?.key || "").toLowerCase();
-      if (k !== key) continue;
-      if (!ACTIVE(it)) continue;
-      if (variantKey) {
-        const vkey = normalizeVariantKey((it as any)?.variant?.key || "");
-        if (vkey && vkey !== normalizeVariantKey(variantKey)) continue;
-      }
-      const d = daysUntil(endDateFor(it));
+      const v =
+        (it as any)?.variant?.key &&
+        normalizeVariantKey((it as any).variant.key);
+      if (v && desired.has(v)) return true;
+      const arr = (it as any)?.variants as Array<{ key?: string }> | undefined;
+      if (
+        Array.isArray(arr) &&
+        arr.some((x) => desired.has(normalizeVariantKey(x?.key || "")))
+      )
+        return true;
+    }
+    const snapKeys = new Set(
+      extractKeys(userSnapshot).map((k) => normalizeVariantKey(k))
+    );
+    for (const k of desired) if (snapKeys.has(k)) return true;
+    return false;
+  };
+
+  const ownedExactVariant = (norm: "starter" | "pro" | "swing") =>
+    ownedByRaw(norm) || ownedByGrouped(norm);
+
+  const expiringVariantSoon = (
+    norm: "starter" | "pro" | "swing",
+    win = 7
+  ): boolean => {
+    const vid = variantIdFor(norm);
+    if (!vid) return false;
+    const candidates = rawUP.filter(
+      (row) => toStrId(row.variantId) === String(vid) && isActiveRow(row)
+    );
+    for (const row of candidates) {
+      const d = daysUntil(row.endsAt);
+      if (Number.isFinite(d) && d >= 0 && d <= win) return true;
+    }
+    // fallback using grouped algo item
+    for (const it of entitlements || []) {
+      const isAlgo =
+        String((it as any)?.key || "").toLowerCase() === "algo_simulator";
+      if (!isAlgo) continue;
+      const ends =
+        (it as any)?.endsAt ||
+        (it as any)?.subscription?.endsAt ||
+        (it as any)?.license?.endsAt ||
+        (it as any)?.meta?.endsAt;
+      const d = daysUntil(ends);
       if (Number.isFinite(d) && d >= 0 && d <= win) return true;
     }
     return false;
   };
 
-  // Bundle expiry via bundled components
-  const expiringBundle = useMemo(() => {
-    const comps = (entitlements || []).filter((it: any) => {
-      const k = String(it?.key || "").toLowerCase();
-      const fromBundle = String(it?.meta?.source || "")
-        .toLowerCase()
-        .includes("bundle");
-      return ACTIVE(it) && fromBundle && (k === "journaling" || k === "fii_dii_data");
-    });
-    if (!comps.length) return false;
-    const soonest = Math.min(
-      ...comps
-        .map((it: any) => daysUntil(endDateFor(it)))
-        .filter((n: number) => Number.isFinite(n))
-    );
-    return Number.isFinite(soonest) && soonest >= 0 && soonest <= 7;
-  }, [entitlements]);
+  const expiringStarter = expiringVariantSoon("starter", 7);
+  const expiringPro = expiringVariantSoon("pro", 7);
+  const expiringSwing = expiringVariantSoon("swing", 7);
 
-  // Journaling expiring (solo only; if bundle covers it, don't show renew)
-  const expiringJournalingSolo = useMemo(() => {
-    const ownsBundleViaComponents = (entitlements || []).some((it: any) => {
-      const k = String(it?.key || "").toLowerCase();
-      const fromBundle = String(it?.meta?.source || "")
-        .toLowerCase()
-        .includes("bundle");
-      return ACTIVE(it) && fromBundle && (k === "journaling" || k === "fii_dii_data");
-    });
-    if (ownsBundleViaComponents) return false;
-    return (
-      isExpiringSoon("journaling", 7) || isExpiringSoon("journaling_solo", 7)
-    );
-  }, [entitlements]);
-
-  const expiringStarter = isExpiringSoon("algo_simulator", 7, "starter");
-  const expiringPro = isExpiringSoon("algo_simulator", 7, "pro");
-  const expiringSwing = isExpiringSoon("algo_simulator", 7, "swing");
-
-  /* ---------- Checkout helpers (purchase/upgrade/renew) ---------- */
+  /* ---------- Checkout helpers ---------- */
   const openProductCheckout = async (
     product: Product,
     interval: "monthly" | "yearly",
@@ -479,7 +518,7 @@ const Price = () => {
 
       rz.open();
     } catch {
-      // keep user on page
+      // ignore
     }
   };
 
@@ -586,7 +625,9 @@ const Price = () => {
         id: v.key === "starter" ? 1 : v.key === "pro" ? 2 : 3,
         key: normKey,
         name: v.name,
-        price: v.priceMonthly ? `₹${v.priceMonthly.toLocaleString("en-IN")}` : "₹1",
+        price: v.priceMonthly
+          ? `₹${v.priceMonthly.toLocaleString("en-IN")}`
+          : "₹1",
         period: "month",
         description: variantDescription(normKey),
         features: variantFeatures(normKey),
@@ -595,7 +636,8 @@ const Price = () => {
       };
     });
 
-    const rank = (k: "starter" | "pro" | "swing") => ({ starter: 1, pro: 2, swing: 3 }[k]);
+    const rank = (k: "starter" | "pro" | "swing") =>
+      ({ starter: 1, pro: 2, swing: 3 }[k]);
     vs.sort((a, b) => rank(a.key) - rank(b.key));
 
     if (vs.length && selectedAlgo === null)
@@ -603,18 +645,19 @@ const Price = () => {
     return vs;
   }, [algo, selectedAlgo]);
 
-  // ======== BUNDLE OWNERSHIP DECISION ========
+  // ======== BUNDLE OWNERSHIP ========
   type BundleStatus = { owned: boolean; interval: "monthly" | "yearly" | null };
+
+  const ACTIVE = (x: any) =>
+    String(x?.status || "inactive").toLowerCase() === "active" &&
+    (!x?.endsAt || new Date(x.endsAt).getTime() > Date.now());
 
   const getBundleStatus = (items: any[]): BundleStatus => {
     const byKey = (k: string) =>
       (items || []).find(
-        (it) =>
-          String(it?.key || "").toLowerCase() === k &&
-          ACTIVE(it)
+        (it) => String(it?.key || "").toLowerCase() === k && ACTIVE(it)
       );
 
-    // Direct bundle entitlement (if you store one)
     const bundleEnt = byKey("essentials_bundle");
     if (bundleEnt) {
       const rawInterval =
@@ -635,13 +678,15 @@ const Price = () => {
       return { owned: true, interval: iv };
     }
 
-    // Infer bundle from components granted via bundle
+    // infer via bundled components
     const comps = (items || []).filter((it: any) => {
       const k = String(it?.key || "").toLowerCase();
       const fromBundle = String(it?.meta?.source || "")
         .toLowerCase()
         .includes("bundle");
-      return ACTIVE(it) && fromBundle && (k === "journaling" || k === "fii_dii_data");
+      return (
+        ACTIVE(it) && fromBundle && (k === "journaling" || k === "fii_dii_data")
+      );
     });
 
     if (comps.length) {
@@ -654,7 +699,9 @@ const Price = () => {
       const days = comps
         .map((c) => durDays(c))
         .filter((n) => Number.isFinite(n)) as number[];
-      const avg = days.length ? days.reduce((a, b) => a + b, 0) / days.length : NaN;
+      const avg = days.length
+        ? days.reduce((a, b) => a + b, 0) / days.length
+        : NaN;
       const interval: "monthly" | "yearly" =
         Number.isFinite(avg) && avg >= 300 ? "yearly" : "monthly";
       return { owned: true, interval };
@@ -665,7 +712,6 @@ const Price = () => {
 
   const bundleStatus = getBundleStatus(entitlements as any);
 
-  /** Bundle CTA label */
   const bundleCtaLabel = (() => {
     if (userLoading || entLoading) return "Checking...";
     if (!bundleStatus.owned) {
@@ -680,21 +726,17 @@ const Price = () => {
     return `Get Complete Bundle - ${fmtINR(bundleAnnualNum)}/year`;
   })();
 
-  /** Bundle CTA click behavior (now opens Razorpay when logged-in) */
   const handleBundleCta = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (userLoading || entLoading || !bundle) return;
 
     const token = localStorage.getItem("token");
-
-    // Not logged-in → go to signup
     if (!token) {
       navigate(toRegister("essentials_bundle", null, bundleBilling));
       return;
     }
 
-    // Logged-in
     if (bundleStatus.owned) {
       if (bundleStatus.interval === "yearly") {
         navigate("/dashboard");
@@ -704,16 +746,14 @@ const Price = () => {
         navigate("/dashboard");
         return;
       }
-      // Own monthly, toggled yearly → upgrade via Razorpay
       await openProductCheckout(bundle, "yearly");
       return;
     }
 
-    // Fresh purchase → Razorpay
     await openProductCheckout(bundle, bundleBilling);
   };
 
-  // ======== JOURNALING OWNERSHIP (SOLO) ========
+  // ======== JOURNALING (SOLO) OWNERSHIP + RENEW ========
   type SingleStatus = { owned: boolean; interval: "monthly" | "yearly" | null };
 
   const getSingleStatus = (items: any[], keys: string[]): SingleStatus => {
@@ -732,14 +772,9 @@ const Price = () => {
         : null) ||
       null;
 
-    if (rawInterval === "yearly" || "monthly") {
-      const iv =
-        rawInterval === "yearly"
-          ? "yearly"
-          : rawInterval === "monthly"
-          ? "monthly"
-          : null;
-      if (iv) return { owned: true, interval: iv };
+    if (rawInterval === "yearly" || rawInterval === "monthly") {
+      const iv = rawInterval as "yearly" | "monthly";
+      return { owned: true, interval: iv };
     }
 
     const s = ent?.startedAt ? new Date(ent.startedAt).getTime() : NaN;
@@ -750,12 +785,47 @@ const Price = () => {
     return { owned: true, interval };
   };
 
-  const journalingStatus = getSingleStatus(
-    entitlements as any,
-    ["journaling", "journaling_solo", "trading_journal_pro"]
-  );
+  const journalingStatus = getSingleStatus(entitlements as any, [
+    "journaling",
+    "journaling_solo",
+    "trading_journal_pro",
+  ]);
 
-  /** Journaling CTA label */
+  // Renew window for Journaling (solo), prefer raw user_products (productId === journaling_solo)
+  const expiringJournalingSolo = useMemo(() => {
+    const isFromBundle = (x: any) =>
+      String(x?.meta?.source || "")
+        .toLowerCase()
+        .includes("bundle");
+    const endsSoon = (iso?: string) => {
+      const d = daysUntil(iso);
+      return Number.isFinite(d) && d >= 0 && d <= 7;
+    };
+
+    if (journaling && rawUP.length) {
+      const pid = String(journaling._id);
+      return rawUP.some(
+        (row) =>
+          toStrId(row.productId) === pid &&
+          isActiveRow(row) &&
+          !isFromBundle(row) &&
+          endsSoon(row.endsAt)
+      );
+    }
+
+    return (entitlements || []).some((it: any) => {
+      const k = String(it?.key || "").toLowerCase();
+      if (!(k === "journaling" || k === "journaling_solo")) return false;
+      if (!ACTIVE(it) || isFromBundle(it)) return false;
+      const ends =
+        it?.endsAt ||
+        it?.subscription?.endsAt ||
+        it?.license?.endsAt ||
+        it?.meta?.endsAt;
+      return endsSoon(ends);
+    });
+  }, [journaling, rawUP, entitlements]);
+
   const journalingCtaLabel = (() => {
     if (userLoading || entLoading) return "Checking...";
     if (!journalingStatus.owned) {
@@ -770,7 +840,6 @@ const Price = () => {
     return `Get Journaling Only - ${fmtINR(journalingAnnualNum)}/year`;
   })();
 
-  /** Journaling CTA click behavior (opens Razorpay if logged-in) */
   const handleJournalingCta = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -787,18 +856,20 @@ const Price = () => {
         navigate("/dashboard");
         return;
       }
-      // Own monthly, toggled yearly → upgrade
       if (!token) {
-        navigate(toRegister(journaling.key || "journaling_solo", null, "yearly"));
+        navigate(
+          toRegister(journaling.key || "journaling_solo", null, "yearly")
+        );
         return;
       }
       await openProductCheckout(journaling, "yearly");
       return;
     }
 
-    // Not owned
     if (!token) {
-      navigate(toRegister(journaling.key || "journaling_solo", null, journalBilling));
+      navigate(
+        toRegister(journaling.key || "journaling_solo", null, journalBilling)
+      );
       return;
     }
     await openProductCheckout(journaling, journalBilling);
@@ -817,7 +888,7 @@ const Price = () => {
         </button>
 
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-          {/* ===== Hero Heading ===== */}
+          {/* ===== Hero ===== */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -827,7 +898,7 @@ const Price = () => {
             <div className="text-xs md:text-sm font-semibold tracking-[0.25em] text-sky-400/90 uppercase mb-3">
               Trader&apos;s Toolkit
             </div>
-            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight">
+            <h1 className="text-4xl md:6xl lg:text-6xl font-extrabold leading-tight">
               <span className="text-white">Professional </span>
               <span className="bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
                 Trading Tools
@@ -838,7 +909,7 @@ const Price = () => {
             </p>
           </motion.div>
 
-          {/* Header Tabs */}
+          {/* Tabs */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -880,6 +951,179 @@ const Price = () => {
           </motion.div>
 
           <AnimatePresence mode="wait">
+            {/* ===== ALGO ===== */}
+            {activeTab === "algo" && (
+              <motion.div
+                key="algo"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="mb-20"
+              >
+                <div className="text-center mb-12">
+                  <h2 className="text-3xl font-bold mb-2">
+                    Algorithmic Trading Solutions
+                  </h2>
+                  <p className="text-gray-400 max-w-2xl mx-auto">
+                    Advanced automation for scalping & swing strategies. Connect
+                    your broker & run tested systems.
+                  </p>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-8 items-start">
+                  {algoPlans.map((plan) => {
+                    const isSelected = selectedAlgo === plan.id;
+                    const popular = plan.popular;
+
+                    const token =
+                      typeof window !== "undefined"
+                        ? localStorage.getItem("token")
+                        : null;
+
+                    const isOwned =
+                      plan.key === "starter"
+                        ? ownedExactVariant("starter")
+                        : plan.key === "pro"
+                        ? ownedExactVariant("pro")
+                        : ownedExactVariant("swing");
+
+                    const label =
+                      userLoading || entLoading
+                        ? "Checking..."
+                        : isOwned &&
+                          ((plan.key === "starter" && expiringStarter) ||
+                            (plan.key === "pro" && expiringPro) ||
+                            (plan.key === "swing" && expiringSwing))
+                        ? "Renew Now"
+                        : isOwned
+                        ? "Open Dashboard"
+                        : token
+                        ? "Pay Now"
+                        : "Get Started";
+
+                    const linkTo = isOwned
+                      ? "/dashboard"
+                      : token
+                      ? "#"
+                      : toRegister(algo?.key || "algo_simulator", plan.key);
+
+                    return (
+                      <motion.div
+                        key={plan.key}
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ duration: 0.25 }}
+                        style={{ transformOrigin: "center" }}
+                        className="w-full"
+                      >
+                        <div
+                          className={`relative w-full max-w-[360px] rounded-2xl border ${
+                            popular
+                              ? "border-yellow-400"
+                              : "border-purple-600/50"
+                          } bg-[#101223] px-6 py-10 ${
+                            popular
+                              ? "shadow-yellow-500/20"
+                              : "shadow-purple-500/20"
+                          } shadow-2xl group h-full mx-auto flex flex-col justify-between transition-all duration-300 ${
+                            isSelected ? "transform scale-105" : ""
+                          } ${popular ? "md:-translate-y-5" : ""}`}
+                          onClick={() => setSelectedAlgo(plan.id)}
+                        >
+                          {popular && (
+                            <div className="pointer-events-none absolute top-0 right-0 bg-yellow-400 text-black text-xs font-bold px-4 py-1 rounded-bl-lg rounded-tr-lg">
+                              MOST POPULAR
+                            </div>
+                          )}
+
+                          <div
+                            className={`pointer-events-none absolute -inset-0.5 bg-gradient-to-r ${
+                              popular
+                                ? "from-yellow-400 to-amber-500"
+                                : "from-purple-600 to-indigo-500"
+                            } rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300`}
+                          />
+
+                          <div className="relative z-10">
+                            <div className="flex items-center gap-3 mb-4">
+                              {variantIcon(plan.key)}
+                              <h3 className="text-xl font-bold">
+                                {plan.name}
+                                {popular && (
+                                  <span className="ml-2 text-yellow-400">
+                                    <BadgeCheck className="inline w-5 h-5" />
+                                  </span>
+                                )}
+                              </h3>
+                            </div>
+
+                            <p className="text-gray-400 text-sm mb-4">
+                              {plan.description}
+                            </p>
+
+                            <div className="mb-6">
+                              <div className="text-4xl font-bold mb-1">
+                                {plan.price}
+                              </div>
+                              <div className="text-gray-400 text-sm">
+                                per month
+                              </div>
+                            </div>
+
+                            <ul className="space-y-3 text-sm text-gray-300 text-left mb-8">
+                              {plan.features.map((f) => (
+                                <li key={f} className="flex items-start gap-2">
+                                  <CheckCircle2
+                                    className={`flex-shrink-0 ${
+                                      popular
+                                        ? "text-yellow-400"
+                                        : "text-purple-400"
+                                    } w-4 h-4 mt-0.5`}
+                                  />
+                                  <span>{f}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <Link
+                            to={linkTo}
+                            onClick={(e) =>
+                              onAlgoCtaClick(
+                                plan.key as "starter" | "pro" | "swing"
+                              )(e)
+                            }
+                            className={`relative z-10 w-full mt-auto py-3 rounded-xl font-semibold transition-all duration-300 text-center ${
+                              popular
+                                ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-black hover:shadow-lg hover:shadow-yellow-500/30"
+                                : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg hover:shadow-purple-500/30"
+                            } flex items-center justify-center gap-2 ${
+                              userLoading || entLoading
+                                ? "opacity-70 cursor-not-allowed"
+                                : ""
+                            }`}
+                            aria-disabled={userLoading || entLoading}
+                            aria-label={`${label} for ${plan.name}`}
+                          >
+                            {label}
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-10 text-gray-400 text-sm flex flex-col md:flex-row items-center justify-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                    <span>Secure payment processing</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ===== BUNDLE ===== */}
             {activeTab === "bundle" && (
               <motion.div
                 key="bundle"
@@ -889,7 +1133,6 @@ const Price = () => {
                 transition={{ duration: 0.3 }}
                 className="mb-20"
               >
-                {/* ======= BUNDLE SECTION ======= */}
                 <div className="max-w-4xl mx-auto relative rounded-3xl overflow-hidden border border-gray-700 bg-[#0b0f1a] shadow-2xl">
                   {/* glow */}
                   <div className="pointer-events-none absolute -inset-px rounded-3xl bg-gradient-to-r from-blue-600/20 via-indigo-500/20 to-purple-600/20 blur opacity-60" />
@@ -946,7 +1189,9 @@ const Price = () => {
                           <div className="text-sm text-blue-200">Starts at</div>
                           <div className="text-3xl md:text-4xl font-bold leading-none">
                             {displayBundlePrice}
-                            <span className="text-lg font-normal">/{bundlePeriod}</span>
+                            <span className="text-lg font-normal">
+                              /{bundlePeriod}
+                            </span>
                           </div>
                           <div className="text-xs md:text-sm text-blue-100 mt-1">
                             No hidden fees • Cancel anytime
@@ -956,17 +1201,19 @@ const Price = () => {
 
                       {/* Highlights */}
                       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {["2 tools included", "Save up to 60%", "Priority support"].map(
-                          (h) => (
-                            <div
-                              key={h}
-                              className="flex items-center gap-2 bg-black/15 border border-white/15 rounded-xl px-3 py-2"
-                            >
-                              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                              <span className="text-sm text-blue-50">{h}</span>
-                            </div>
-                          )
-                        )}
+                        {[
+                          "2 tools included",
+                          "Save up to 60%",
+                          "Priority support",
+                        ].map((h) => (
+                          <div
+                            key={h}
+                            className="flex items-center gap-2 bg-black/15 border border-white/15 rounded-xl px-3 py-2"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                            <span className="text-sm text-blue-50">{h}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -985,7 +1232,9 @@ const Price = () => {
                             className="inline-flex items-center gap-2 rounded-full border border-gray-700 bg-gray-800/50 px-3 py-1.5"
                           >
                             <span className="text-lg">{t.icon}</span>
-                            <span className="text-sm text-gray-200">{t.name}</span>
+                            <span className="text-sm text-gray-200">
+                              {t.name}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -1019,9 +1268,14 @@ const Price = () => {
                               </p>
                               <ul className="space-y-1.5">
                                 {tool.features.map((f, i) => (
-                                  <li key={i} className="flex items-start gap-2">
+                                  <li
+                                    key={i}
+                                    className="flex items-start gap-2"
+                                  >
                                     <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-blue-400" />
-                                    <span className="text-[12px] text-gray-300">{f}</span>
+                                    <span className="text-[12px] text-gray-300">
+                                      {f}
+                                    </span>
                                   </li>
                                 ))}
                               </ul>
@@ -1064,7 +1318,6 @@ const Price = () => {
                       </div>
 
                       <div className="flex items-center">
-                        {/* Use a button so we can intercept and open Razorpay when logged-in */}
                         <button
                           aria-label="Get Complete Bundle"
                           onClick={handleBundleCta}
@@ -1074,195 +1327,14 @@ const Price = () => {
                           {bundleCtaLabel}
                           <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                         </button>
-
-                        {/* Renew now for Bundle — based on component entitlements */}
-                        {bundle && bundleStatus.owned && expiringBundle && (
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (!localStorage.getItem("token")) {
-                                navigate(
-                                  toRegister(bundle.key, null, bundleBilling) + "&renew=1"
-                                );
-                                return;
-                              }
-                              openProductCheckout(bundle, bundleBilling, true);
-                            }}
-                            className="ml-3 inline-flex items-center gap-2 border border-emerald-500 text-emerald-400 hover:bg-emerald-900/30 font-semibold py-3 px-6 rounded-xl transition-all"
-                          >
-                            Renew now
-                          </button>
-                        )}
                       </div>
                     </div>
                   </div>
                 </div>
-                {/* ======= /BUNDLE SECTION ======= */}
               </motion.div>
             )}
 
-            {activeTab === "algo" && (
-              <motion.div
-                key="algo"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="mb-20"
-              >
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl font-bold mb-2">
-                    Algorithmic Trading Solutions
-                  </h2>
-                  <p className="text-gray-400 max-w-2xl mx-auto">
-                    Advanced automation for scalping & swing strategies. Connect your
-                    broker & run tested systems.
-                  </p>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-8 items-start">
-                  {algoPlans.map((plan) => {
-                    const isSelected = selectedAlgo === plan.id;
-                    const popular = plan.popular;
-
-                    const token =
-                      typeof window !== "undefined"
-                        ? localStorage.getItem("token")
-                        : null;
-
-                    const isOwned =
-                      plan.key === "starter"
-                        ? ownedExactVariant("starter")
-                        : plan.key === "pro"
-                        ? ownedExactVariant("pro")
-                        : ownedExactVariant("swing");
-
-                    const label =
-                      userLoading || entLoading
-                        ? "Checking..."
-                        : isOwned &&
-                          ((plan.key === "starter" && expiringStarter) ||
-                            (plan.key === "pro" && expiringPro) ||
-                            (plan.key === "swing" && expiringSwing))
-                        ? "Renew Now"
-                        : isOwned
-                        ? "Open Dashboard"
-                        : token
-                        ? "Pay Now"
-                        : "Get Started";
-
-                    const linkTo = isOwned
-                      ? "/dashboard"
-                      : token
-                      ? "#"
-                      : toRegister(algo?.key || "algo_simulator", plan.key);
-
-                    return (
-                      <motion.div
-                        key={plan.key}
-                        whileHover={{ scale: 1.05 }}
-                        transition={{ duration: 0.25 }}
-                        style={{ transformOrigin: "center" }}
-                        className="w-full"
-                      >
-                        <div
-                          className={`relative w-full max-w-[360px] rounded-2xl border ${
-                            popular ? "border-yellow-400" : "border-purple-600/50"
-                          } bg-[#101223] px-6 py-10 ${
-                            popular ? "shadow-yellow-500/20" : "shadow-purple-500/20"
-                          } shadow-2xl group h-full mx-auto flex flex-col justify-between transition-all duration-300 ${
-                            isSelected ? "transform scale-105" : ""
-                          } ${popular ? "md:-translate-y-5" : ""}`}
-                          onClick={() => setSelectedAlgo(plan.id)}
-                        >
-                          {popular && (
-                            <div className="pointer-events-none absolute top-0 right-0 bg-yellow-400 text-black text-xs font-bold px-4 py-1 rounded-bl-lg rounded-tr-lg">
-                              MOST POPULAR
-                            </div>
-                          )}
-
-                          <div
-                            className={`pointer-events-none absolute -inset-0.5 bg-gradient-to-r ${
-                              popular
-                                ? "from-yellow-400 to-amber-500"
-                                : "from-purple-600 to-indigo-500"
-                            } rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300`}
-                          />
-
-                          <div className="relative z-10">
-                            <div className="flex items-center gap-3 mb-4">
-                              {variantIcon(plan.key)}
-                              <h3 className="text-xl font-bold">
-                                {plan.name}
-                                {popular && (
-                                  <span className="ml-2 text-yellow-400">
-                                    <BadgeCheck className="inline w-5 h-5" />
-                                  </span>
-                                )}
-                              </h3>
-                            </div>
-
-                            <p className="text-gray-400 text-sm mb-4">
-                              {plan.description}
-                            </p>
-
-                            <div className="mb-6">
-                              <div className="text-4xl font-bold mb-1">
-                                {plan.price}
-                              </div>
-                              <div className="text-gray-400 text-sm">per month</div>
-                            </div>
-
-                            <ul className="space-y-3 text-sm text-gray-300 text-left mb-8">
-                              {plan.features.map((f) => (
-                                <li key={f} className="flex items-start gap-2">
-                                  <CheckCircle2
-                                    className={`flex-shrink-0 ${
-                                      popular ? "text-yellow-400" : "text-purple-400"
-                                    } w-4 h-4 mt-0.5`}
-                                  />
-                                  <span>{f}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          <Link
-                            to={linkTo}
-                            onClick={(e) =>
-                              onAlgoCtaClick(plan.key as "starter" | "pro" | "swing")(e)
-                            }
-                            className={`relative z-10 w-full mt-auto py-3 rounded-xl font-semibold transition-all duration-300 text-center ${
-                              popular
-                                ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-black hover:shadow-lg hover:shadow-yellow-500/30"
-                                : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg hover:shadow-purple-500/30"
-                            } flex items-center justify-center gap-2 ${
-                              userLoading || entLoading
-                                ? "opacity-70 cursor-not-allowed"
-                                : ""
-                            }`}
-                            aria-disabled={userLoading || entLoading}
-                            aria-label={`${label} for ${plan.name}`}
-                          >
-                            {label}
-                            <ChevronRight className="w-4 h-4" />
-                          </Link>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-10 text-gray-400 text-sm flex flex-col md:flex-row items-center justify-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-400" />
-                    <span>Secure payment processing</span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
+            {/* ===== JOURNALING ===== */}
             {activeTab === "journaling" && (
               <motion.div
                 key="journaling"
@@ -1273,23 +1345,27 @@ const Price = () => {
                 className="mb-20"
               >
                 <div className="text-center mb-12">
-                  <h2 className="text-3xl font-bold mb-2">Advanced Trading Journal</h2>
+                  <h2 className="text-3xl font-bold mb-2">
+                    Advanced Trading Journal
+                  </h2>
                   <p className="text-gray-400 max-w-2xl mx-auto">
-                    Transform your trading performance with detailed analytics, psychological
-                    insights, and actionable feedback
+                    Transform your trading performance with detailed analytics,
+                    psychological insights, and actionable feedback
                   </p>
                 </div>
 
-                <div className="rounded-2xl overflow-hidden shadow-xl bg-gray-800 border border-gray-700 max-w-5xl mx-auto">
+                <div className="rounded-2xl overflow-hidden shadow-xl bg-gray-800 border border-gray-700 mx-auto">
                   {/* Header band with toggle & price */}
                   <div className="relative">
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-10 md:px-12 text-white">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
                         <div className="mb-6 md:mb-0">
-                          <h2 className="text-2xl font-bold mb-2">Trading Journal Pro</h2>
+                          <h2 className="text-2xl font-bold mb-2">
+                            Trading Journal Pro
+                          </h2>
                           <p className="text-blue-100">
-                            Comprehensive trade analysis with psychological insights and
-                            performance tracking
+                            Comprehensive trade analysis with psychological
+                            insights and performance tracking
                           </p>
                         </div>
 
@@ -1327,7 +1403,9 @@ const Price = () => {
 
                           <div className="text-3xl font-bold">
                             {displayJournalPrice}
-                            <span className="text-lg font-normal">/{journalingPeriod}</span>
+                            <span className="text-lg font-normal">
+                              /{journalingPeriod}
+                            </span>
                           </div>
                           <div className="text-sm text-blue-200 mt-1">
                             No hidden fees • Cancel anytime
@@ -1336,38 +1414,82 @@ const Price = () => {
                       </div>
                     </div>
 
-                    {/* Content: two feature cards */}
+                    {/* Content: two feature cards + grid + CTAs */}
                     <div className="p-8">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                         {/* Performance Analytics card */}
                         <div className="bg-gray-700/30 p-6 rounded-xl border border-gray-600">
                           <div className="flex items-center mb-4">
                             <div className="bg-blue-700 p-3 rounded-lg mr-4">
-                              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2z" />
+                              <svg
+                                className="h-6 w-6 text-white"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2z"
+                                />
                               </svg>
                             </div>
-                            <h3 className="text-xl font-semibold text-blue-400">Performance Analytics</h3>
+                            <h3 className="text-xl font-semibold text-blue-400">
+                              Performance Analytics
+                            </h3>
                           </div>
                           <p className="text-gray-300 mb-4">
-                            Deep dive into your trading metrics with advanced analytics that highlight your strengths and pinpoint areas for improvement.
+                            Deep dive into your trading metrics with advanced
+                            analytics that highlight your strengths and pinpoint
+                            areas for improvement.
                           </p>
                           <ul className="text-sm text-gray-400 space-y-2">
                             <li className="flex items-center">
-                              <svg className="h-4 w-4 text-green-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <svg
+                                className="h-4 w-4 text-green-400 mr-2"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
                               </svg>
                               Win rate analysis by strategy & market condition
                             </li>
                             <li className="flex items-center">
-                              <svg className="h-4 w-4 text-green-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <svg
+                                className="h-4 w-4 text-green-400 mr-2"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
                               </svg>
                               Risk-reward ratio tracking
                             </li>
                             <li className="flex items-center">
-                              <svg className="h-4 w-4 text-green-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <svg
+                                className="h-4 w-4 text-green-400 mr-2"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
                               </svg>
                               Performance benchmarking
                             </li>
@@ -1378,31 +1500,75 @@ const Price = () => {
                         <div className="bg-gray-700/30 p-6 rounded-xl border border-gray-600">
                           <div className="flex items-center mb-4">
                             <div className="bg-purple-700 p-3 rounded-lg mr-4">
-                              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              <svg
+                                className="h-6 w-6 text-white"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
                               </svg>
                             </div>
-                            <h3 className="text-xl font-semibold text-purple-400">Psychological Insights</h3>
+                            <h3 className="text-xl font-semibold text-purple-400">
+                              Psychological Insights
+                            </h3>
                           </div>
                           <p className="text-gray-300 mb-4">
-                            Understand your emotional patterns and psychological triggers that impact your trading decisions and outcomes.
+                            Understand your emotional patterns and psychological
+                            triggers that impact your trading decisions and
+                            outcomes.
                           </p>
                           <ul className="text-sm text-gray-400 space-y-2">
                             <li className="flex items-center">
-                              <svg className="h-4 w-4 text-green-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <svg
+                                className="h-4 w-4 text-green-400 mr-2"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
                               </svg>
                               Emotional state tracking
                             </li>
                             <li className="flex items-center">
-                              <svg className="h-4 w-4 text-green-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <svg
+                                className="h-4 w-4 text-green-400 mr-2"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
                               </svg>
                               Bias identification tools
                             </li>
                             <li className="flex items-center">
-                              <svg className="h-4 w-4 text-green-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <svg
+                                className="h-4 w-4 text-green-400 mr-2"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
                               </svg>
                               Mindset improvement exercises
                             </li>
@@ -1412,7 +1578,9 @@ const Price = () => {
 
                       {/* Features grid */}
                       <div className="bg-black/20 rounded-lg p-6 mb-8 border border-gray-700">
-                        <div className="text-center text-lg font-semibold mb-4 text-blue-300">COMPREHENSIVE FEATURES</div>
+                        <div className="text-center text-lg font-semibold mb-4 text-blue-300">
+                          COMPREHENSIVE FEATURES
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
                           {[
                             "Trade tracking & performance analytics",
@@ -1424,8 +1592,13 @@ const Price = () => {
                             "Trade replay functionality",
                             "Risk management statistics",
                           ].map((feature, index) => (
-                            <div key={index} className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
-                              <div className="text-sm text-gray-300">{feature}</div>
+                            <div
+                              key={index}
+                              className="bg-gray-800/50 p-3 rounded-lg border border-gray-700"
+                            >
+                              <div className="text-sm text-gray-300">
+                                {feature}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1435,11 +1608,23 @@ const Price = () => {
                       <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-gray-700">
                         <div className="mb-4 sm:mb-0">
                           <div className="text-gray-400 text-sm mb-1">
-                            {bundleStatus.owned ? "Included in your Essential Bundle" : "Included in Essential Bundle"}
+                            {bundleStatus.owned
+                              ? "Included in your Essential Bundle"
+                              : "Included in Essential Bundle"}
                           </div>
                           <div className="flex items-center text-white">
-                            <svg className="h-5 w-5 text-green-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            <svg
+                              className="h-5 w-5 text-green-400 mr-2"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                              />
                             </svg>
                             Save 60% when purchased as part of the bundle
                           </div>
@@ -1454,9 +1639,12 @@ const Price = () => {
                             disabled={userLoading || entLoading || !bundle}
                           >
                             {bundleStatus.owned
-                              ? bundleStatus.interval === "yearly" || bundleBilling === "monthly"
+                              ? bundleStatus.interval === "yearly" ||
+                                bundleBilling === "monthly"
                                 ? "Go to Dashboard"
-                                : `Get Complete Bundle - ${fmtINR(BUNDLE_ANNUAL)}/year`
+                                : `Get Complete Bundle - ${fmtINR(
+                                    BUNDLE_ANNUAL
+                                  )}/year`
                               : `Get Complete Bundle - ${displayBundlePrice}/${bundlePeriod}`}
                           </button>
 
@@ -1464,48 +1652,52 @@ const Price = () => {
                           {!bundleStatus.owned && (
                             <button
                               onClick={handleJournalingCta}
-                              aria-label={journalingCtaLabel}
+                              aria-label="Get Journaling"
                               className={`border font-semibold py-3 px-6 rounded-lg transition-all ${
                                 journalingStatus.owned
                                   ? "border-emerald-500 text-emerald-400 hover:bg-emerald-900/30"
                                   : "border-blue-500 text-blue-400 hover:bg-blue-900/30"
                               } disabled:opacity-60`}
-                              disabled={userLoading || entLoading || !journaling}
+                              disabled={
+                                userLoading || entLoading || !journaling
+                              }
                             >
                               {journalingCtaLabel}
                             </button>
                           )}
 
-                          {/* Renew now (journaling SOLO) */}
-                          {journaling &&
-                            expiringJournalingSolo && (
-                              <button
-                                onClick={async (e) => {
-                                  e.preventDefault();
-                                  const token = localStorage.getItem("token");
-                                  if (!token) {
-                                    navigate(
-                                      toRegister(
-                                        journaling.key || "journaling_solo",
-                                        null,
-                                        journalBilling
-                                      ) + "&renew=1"
-                                    );
-                                    return;
-                                  }
-                                  await openProductCheckout(journaling, journalBilling, true);
-                                }}
-                                className="border border-emerald-500 text-emerald-400 hover:bg-emerald-900/30 font-semibold py-3 px-6 rounded-lg transition-all"
-                              >
-                                Renew now
-                              </button>
-                            )}
+                          {/* ✅ Renew now (Journaling SOLO) */}
+                          {journaling && expiringJournalingSolo && (
+                            <button
+                              onClick={async (e) => {
+                                e.preventDefault();
+                                const token = localStorage.getItem("token");
+                                if (!token) {
+                                  navigate(
+                                    toRegister(
+                                      journaling.key || "journaling_solo",
+                                      null,
+                                      journalBilling
+                                    ) + "&renew=1"
+                                  );
+                                  return;
+                                }
+                                await openProductCheckout(
+                                  journaling,
+                                  journalBilling,
+                                  true
+                                );
+                              }}
+                              className="border border-emerald-500 text-emerald-400 hover:bg-emerald-900/30 font-semibold py-3 px-6 rounded-lg transition-all"
+                            >
+                              Renew Now
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                {/* ======= /JOURNALING SECTION ======= */}
               </motion.div>
             )}
           </AnimatePresence>

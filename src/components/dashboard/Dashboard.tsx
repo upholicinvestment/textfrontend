@@ -1,6 +1,5 @@
-// src/components/dashboard/Dashboard.tsx
 import React, { useEffect, useMemo, useState, useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import api from "../../api";
 import { AuthContext } from "../../context/AuthContext";
 
@@ -42,17 +41,18 @@ import {
 import { useExpiryQueue, ExpiryItem } from "../../hooks/useExpiryQueue";
 import ExpiryModal from "./components/ExpiryModal";
 
+type SearchScope = "all" | "strategies" | "products" | "activity";
+
 const Dashboard: React.FC = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const { search } = useLocation();
+  const urlView = new URLSearchParams(search).get("view")?.toLowerCase();
 
   // ---------- Sidebar / UI ----------
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
-  // (optional) for the bell icon
-  const [openInbox, setOpenInbox] = useState(false);
-  const notifications = 3;
+  const [searchScope, setSearchScope] = useState<SearchScope>("all");
 
   // ---------- Entitlements ----------
   const [myProducts, setMyProducts] = useState<MyProduct[]>([]);
@@ -137,10 +137,16 @@ const Dashboard: React.FC = () => {
     [ownedKeys]
   );
 
-  // === DECISION: Which dashboard to show? ===
-  const shouldUseAlgoDashboard = ownsAlgo;
-  const shouldUseBundleDashboard =
-    !ownsAlgo && (hasBundleProduct || hasBundleViaComponents || ownsJournaling);
+  // Default view
+  const defaultView =
+    ownsAlgo
+      ? "algo"
+      : hasBundleProduct || hasBundleViaComponents || ownsJournaling
+      ? "bundle"
+      : "empty";
+
+  const view: "algo" | "bundle" | "empty" =
+    urlView === "algo" || urlView === "bundle" ? (urlView as any) : (defaultView as any);
 
   // ---------- History & date helpers (ALGO view only) ----------
   const availableKeys = useMemo(() => new Set(history.map((h) => h.dateKey)), [history]);
@@ -166,14 +172,14 @@ const Dashboard: React.FC = () => {
 
   // Keep date input in sync
   useEffect(() => {
-    if (!shouldUseAlgoDashboard) return;
+    if (view !== "algo") return;
     if (isToday) setDateInputISO(todayISO());
     else setDateInputISO(dateKeyToISO(selectedKey));
-  }, [selectedKey, isToday, shouldUseAlgoDashboard]);
+  }, [selectedKey, isToday, view]);
 
-  // Load summary history (latest N days) — ALGO only
+  // Load summary history — ALGO only
   useEffect(() => {
-    if (!shouldUseAlgoDashboard) return;
+    if (view !== "algo") return;
     (async () => {
       try {
         const r = await api.get("/summary/history?limit=30", { params: withUser() });
@@ -187,81 +193,50 @@ const Dashboard: React.FC = () => {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldUseAlgoDashboard]);
+  }, [view]);
 
-  // Load summary (today live or by-date) with polling for today — ALGO only
+  // Load summary (today or by-date) — ALGO only
   useEffect(() => {
-    if (!shouldUseAlgoDashboard) return;
+    if (view !== "algo") return;
 
     let isMounted = true;
     let timer: any = null;
 
-    // const loadToday = async () => {
-    //   try {
-    //     setSummaryError(null);
-    //     const r = await api.get("/summary", { params: withUser() });
-    //     if (isMounted) setSummary(r.data as Summary);
-    //     Promise.allSettled([
-    //       api.get("/orderbook/save-raw", { params: withUser() }),
-    //       api.get("/pnl/trades/save", { params: withUser() }),
-    //     ]).catch(() => {});
-    //   } catch {
-    //     if (isMounted) {
-    //       setSummary(null);
-    //       setSummaryError("Couldn’t load summary.");
-    //     }
-    //   }
-    // };
-
-    // optional: keep this helper somewhere central
-const checkBrokerConfigs = async (): Promise<boolean> => {
-  try {
-    const r = await api.get("/broker-configs/exists", {
-      params: withUser(),
-      validateStatus: () => true,
-    });
-    return r.status === 200 && !!r.data?.hasBrokerConfig;
-  } catch {
-    return false;
-  }
-};
-
-const loadToday = async () => {
-  try {
-    setSummaryError(null);
-
-    // 1) Gate everything behind broker-config presence
-    const hasBroker = await checkBrokerConfigs();
-    if (!hasBroker) {
-      // choose one of these behaviours:
-      if (isMounted) {
-        // A) show nothing
-        setSummary(null);
-        // (optional) setSummaryError("Connect a broker to see today's summary.");
-        // B) or show zeros instead of an error:
-        // setSummary({ totalPnl: 0, totalTrades: 0, openPositions: 0, successRatePct: 0, riskReward: 0 });
+    const checkBrokerConfigs = async (): Promise<boolean> => {
+      try {
+        const r = await api.get("/broker-configs/exists", {
+          params: withUser(),
+          validateStatus: () => true,
+        });
+        return r.status === 200 && !!r.data?.hasBrokerConfig;
+      } catch {
+        return false;
       }
-      return;
-    }
+    };
 
-    // 2) Now safe to call /summary
-    const r = await api.get<Summary>("/summary", { params: withUser() });
-    if (isMounted) setSummary(r.data);
+    const loadToday = async () => {
+      try {
+        setSummaryError(null);
+        const hasBroker = await checkBrokerConfigs();
+        if (!hasBroker) {
+          if (isMounted) setSummary(null);
+          return;
+        }
+        const r = await api.get<Summary>("/summary", { params: withUser() });
+        if (isMounted) setSummary(r.data);
 
-    // 3) Fire the side-effect saves (no throw/no console noise on 4xx)
-    void Promise.allSettled([
-      api.get("/orderbook/save-raw", { params: withUser(), validateStatus: () => true }),
-      api.get("/pnl/trades/save",   { params: withUser(), validateStatus: () => true }),
-    ]);
-  } catch {
-    if (isMounted) {
-      setSummary(null);
-      setSummaryError("Couldn’t load summary.");
-    }
-  }
-};
+        void Promise.allSettled([
+          api.get("/orderbook/save-raw", { params: withUser(), validateStatus: () => true }),
+          api.get("/pnl/trades/save", { params: withUser(), validateStatus: () => true }),
+        ]);
+      } catch {
+        if (isMounted) {
+          setSummary(null);
+          setSummaryError("Couldn’t load summary.");
+        }
+      }
+    };
 
-    
     const loadByDate = async (dateKey: string) => {
       try {
         setSummaryError(null);
@@ -293,9 +268,9 @@ const loadToday = async () => {
       if (timer) clearInterval(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey, isToday, shouldUseAlgoDashboard]);
+  }, [selectedKey, isToday, view]);
 
-  // Compute day range (UTC) for strategies (ALGO only)
+  // Compute day range (UTC) for strategies
   const dayFromTo = useMemo(() => {
     const iso = dateInputISO;
     const from = `${iso}T00:00:00.000Z`;
@@ -303,9 +278,9 @@ const loadToday = async () => {
     return { from, to };
   }, [dateInputISO]);
 
-  // Load strategy-wise P&L when day changes — ALGO only
+  // Load strategy-wise P&L — ALGO only
   useEffect(() => {
-    if (!shouldUseAlgoDashboard) return;
+    if (view !== "algo") return;
     let cancelled = false;
     (async () => {
       try {
@@ -329,11 +304,12 @@ const loadToday = async () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayFromTo.from, dayFromTo.to, shouldUseAlgoDashboard]);
+  }, [dayFromTo.from, dayFromTo.to, view]);
 
-  // sorting + filtered list for strategies (uses top search)
+  // 🔎 Scoped + sorted strategies view
   const strategiesView = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const qAll = searchQuery.trim().toLowerCase();
+    const q = searchScope === "all" || searchScope === "strategies" ? qAll : "";
     const arr = strategies.filter((s) => !q || s.strategyName.toLowerCase().includes(q));
     const sorters: Record<typeof sortBy, (a: StrategyPnL, b: StrategyPnL) => number> = {
       pnl: (a, b) => a.pnl - b.pnl,
@@ -346,7 +322,7 @@ const loadToday = async () => {
       return sortDir === "desc" ? -v : v;
     });
     return arr;
-  }, [strategies, searchQuery, sortBy, sortDir]);
+  }, [strategies, searchQuery, searchScope, sortBy, sortDir]);
 
   const hasAllBundle = useMemo(
     () => hasBundleProduct || hasBundleViaComponents,
@@ -391,7 +367,7 @@ const loadToday = async () => {
         icon: <PackageOpen className="h-6 w-6" />,
         stats: "2 tools included",
         change: "+12.4%",
-        link: "/bundle",
+        link: "/dashboard?view=bundle",
         gradient: "from-blue-500 to-cyan-400",
         trend: "up",
         newFeature: false,
@@ -431,7 +407,7 @@ const loadToday = async () => {
         icon: <Activity className="h-6 w-6" />,
         stats: chips.length ? `${chips.length} plan${chips.length > 1 ? "s" : ""} active` : "Active",
         change: "+15.7%",
-        link: algo?.route || "/comming-soon",
+        link: "/dashboard?view=algo",
         gradient: "from-purple-500 to-violet-400",
         trend: "up",
         newFeature: true,
@@ -458,7 +434,28 @@ const loadToday = async () => {
     return ui;
   }, [myProducts, hasAllBundle, ownsJournalingSolo, ownedKeys, algoVariantBadges]);
 
-  // ✅ Use these three computed links in children
+  // 🔎 Scoped search for products
+  const productsUIFiltered = useMemo(() => {
+    const qAll = searchQuery.trim().toLowerCase();
+    const q = searchScope === "all" || searchScope === "products" ? qAll : "";
+    if (!q) return productsUI;
+
+    const matchCard = (p: ProductUI) => {
+      const hay = [
+        p.name,
+        p.description ?? "",
+        ...(p.bundleComponents?.map((c) => c.label) ?? []),
+        ...(p.algoVariants?.map((v) => v.label) ?? []),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    };
+
+    return productsUI.filter(matchCard);
+  }, [productsUI, searchQuery, searchScope]);
+
+  // ✅ Links used in children
   const journalingLink =
     myProducts.find((p) => p.key === "journaling")?.route ||
     myProducts.find((p) => p.key === "journaling_solo")?.route ||
@@ -469,10 +466,9 @@ const loadToday = async () => {
     componentRouteMap["fii_dii_data"] ||
     "/fii-dii";
 
-  const algoLink =
-    myProducts.find((p) => p.key === "algo_simulator")?.route || "/comming-soon";
+  const algoLink = myProducts.find((p) => p.key === "algo_simulator")?.route || "/comming-soon";
 
-  // ---- Stat cards derived from summary ----
+  // ---- Stat cards
   const statCards: Stat[] = [
     {
       title: "Triggered Trades",
@@ -486,8 +482,7 @@ const loadToday = async () => {
     },
     {
       title: "Portfolio Value",
-      value:
-        summary ? prettyINR(summary.totalPnl) ?? String(summary.totalPnl) : "—",
+      value: summary ? prettyINR(summary.totalPnl) ?? String(summary.totalPnl) : "—",
       icon: <DollarSign className="h-5 w-5" />,
       trend: summary && summary.totalPnl >= 0 ? "up" : "down",
       change: "",
@@ -527,6 +522,7 @@ const loadToday = async () => {
     },
   ];
 
+  // Loads
   const loadTriggeredTrades = async (opts?: { strategy?: string }) => {
     try {
       setTradesError(null);
@@ -586,15 +582,13 @@ const loadToday = async () => {
       const r = await api.get("/positions/open", {
         params: withUser({ from: dayFromTo.from, to: dayFromTo.to }),
       });
-      const rows: LivePosition[] = (Array.isArray(r.data?.data) ? r.data.data : []).map(
-        (x: any) => ({
-          id: x.id ?? `${x.symbol}|${x.side ?? "NA"}`,
-          symbol: x.symbol,
-          qty: x.qty,
-          avgPrice: x.avgEntry ?? 0,
-          ts: x.lastFillMs ?? null,
-        })
-      );
+      const rows: LivePosition[] = (Array.isArray(r.data?.data) ? r.data.data : []).map((x: any) => ({
+        id: x.id ?? `${x.symbol}|${x.side ?? "NA"}`,
+        symbol: x.symbol,
+        qty: x.qty,
+        avgPrice: x.avgEntry ?? 0,
+        ts: x.lastFillMs ?? null,
+      }));
       setPositions(rows);
     } catch (e: any) {
       setPositions([]);
@@ -629,7 +623,6 @@ const loadToday = async () => {
       const status: string | undefined =
         p.status || p.subscriptionStatus || p.entitlementStatus || "active";
 
-      // ✅ Prefer explicit renewal/manage URLs; default to /pricing?renew=1&productKey=...&variantKey=...
       const qs = new URLSearchParams({
         renew: "1",
         productKey: String((p.key || "").toLowerCase()),
@@ -644,30 +637,27 @@ const loadToday = async () => {
       items.push({ id: String(id), name: String(name), endsAt: String(endsAt), status, renewUrl });
     }
 
-    // de-dup by id
     const unique: Record<string, ExpiryItem> = {};
     for (const it of items) unique[it.id] = it;
     return Object.values(unique);
   }, [myProducts]);
 
-  // ✅ nudge flag to recompute queue once right after successful login
   const [kickExpiry, setKickExpiry] = useState(0);
 
-  // ✅ one-time clear of today's seen flags if we *just logged in*
   useEffect(() => {
     if (loadingEntitlements) return;
 
-    const justLoggedIn = sessionStorage.getItem('__justLoggedIn') === '1';
+    const justLoggedIn = sessionStorage.getItem("__justLoggedIn") === "1";
     if (!justLoggedIn) return;
 
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = new Date().toISOString().slice(0, 10);
     for (const it of expiryItems) {
       try {
         localStorage.removeItem(`${today}::expiry::${it.id}`);
       } catch {}
     }
-    sessionStorage.removeItem('__justLoggedIn');
-    setKickExpiry((n) => n + 1); // force items identity change below
+    sessionStorage.removeItem("__justLoggedIn");
+    setKickExpiry((n) => n + 1);
   }, [loadingEntitlements, expiryItems]);
 
   const {
@@ -676,10 +666,8 @@ const loadToday = async () => {
     dismiss: closeExpiryModal,
     renew: renewExpiry,
   } = useExpiryQueue({
-    // change identity when kickExpiry flips so the hook recomputes immediately after login
     items: kickExpiry ? expiryItems.slice() : expiryItems,
     maxDays: 7,
-    // debug: true,
   });
 
   // Navigation actions
@@ -722,10 +710,11 @@ const loadToday = async () => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
+          /** NEW scope props */
+          searchScope={searchScope}
+          onSearchScopeChange={setSearchScope}
           dateLabel={undefined}
           onHomeClick={() => navigate("/")}
-          onBellClick={() => setOpenInbox(true)}
-          notifications={notifications}
         />
 
         <main className="flex-1 overflow-auto">
@@ -733,8 +722,11 @@ const loadToday = async () => {
             <div className="max-w-7xl mx-auto">
               {loadingEntitlements ? (
                 <div className="text-sm text-slate-600">Loading dashboard…</div>
-              ) : shouldUseAlgoDashboard ? (
+              ) : view === "algo" ? (
                 <AlgoDashboardBody
+                  /** NEW search props */
+                  searchQuery={searchQuery}
+                  searchScope={searchScope}
                   userName={user?.name}
                   isToday={isToday}
                   selectedKey={selectedKey}
@@ -761,7 +753,8 @@ const loadToday = async () => {
                   sortDir={sortDir}
                   setSortBy={setSortBy}
                   setSortDir={setSortDir}
-                  productsUI={productsUI}
+                  /** pass filtered products */
+                  productsUI={productsUIFiltered}
                   loadingEntitlements={loadingEntitlements}
                   tradesLoading={tradesLoading}
                   tradesError={tradesError}
@@ -772,24 +765,22 @@ const loadToday = async () => {
                   loadTriggeredTrades={loadTriggeredTrades}
                   loadLivePositions={loadLivePositions}
                 />
-              ) : shouldUseBundleDashboard ? (
+              ) : view === "bundle" ? (
                 <BundleDashboardBody
                   journalingLink={journalingLink}
                   fiiDiiLink={fiiDiiLink}
                   ownsFiiDii={ownsFiiDii}
                   showFiiDiiInQuickAccess={showFiiDiiInQuickAccess}
                   loadingEntitlements={loadingEntitlements}
-                  productsUI={productsUI}
+                  /** pass filtered products */
+                  productsUI={productsUIFiltered}
                 />
               ) : (
                 <div className="bg-white rounded-2xl border border-slate-100 p-8 text-slate-700">
-                  <h2 className="text-xl font-bold text-slate-900 mb-2">
-                    No products yet
-                  </h2>
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">No products yet</h2>
                   <p className="mb-4">
                     Buy the <span className="font-semibold">Trader’s Essential Bundle</span> or the{" "}
-                    <span className="font-semibold">ALGO Simulator</span> to unlock this
-                    dashboard.
+                    <span className="font-semibold">ALGO Simulator</span> to unlock this dashboard.
                   </p>
                   <a
                     href="/pricing"
@@ -819,22 +810,13 @@ const loadToday = async () => {
               </div>
 
               <div className="flex items-center space-x-6 text-sm">
-                <Link
-                  to="/terms"
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
-                >
+                <Link to="/terms" className="text-gray-500 hover:text-gray-700 transition-colors">
                   Terms
                 </Link>
-                <Link
-                  to="/privacy"
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
-                >
+                <Link to="/privacy" className="text-gray-500 hover:text-gray-700 transition-colors">
                   Privacy
                 </Link>
-                <Link
-                  to="/contact-us"
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
-                >
+                <Link to="/contact-us" className="text-gray-500 hover:text-gray-700 transition-colors">
                   Contact Us
                 </Link>
               </div>
@@ -843,22 +825,9 @@ const loadToday = async () => {
         </footer>
       </div>
 
-      {/* Optional inbox drawer/modal for the bell */}
-      {openInbox && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/40"
-          onClick={() => setOpenInbox(false)}
-        />
-      )}
-
-      {/* 🔔 Expiry UI popup (shown when there’s something expiring soon) */}
+      {/* 🔔 Expiry UI popup */}
       {showExpiryModal && expiryCurrent && (
-        <ExpiryModal
-          open
-          item={expiryCurrent}
-          onDismiss={closeExpiryModal}
-          onRenew={renewExpiry}
-        />
+        <ExpiryModal open item={expiryCurrent} onDismiss={closeExpiryModal} onRenew={renewExpiry} />
       )}
     </div>
   );

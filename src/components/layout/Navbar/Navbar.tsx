@@ -217,7 +217,7 @@ const Navbar = () => {
       name: "FNO Khazana", 
       icon: <FiDollarSign className="text-lg" />, 
       color: "bg-gradient-to-br from-green-500 to-teal-500", 
-      path: "/comming-soon",
+      path: "/fno-khazana",
       description: "Futures & Options market analysis and insights"
     },
     { 

@@ -1,3 +1,5 @@
+import React from "react";
+
 // ---------- Types returned by /users/me/products ----------
 export interface MyVariant {
   variantId: string;
@@ -5,17 +7,22 @@ export interface MyVariant {
   name: string;
   priceMonthly?: number | null;
   interval?: string | null;
+  /** NEW: per-variant entitlement window/status */
+  endsAt?: string | null;
+  startedAt?: string | null;
+  status?: string | null;
 }
+
 export interface MyProduct {
   productId: string;
-  key: string; // component keys, algo_simulator, journaling_solo, essentials_bundle, fii_dii_data, journaling
+  key: string; // algo_simulator, journaling_solo, essentials_bundle, fii_dii_data, journaling
   name: string;
   route: string; // e.g. "/fii-dii"
   hasVariants: boolean;
   forSale: boolean;
   status: string; // "active"
   startedAt: string | null;
-  endsAt: string | null;
+  endsAt: string | null; // max across user entitlements for this product
   variant: MyVariant | null;
   /** if backend groups multiple entitlements into one product, all variants arrive here */
   variants?: MyVariant[];
