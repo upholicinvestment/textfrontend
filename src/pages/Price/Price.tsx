@@ -358,12 +358,6 @@ const Price = () => {
     ],
   };
 
-  const variantKeyById = useMemo(() => {
-    const m = new Map<string, "starter" | "pro" | "swing">();
-    for (const v of algo?.variants || [])
-      m.set(String(v._id), normalizeVariantKey(v.key) as any);
-    return m;
-  }, [algo]);
 
   const startOfDay = (d: Date) => {
     const x = new Date(d);
