@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Menu, Search, Calendar, Home, Filter, Activity, PackageOpen } from "lucide-react";
 import NotificationBell from "../../notifications/NotificationBell";
 
