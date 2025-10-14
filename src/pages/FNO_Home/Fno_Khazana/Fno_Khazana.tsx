@@ -3,7 +3,7 @@ import ChartMapping from "../../ChartMapping/ChartMapping";
 const Fno_Khazana = () => {
   return (
     <>
-      <div className="pt-3">
+      <div>
         <ChartMapping />
       </div>
     </>

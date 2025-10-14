@@ -37,7 +37,7 @@ const Footer: React.FC = () => {
   ];
 
   const company = [
-    // { name: 'Careers', path: '/careers' },
+    { name: 'Support', path: '/comming-soon' },
     // { name: 'Partners', path: '/partners' },
     { name: 'Contact', path: '/contact-us' },
     // { name: 'Press Kit', path: '/press' },

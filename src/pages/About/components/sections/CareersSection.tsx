@@ -961,7 +961,10 @@ function ApplyModal({
     if (!form.name.trim()) e.name = "Full name is required";
     if (!form.email.trim()) e.email = "Email is required";
     else if (!EMAIL_RX.test(form.email)) e.email = "Enter a valid email";
+    // if (!form.phone.trim()) e.phone = "Phone is required";
     if (!form.phone.trim()) e.phone = "Phone is required";
+    else if (!/^\d{10}$/.test(form.phone)) e.phone = "Enter a valid 10-digit phone";
+
     if (!form.linkedin.trim()) e.linkedin = "LinkedIn is required";
     if (form.expYears === "") e.expYears = "Experience is required";
     else if (isNaN(Number(form.expYears)) || Number(form.expYears) < 0)
@@ -1092,10 +1095,26 @@ function ApplyModal({
                       onChange={(v) => { setForm({ ...form, email: v }); if (errors.email) setErrors({ ...errors, email: "" }); }}
                       error={errors.email}
                     />
-                    <Input id="apply-phone" label="Phone" value={form.phone}
+                    {/* <Input id="apply-phone" label="Phone" value={form.phone}
                       onChange={(v) => { setForm({ ...form, phone: v }); if (errors.phone) setErrors({ ...errors, phone: "" }); }}
                       error={errors.phone}
-                    />
+                    /> */}
+                    <Input
+  id="apply-phone"
+  label="Phone"
+  type="tel"
+  inputMode="numeric"
+  maxLength={10}
+  pattern="\d{10}"
+  value={form.phone}
+  onChange={(v) => {
+    const digits = v.replace(/\D/g, "").slice(0, 10);
+    setForm({ ...form, phone: digits });
+    if (errors.phone) setErrors({ ...errors, phone: "" });
+  }}
+  error={errors.phone}
+/>
+
                     <Input id="apply-linkedin" label="LinkedIn" placeholder="https://"
                       value={form.linkedin}
                       onChange={(v) => { setForm({ ...form, linkedin: v }); if (errors.linkedin) setErrors({ ...errors, linkedin: "" }); }}
@@ -1228,7 +1247,10 @@ function SendResumeModal({ open, onClose }: { open: boolean; onClose: () => void
     if (!form.name.trim()) e.name = "Full name is required";
     if (!form.email.trim()) e.email = "Email is required";
     else if (!EMAIL_RX.test(form.email)) e.email = "Enter a valid email";
+    // if (!form.phone.trim()) e.phone = "Phone is required";
     if (!form.phone.trim()) e.phone = "Phone is required";
+    else if (!/^\d{10}$/.test(form.phone)) e.phone = "Enter a valid 10-digit phone";
+
     if (!form.targetDepartment.trim()) e.targetDepartment = "Preferred department is required";
     if (!form.roleTitle.trim()) e.roleTitle = "Desired role title is required";
     if (!form.linkedin.trim()) e.linkedin = "LinkedIn is required";
@@ -1356,10 +1378,26 @@ function SendResumeModal({ open, onClose }: { open: boolean; onClose: () => void
                       onChange={(v) => { setForm({ ...form, email: v }); if (errors.email) setErrors({ ...errors, email: "" }); }}
                       error={errors.email}
                     />
-                    <Input id="resume-phone" label="Phone" value={form.phone}
+                    {/* <Input id="resume-phone" label="Phone" value={form.phone}
                       onChange={(v) => { setForm({ ...form, phone: v }); if (errors.phone) setErrors({ ...errors, phone: "" }); }}
                       error={errors.phone}
+                    /> */}
+                    <Input
+                      id="apply-phone"
+                      label="Phone"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="\d{10}"
+                      value={form.phone}
+                      onChange={(v) => {
+                        const digits = v.replace(/\D/g, "").slice(0, 10);
+                        setForm({ ...form, phone: digits });
+                        if (errors.phone) setErrors({ ...errors, phone: "" });
+                      }}
+                      error={errors.phone}
                     />
+
                     <Input id="resume-targetDepartment" label="Preferred Department"
                       value={form.targetDepartment}
                       onChange={(v) => { setForm({ ...form, targetDepartment: v }); if (errors.targetDepartment) setErrors({ ...errors, targetDepartment: "" }); }}
@@ -1455,6 +1493,44 @@ function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: str
   );
 }
 
+// function Input({
+//   id,
+//   label,
+//   value,
+//   onChange,
+//   type = "text",
+//   placeholder,
+//   error,
+// }: {
+//   id?: string;
+//   label: string;
+//   value: string | number;
+//   onChange: (v: string) => void;
+//   type?: string;
+//   placeholder?: string;
+//   error?: string;
+// }) {
+//   const hasError = !!error;
+//   return (
+//     <div className="flex flex-col">
+//       <Label htmlFor={id}>{label}</Label>
+//       <input
+//         id={id}
+//         type={type}
+//         value={value}
+//         placeholder={placeholder}
+//         onChange={(e) => onChange(e.target.value)}
+//         aria-invalid={hasError}
+//         className={`w-full bg-slate-900/80 border rounded-xl px-3 py-2 text-slate-200 outline-none transition-colors
+//         ${hasError
+//           ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30"
+//           : "border-slate-700 focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40"
+//         }`}
+//       />
+//       {hasError && <span className="mt-1 text-xs text-red-400">{error}</span>}
+//     </div>
+//   );
+// }
 function Input({
   id,
   label,
@@ -1463,6 +1539,9 @@ function Input({
   type = "text",
   placeholder,
   error,
+  inputMode,
+  maxLength,
+  pattern,
 }: {
   id?: string;
   label: string;
@@ -1471,6 +1550,9 @@ function Input({
   type?: string;
   placeholder?: string;
   error?: string;
+  inputMode?: React.InputHTMLAttributes<HTMLInputElement>["inputMode"];
+  maxLength?: number;
+  pattern?: string;
 }) {
   const hasError = !!error;
   return (
@@ -1482,11 +1564,15 @@ function Input({
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
+        inputMode={inputMode}
+        maxLength={maxLength}
+        pattern={pattern}
         aria-invalid={hasError}
         className={`w-full bg-slate-900/80 border rounded-xl px-3 py-2 text-slate-200 outline-none transition-colors
-        ${hasError
-          ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30"
-          : "border-slate-700 focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40"
+        ${
+          hasError
+            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30"
+            : "border-slate-700 focus:border-[#4a56d2] focus:ring-2 focus:ring-[#4a56d2]/40"
         }`}
       />
       {hasError && <span className="mt-1 text-xs text-red-400">{error}</span>}

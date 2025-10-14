@@ -1,3 +1,4 @@
+// src/components/dashboard/Dashboard.tsx
 import React, { useEffect, useMemo, useState, useContext } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import api from "../../api";
@@ -43,7 +44,16 @@ import ExpiryModal from "./components/ExpiryModal";
 
 type SearchScope = "all" | "strategies" | "products" | "activity";
 
-const Dashboard: React.FC = () => {
+/** NEW: Suggestion type for HeaderBar autocomplete */
+type Suggestion = {
+  key: string;
+  label: string;
+  hint?: string;
+  type: "strategy" | "product";
+  href?: string;
+};
+
+const Dashboard: React.FC<{}> = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const { search } = useLocation();
@@ -680,6 +690,94 @@ const Dashboard: React.FC = () => {
     if (next) setSelectedKey(next);
   };
 
+  /* ================================
+   *   AUTOCOMPLETE SUGGESTIONS
+   * ================================ */
+  const suggestions: Suggestion[] = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+
+    // Strategy suggestions (unique names)
+    const stratSet = new Set<string>();
+    for (const s of strategies) {
+      if (!s?.strategyName) continue;
+      const name = s.strategyName;
+      if (name.toLowerCase().includes(q)) stratSet.add(name);
+    }
+    const strategySugs: Suggestion[] = Array.from(stratSet).slice(0, 8).map((name) => ({
+      key: `strat::${name}`,
+      label: name,
+      hint: "Filter strategies to this name",
+      type: "strategy",
+    }));
+
+    // Product suggestions (cards + component chips + variants)
+    const productSugs: Suggestion[] = productsUI
+      .flatMap((p) => {
+        const arr: Suggestion[] = [];
+        if (p.name?.toLowerCase().includes(q)) {
+          arr.push({
+            key: `prod::${p.id}`,
+            label: p.name,
+            hint: p.description || "Open product dashboard",
+            type: "product",
+            href: p.link || "#",
+          });
+        }
+        (p.bundleComponents || []).forEach((c) => {
+          if (c.label.toLowerCase().includes(q)) {
+            arr.push({
+              key: `prodchip::${p.id}::${c.key}`,
+              label: c.label,
+              hint: p.name,
+              type: "product",
+              href: p.link || "#",
+            });
+          }
+        });
+        (p.algoVariants || []).forEach((v) => {
+          if (v.label.toLowerCase().includes(q)) {
+            arr.push({
+              key: `prodvar::${p.id}::${v.key}`,
+              label: `${p.name} — ${v.label}`,
+              hint: p.stats || "ALGO variant",
+              type: "product",
+              href: p.link || "#",
+            });
+          }
+        });
+        return arr;
+      })
+      .slice(0, 8);
+
+    // Respect scope
+    if (searchScope === "strategies") return strategySugs.slice(0, 8);
+    if (searchScope === "products") return productSugs.slice(0, 8);
+
+    // "all" or "activity": interleave results for balance
+    const out: Suggestion[] = [];
+    const max = Math.max(strategySugs.length, productSugs.length);
+    for (let i = 0; i < max; i++) {
+      if (strategySugs[i]) out.push(strategySugs[i]);
+      if (productSugs[i]) out.push(productSugs[i]);
+    }
+    return out.slice(0, 10);
+  }, [searchQuery, searchScope, strategies, productsUI]);
+
+  const onPickSuggestion = (s: Suggestion) => {
+    if (s.type === "product" && s.href) {
+      setSearchScope("products");
+      setSearchQuery(s.label);
+      navigate(s.href);
+      return;
+    }
+    if (s.type === "strategy") {
+      setSearchScope("strategies");
+      setSearchQuery(s.label);
+      // remain on page; table will filter automatically
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50/50">
       {/* Sidebar */}
@@ -713,6 +811,9 @@ const Dashboard: React.FC = () => {
           /** NEW scope props */
           searchScope={searchScope}
           onSearchScopeChange={setSearchScope}
+          /** NEW suggestions props */
+          suggestions={suggestions}
+          onPickSuggestion={onPickSuggestion}
           dateLabel={undefined}
           onHomeClick={() => navigate("/")}
         />

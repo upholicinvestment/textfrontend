@@ -3,7 +3,11 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 
 import Home from '../pages/Home/Home';
+import AdminDashboard from '../pages/Admin/AdminDashboard';
+
 import Layout from '../pages/FNO_Home/Layout/Layout';
+import Main from '../pages/FNO_Home/Fno_Homepage/Main';
+// import ScannerDashboard from '../pages/Fundamental_Scanner/Scanner_Dashboard/ScannerDashboard';
 import Fii_Dii_Activity from '../pages/Fii_Dii/Fii_Dii/Fii_Dii_Activity';
 import Fii_Dii_Fno from '../pages/Fii_Dii/Fii_Dii/Fii_Dii_Fno';
 import Dii_Index_Opt from '../pages/Fii_Dii/Dii_Index/Dii_Index_Opt';
@@ -31,6 +35,7 @@ import Algo_Similator_Home from '../pages/Algo_Simulator/Algo_Home/Algo_Similato
 import FiiDiiHome from '../pages/Fii_Dii/Fii_Dii_Home/FiiDiiHome';
 import MyProfile from '../pages/Myprofile/Myprofile';
 import RequireEntitlement from './RequireEntitlement'; // ⬅️ NEW
+// import Support from '../pages/Policies/Support';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -38,7 +43,9 @@ const AppRoutes: React.FC = () => {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Home />} />
-        <Route path="/fno-khazana" element={<Layout />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/fno-khazana-charts" element={<Layout />} />
+        <Route path="/fno-khazana" element={<Main/>} />
         <Route path="/fii-dii-activity" element={<Fii_Dii_Activity />} />
         <Route path="/fii-dii-fno" element={<Fii_Dii_Fno />} />
         <Route path="/dii-index-opt" element={<Dii_Index_Opt />} />
@@ -56,7 +63,8 @@ const AppRoutes: React.FC = () => {
         <Route path="/contact-us" element={<ContactUs />} />
         <Route path="/algo-simulator" element={<Algo_Similator_Home />} />
         <Route path='/fii-dii-fno-home' element={<FiiDiiHome/>} />
-
+        {/* <Route path='/support' element={<Support/>} /> */}
+        {/* <Route path="/fundamental-scanner" element={<ScannerDashboard />} /> */}
         {/* Guest-only: login & signup (keeps your purchase allowance logic) */}
         <Route element={<GuestRoute />}>
           <Route path="/login" element={<Login />} />

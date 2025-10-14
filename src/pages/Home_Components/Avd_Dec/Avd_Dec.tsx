@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { motion } from "framer-motion";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface ChartData {
   time: string;
@@ -27,115 +27,122 @@ interface MarketBreadthData {
   chartData: ChartData[];
 }
 
+const REFRESH_MS = 10_000; // ⏱️ poll every 10s
+const API_URL = "https://api.upholictech.com/api/advdec?bin=5"; // you can tweak bin
+
 const Avd_Dec: React.FC = () => {
   const [data, setData] = useState<MarketBreadthData | null>(null);
-  const [loading, setLoading] = useState(true); // Start with loading true
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const controllerRef = useRef<AbortController | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // console.log("Component render - loading:", loading, "data:", data, "error:", error);
+  const controllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
 
   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <motion.div
-      className="w-full max-w-5xl min-h-[300px] bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl shadow-xl p-6"
+      className="w-full max-w-5xl min-h-[300px] rounded-2xl shadow-xl p-6"
       initial={{ opacity: 0, y: 50 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
+      style={{
+        background: "var(--card-bg)",
+        color: "var(--fg)",
+        border: "1px solid var(--border)",
+      }}
     >
       {children}
     </motion.div>
   );
 
-  useEffect(() => {
-    // console.log("Effect running - initial fetch");
-    
-    const fetchData = async () => {
-      controllerRef.current = new AbortController();
-      const signal = controllerRef.current.signal;
+  const fetchData = useCallback(async () => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
 
-      try {
-        // console.log("Starting fetch request");
-        const response = await fetch("https://api.upholictech.com/api/advdec", {
-          signal,
-          cache: 'no-cache'
-        });
-        
+    try {
+      const url = `${API_URL}&_=${Date.now()}`; // cache-buster
+      const resp = await fetch(url, {
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        // console.log("Received data:", result);
-
-        if (!result || !result.current || !result.chartData) {
-          throw new Error("Invalid data structure received");
-        }
-
-        setData(result);
-        setLoading(false);
-        setError(null);
-      } catch (err) {
-        // if (err.name !== 'AbortError') {
-          // console.error("Fetch error:", err);
-          // setError(err.message || "Failed to load data");
-          // setLoading(false);
-        // }
-        
+      const json: MarketBreadthData = await resp.json();
+      if (!json || typeof json !== "object" || !json.current || !json.chartData) {
+        throw new Error("Invalid payload");
       }
-    };
 
-    fetchData();
-
-    const intervalId = setInterval(fetchData, 70000);
-    // console.log("Set up refresh interval");
-
-    return () => {
-      // console.log("Cleanup - aborting request and clearing interval");
-      if (controllerRef.current) {
-        controllerRef.current.abort();
-      }
-      clearInterval(intervalId);
-    };
+      if (!mountedRef.current) return;
+      setData(json);
+      setLastUpdated(new Date());
+      setError(null);
+      setLoading(false);
+    } catch (e: any) {
+      if (e?.name === "AbortError") return; // expected on refresh/unmount
+      if (!mountedRef.current) return;
+      setError(e?.message || "Failed to load data");
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    fetchData();
+    const id = setInterval(fetchData, REFRESH_MS);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(id);
+      controllerRef.current?.abort();
+    };
+  }, [fetchData]);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    fetchData();
+  };
+
   if (loading) {
-    // console.log("Rendering loading state");
     return (
       <Wrapper>
-        <h2 className="text-2xl font-bold text-center text-white mb-4">
+        <h2 className="text-2xl font-bold text-center mb-4" style={{ color: "var(--fg)" }}>
           📈 Market Breadth (Adv/Dec)
         </h2>
-        <div className="flex justify-center gap-10 mb-6 text-white text-base sm:text-lg">
-          {['Advances', 'Declines', 'Total'].map((item) => (
+        <div className="flex justify-center gap-10 mb-6 text-base sm:text-lg" style={{ color: "var(--fg)" }}>
+          {["Advances", "Declines", "Total"].map((item) => (
             <div key={item}>
-              <span className="text-gray-400">{item}: </span>
-              <span className="animate-pulse bg-gray-700 rounded h-6 w-10 inline-block"></span>
+              <span style={{ color: "var(--muted)" }}>{item}: </span>
+              <span
+                className="animate-pulse rounded h-6 w-10 inline-block align-middle"
+                style={{ background: "var(--grid)" }}
+              />
             </div>
           ))}
         </div>
-        <div className="min-h-[220px] flex items-center justify-center">
-          <div className="text-white">Loading market data...</div>
+        <div className="min-h-[220px] flex items-center justify-center" style={{ color: "var(--muted)" }}>
+          Loading market data...
         </div>
       </Wrapper>
     );
   }
 
-  if (error) {
-    // console.log("Rendering error state:", error);
+  if (error && !data) {
     return (
       <Wrapper>
-        <h2 className="text-2xl font-bold text-center text-white mb-4">
+        <h2 className="text-2xl font-bold text-center mb-4" style={{ color: "var(--fg)" }}>
           📈 Market Breadth (Adv/Dec)
         </h2>
         <div className="min-h-[220px] flex flex-col items-center justify-center">
           <div className="text-red-400 mb-4">Error: {error}</div>
           <button
-            onClick={() => {
-              setLoading(true);
-              setError(null);
+            onClick={handleRetry}
+            className="px-4 py-2 rounded hover:opacity-90 transition"
+            style={{
+              background: "var(--card-bg)",
+              color: "var(--fg)",
+              border: "1px solid var(--border)",
             }}
-            className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 transition"
           >
             Retry
           </button>
@@ -144,55 +151,61 @@ const Avd_Dec: React.FC = () => {
     );
   }
 
-  // console.log("Rendering with data:", data);
   return (
     <Wrapper>
-      <h2 className="text-2xl font-bold text-center text-white mb-4">
-        📈 Market Breadth (Adv/Dec)
-      </h2>
-      <div className="flex justify-center gap-10 mb-6 text-white text-base sm:text-lg">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold" style={{ color: "var(--fg)" }}>
+          📈 Market Breadth (Adv/Dec)
+        </h2>
+        <div className="text-xs" style={{ color: "var(--muted)" }}>
+          {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString("en-IN", { hour12: false })}` : ""}
+        </div>
+      </div>
+
+      <div className="flex justify-center gap-10 mb-6 text-base sm:text-lg" style={{ color: "var(--fg)" }}>
         <div>
-          <span className="text-gray-400">Advances: </span>
-          <span className="text-green-400 font-semibold">
+          <span style={{ color: "var(--muted)" }}>Advances: </span>
+          <span className="font-semibold" style={{ color: "#10B981" }}>
             {data?.current?.advances ?? "--"}
           </span>
         </div>
         <div>
-          <span className="text-gray-400">Declines: </span>
-          <span className="text-red-400 font-semibold">
+          <span style={{ color: "var(--muted)" }}>Declines: </span>
+          <span className="font-semibold" style={{ color: "#EF4444" }}>
             {data?.current?.declines ?? "--"}
           </span>
         </div>
         <div>
-          <span className="text-gray-400">Total: </span>
-          <span className="text-blue-300 font-semibold">
+          <span style={{ color: "var(--muted)" }}>Total: </span>
+          <span className="font-semibold" style={{ color: "#60A5FA" }}>
             {data?.current?.total ?? "--"}
           </span>
         </div>
       </div>
+
       <div style={{ minHeight: 220, width: "100%", position: "relative" }}>
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={300}>
           {data?.chartData?.length ? (
-            <AreaChart 
-              data={data.chartData} 
-              margin={{ right: 20, left: -20 }}
-            >
+            <AreaChart data={data.chartData} margin={{ right: 20, left: -20 }}>
               <XAxis
                 dataKey="time"
-                stroke="#9CA3AF"
-                tick={{ fill: "#9CA3AF", fontSize: 10 }}
+                stroke="var(--axis)"
+                tick={{ fill: "var(--axis)", fontSize: 10 }}
               />
-              <YAxis 
-                stroke="#9CA3AF" 
-                tick={{ fill: "#9CA3AF", fontSize: 10 }} 
+              <YAxis
+                allowDecimals={false}
+                stroke="var(--axis)"
+                tick={{ fill: "var(--axis)", fontSize: 10 }}
+                domain={[0, "dataMax + 5"]}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#1F2937",
-                  borderColor: "#374151",
+                  background: "var(--tip)",
+                  borderColor: "var(--tipbr)",
                   borderRadius: "0.5rem",
-                }}
-                itemStyle={{ color: "#F3F4F6" }}
+                } as React.CSSProperties}
+                itemStyle={{ color: "var(--fg)" } as React.CSSProperties}
+                labelStyle={{ color: "var(--fg)" }}
                 formatter={(value: number, name: string) => [
                   value,
                   name === "advances" ? "Advances" : "Declines",
@@ -200,27 +213,12 @@ const Avd_Dec: React.FC = () => {
                 labelFormatter={(label) => `Time: ${label}`}
               />
               <Legend
+                wrapperStyle={{ color: "var(--fg)" }}
                 formatter={(value) => {
                   if (value === "advances") return "📈 Advances";
                   if (value === "declines") return "📉 Declines";
                   return value;
                 }}
-              />
-              <Area
-                type="monotone"
-                dataKey="advances"
-                stroke="#10B981"
-                fill="url(#advFill)"
-                strokeWidth={2}
-                activeDot={{ r: 5 }}
-              />
-              <Area
-                type="monotone"
-                dataKey="declines"
-                stroke="#EF4444"
-                fill="url(#decFill)"
-                strokeWidth={2}
-                activeDot={{ r: 5 }}
               />
               <defs>
                 <linearGradient id="advFill" x1="0" y1="0" x2="0" y2="1">
@@ -232,282 +230,40 @@ const Avd_Dec: React.FC = () => {
                   <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
                 </linearGradient>
               </defs>
+              <Area
+                type="monotone"
+                dataKey="advances"
+                stroke="#10B981"
+                fill="url(#advFill)"
+                strokeWidth={2}
+                activeDot={{ r: 5 }}
+                connectNulls
+              />
+              <Area
+                type="monotone"
+                dataKey="declines"
+                stroke="#EF4444"
+                fill="url(#decFill)"
+                strokeWidth={2}
+                activeDot={{ r: 5 }}
+                connectNulls
+              />
             </AreaChart>
           ) : (
-            <div className="flex items-center justify-center h-full text-white">
+            <div className="flex items-center justify-center h-full" style={{ color: "var(--fg)" }}>
               No chart data available
             </div>
           )}
         </ResponsiveContainer>
       </div>
+
+      {error ? (
+        <div className="mt-3 text-xs" style={{ color: "#f59e0b" }}>
+          Warning: {error}. Showing last available data.
+        </div>
+      ) : null}
     </Wrapper>
   );
 };
 
 export default Avd_Dec;
-
-
-
-
-
-
-
-// import {
-//   AreaChart,
-//   Area,
-//   XAxis,
-//   YAxis,
-//   Tooltip,
-//   Legend,
-//   ResponsiveContainer,
-// } from "recharts";
-// import { motion } from "framer-motion";
-// import { useEffect, useState, useRef } from "react";
-
-// interface ChartData {
-//   time: string;
-//   advances: number;
-//   declines: number;
-// }
-
-// interface MarketBreadthCurrent {
-//   advances: number;
-//   declines: number;
-//   total: number;
-// }
-
-// interface MarketBreadthData {
-//   current: MarketBreadthCurrent;
-//   chartData: ChartData[];
-// }
-
-// const Avd_Dec: React.FC = () => {
-//   const [data, setData] = useState<MarketBreadthData | null>(null);
-//   const [loading, setLoading] = useState(false);
-//   const [error, setError] = useState<string | null>(null);
-//   const lastSlotRef = useRef<string | null>(null);
-//   const initialLoadRef = useRef(true);
-//   const cachedData = useRef<MarketBreadthData | null>(null);
-//   const retryCount = useRef(0);
-//   const MAX_RETRIES = 3;
-
-//   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-//     <motion.div
-//       className="w-full max-w-5xl min-h-[300px] bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl shadow-xl p-6"
-//       initial={{ opacity: 0, y: 50 }}
-//       animate={{ opacity: 1, y: 0 }}
-//       transition={{ duration: 0.6, ease: "easeOut" }}
-//     >
-//       {children}
-//     </motion.div>
-//   );
-
-//   useEffect(() => {
-//     const controller = new AbortController();
-//     let timeoutId: number;
-
-//     const fetchMarketBreadth = async () => {
-//       try {
-//         if (initialLoadRef.current) {
-//           setLoading(true);
-//           initialLoadRef.current = false;
-//         }
-
-//         timeoutId = window.setTimeout(() => controller.abort(), 8000);
-
-//         const response = await fetch("https://api.upholictech.com/api/advdec", {
-//           signal: controller.signal,
-//           cache: 'no-cache'
-//         });
-
-//         clearTimeout(timeoutId);
-
-//         if (!response.ok) {
-//           throw new Error(`Failed to fetch: ${response.status}`);
-//         }
-
-//         const result = await response.json() as MarketBreadthData;
-//         const latestSlot = result.chartData?.[result.chartData.length - 1]?.time;
-
-//         // Update cache and state
-//         cachedData.current = result;
-//         setData(result);
-//         lastSlotRef.current = latestSlot ?? null;
-//         setLoading(false);
-//         retryCount.current = 0; // Reset retry counter on success
-
-//       } catch (err) {
-//         clearTimeout(timeoutId);
-//         setLoading(false);
-
-//         if (err instanceof Error) {
-//           if (err.name !== 'AbortError') {
-//             if (retryCount.current < MAX_RETRIES) {
-//               retryCount.current++;
-//               setTimeout(fetchMarketBreadth, 1000 * retryCount.current);
-//               return;
-//             }
-//             setError(err.message || "Failed to load market data");
-//             console.error("Fetch error:", err);
-//           }
-//         }
-//       }
-//     };
-
-//     // First load - try to show cached data immediately
-//     if (cachedData.current) {
-//       setData(cachedData.current);
-//     }
-//     fetchMarketBreadth();
-    
-//     const intervalId = window.setInterval(fetchMarketBreadth, 5000);
-
-//     return () => {
-//       clearInterval(intervalId);
-//       controller.abort();
-//       clearTimeout(timeoutId);
-//     };
-//   }, []);
-
-//   // Loading skeleton
-//   if (loading && !data) {
-//     return (
-//       <Wrapper>
-//         <h2 className="text-2xl font-bold text-center text-white mb-4">
-//           📈 Market Breadth (Adv/Dec)
-//         </h2>
-//         <div className="flex justify-center gap-10 mb-6 text-white text-base sm:text-lg">
-//           {['Advances', 'Declines', 'Total'].map((item) => (
-//             <div key={item}>
-//               <span className="text-gray-400">{item}: </span>
-//               <span className="animate-pulse bg-gray-700 rounded h-6 w-10 inline-block"></span>
-//             </div>
-//           ))}
-//         </div>
-//         <div className="min-h-[220px] flex items-center justify-center">
-//           <div className="text-white">Loading market data...</div>
-//         </div>
-//       </Wrapper>
-//     );
-//   }
-
-//   return (
-//     <Wrapper>
-//       <h2 className="text-2xl font-bold text-center text-white mb-4">
-//         📈 Market Breadth (Adv/Dec)
-//       </h2>
-//       <div className="flex justify-center gap-10 mb-6 text-white text-base sm:text-lg">
-//         <div>
-//           <span className="text-gray-400">Advances: </span>
-//           <span className="text-green-400 font-semibold">
-//             {data ? data.current.advances : "--"}
-//           </span>
-//         </div>
-//         <div>
-//           <span className="text-gray-400">Declines: </span>
-//           <span className="text-red-400 font-semibold">
-//             {data ? data.current.declines : "--"}
-//           </span>
-//         </div>
-//         <div>
-//           <span className="text-gray-400">Total: </span>
-//           <span className="text-blue-300 font-semibold">
-//             {data ? data.current.total : "--"}
-//           </span>
-//         </div>
-//       </div>
-//       <div style={{ minHeight: 220, width: "100%", position: "relative" }}>
-//         {loading && (
-//           <div className="absolute inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-10">
-//             <div className="text-white">Updating data...</div>
-//           </div>
-//         )}
-//         {error && (
-//           <div className="absolute inset-0 bg-gray-900 bg-opacity-70 flex flex-col items-center justify-center z-10 p-4">
-//             <div className="text-red-400 mb-2">Error: {error}</div>
-//             <button 
-//               onClick={() => {
-//                 setError(null);
-//                 retryCount.current = 0;
-//                 initialLoadRef.current = true;
-//               }}
-//               className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 transition"
-//             >
-//               Retry
-//             </button>
-//           </div>
-//         )}
-//         <ResponsiveContainer width="100%" height={200}>
-//           <AreaChart 
-//             data={data?.chartData || []} 
-//             margin={{ right: 20, left: -20 }}
-//             key={data ? data.chartData.length : 0} // Force re-render on new data
-//           >
-//             <XAxis
-//               dataKey="time"
-//               stroke="#9CA3AF"
-//               tick={{ fill: "#9CA3AF", fontSize: 7 }}
-//             />
-//             <YAxis 
-//               stroke="#9CA3AF" 
-//               tick={{ fill: "#9CA3AF", fontSize: 10 }} 
-//               domain={['auto', 'auto']}
-//             />
-//             <Tooltip
-//               contentStyle={{
-//                 backgroundColor: "#1F2937",
-//                 borderColor: "#374151",
-//                 borderRadius: "0.5rem",
-//                 fontSize: 13,
-//               }}
-//               itemStyle={{ color: "#F3F4F6" }}
-//               formatter={(value: number, name: string) => [
-//                 value,
-//                 name === "advances" ? "Advances" : "Declines",
-//               ]}
-//               labelFormatter={(label) => `Time: ${label}`}
-//             />
-//             <Legend
-//               formatter={(value) => {
-//                 if (value === "advances") return "📈 Advances";
-//                 if (value === "declines") return "📉 Declines";
-//                 return value;
-//               }}
-//               wrapperStyle={{ color: "#D1D5DB", fontSize: 14 }}
-//             />
-//             <Area
-//               type="monotone"
-//               dataKey="advances"
-//               stroke="#10B981"
-//               fill="url(#advFill)"
-//               strokeWidth={2}
-//               activeDot={{ r: 5 }}
-//               dot={false}
-//             />
-//             <Area
-//               type="monotone"
-//               dataKey="declines"
-//               stroke="#EF4444"
-//               fill="url(#decFill)"
-//               strokeWidth={2}
-//               activeDot={{ r: 5 }}
-//               dot={false}
-//             />
-//             <defs>
-//               <linearGradient id="advFill" x1="0" y1="0" x2="0" y2="1">
-//                 <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-//                 <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-//               </linearGradient>
-//               <linearGradient id="decFill" x1="0" y1="0" x2="0" y2="1">
-//                 <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
-//                 <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
-//               </linearGradient>
-//             </defs>
-//           </AreaChart>
-//         </ResponsiveContainer>
-//       </div>
-//     </Wrapper>
-//   );
-// };
-
-// export default Avd_Dec;

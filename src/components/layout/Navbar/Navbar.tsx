@@ -14,7 +14,8 @@ import {
   FiCpu,
   FiDollarSign,
   FiBookOpen,
-  FiDatabase
+  FiDatabase,
+  FiShield, // <-- NEW
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import upholictech from "../../../assets/Upholictech.png";
@@ -60,6 +61,7 @@ type MeResponse = {
   email?: string;
   avatarKey?: string;
   avatarUrl?: string;
+  role?: string; // <-- NEW
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.upholictech.com/api";
@@ -104,7 +106,7 @@ const Navbar = () => {
   const currentUser = authUser || storedUser;
   const isLoggedIn = !!currentUser;
 
-  // ---- Hydrate avatar from /users/me if missing on the user object
+  // ---- Hydrate avatar/role from /users/me if missing on the user object
   const [me, setMe] = useState<MeResponse | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -115,7 +117,9 @@ const Navbar = () => {
         (currentUser && (currentUser.avatarKey || currentUser.avatarUrl)) ||
         (me && (me.avatarKey || me.avatarUrl));
 
-      if (hasAvatarFields) return;
+      const hasRole = (currentUser?.role || me?.role);
+
+      if (hasAvatarFields && hasRole) return;
 
       try {
         const token = localStorage.getItem("token") || "";
@@ -160,6 +164,10 @@ const Navbar = () => {
     "U"
   ).toUpperCase();
 
+  // ---- role (currentUser.role or me.role)
+  const userRole = String((currentUser?.role || me?.role || "customer")).toLowerCase();
+  const isAdmin = userRole === "admin" || userRole === "superuser";
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Scroll shadow / bg state
@@ -202,7 +210,7 @@ const Navbar = () => {
       name: "Fundamental Scanner", 
       icon: <FiBook className="text-lg" />, 
       color: "bg-gradient-to-br from-blue-500 to-cyan-500", 
-      path: "/comming-soon",
+      path: "/fundamental-scanner",
       description: "Deep dive into company fundamentals and valuations"
     },
     { 
@@ -345,7 +353,6 @@ const Navbar = () => {
       img.onload = () => {
         // avatar loaded
       };
-      // ✅ remove unused param to fix TS6133
       img.onerror = () => {
         // avatar failed to load
       };
@@ -646,7 +653,6 @@ const Navbar = () => {
                       src={avatarSrc}
                       alt="Profile avatar"
                       className="w-full h-full object-cover"
-                      // ✅ remove unused param to fix TS6133
                       onError={() => {
                         // failed to display avatar
                       }}
@@ -716,6 +722,25 @@ const Navbar = () => {
                               <span className="flex-1">Dashboard</span>
                               <span className="opacity-0 group-hover:opacity-100 text-white/50 transition">⌘D</span>
                             </Link>
+
+                            {/* --- ADMIN DASHBOARD (Desktop Quick Access) --- */}
+                            {isAdmin && (
+                              <>
+                                <div className="my-1 h-px bg-white/10" />
+                                <Link
+                                  to="/admin"
+                                  role="menuitem"
+                                  className="group flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm text-gray-200 hover:text-white hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 transition"
+                                  onClick={() => setIsProfileOpen(false)}
+                                >
+                                  <span className="grid place-items-center h-8 w-8 rounded-md bg-purple-500/15 text-purple-300 group-hover:bg-purple-500/20 group-hover:text-purple-200 transition">
+                                    <FiShield className="h-4.5 w-4.5" />
+                                  </span>
+                                  <span className="flex-1">Admin Dashboard</span>
+                                  <span className="opacity-0 group-hover:opacity-100 text-white/50 transition">⌘A</span>
+                                </Link>
+                              </>
+                            )}
 
                             <div className="my-1 h-px bg-white/10" />
 
@@ -824,7 +849,7 @@ const Navbar = () => {
                 <Link
                   key={link.name}
                   to={link.path}
-                  className="block px-4 py-3 rounded-lg text-base font-medium text-gray-300 hover:text-white transition-all duration-300 backdrop-blur-sm border border-transparent hover:border-white/10 hover:bg-white/5"
+                  className="block px-4 py-3 rounded-lg text-base font-medium text-gray-300 hover:text-white transition-all duration-300 backdrop-blur-sm border border-transparent hover:border-white/10 hover:bg:white/5"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {link.name}
@@ -856,7 +881,7 @@ const Navbar = () => {
                         <Link
                           key={service.name}
                           to={service.path}
-                          className="flex items-center px-4 py-2.5 rounded-lg text-gray-300 hover:text-white transition-all duration-300 text-sm backdrop-blur-sm border border-transparent hover:border-white/10 hover:bg-white/5"
+                          className="flex items-center px-4 py-2.5 rounded-lg text-gray-300 hover:text:white transition-all duration-300 text-sm backdrop-blur-sm border border-transparent hover:border-white/10 hover:bg-white/5"
                           onClick={() => {
                             setIsServicesOpen(false);
                             setIsMenuOpen(false);
@@ -905,7 +930,6 @@ const Navbar = () => {
                             src={avatarSrc}
                             alt="Profile avatar"
                             className="w-full h-full object-cover"
-                            // ✅ remove unused param to fix TS6133
                             onError={() => {
                               // failed to display avatar (mobile)
                             }}
@@ -940,6 +964,18 @@ const Navbar = () => {
                     >
                       <FiHome /> Dashboard
                     </Link>
+
+                    {/* --- ADMIN DASHBOARD (Mobile) --- */}
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        className="flex items-center gap-2 px-4 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 transition"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <FiShield /> Admin Dashboard
+                      </Link>
+                    )}
+
                     <button
                       onClick={handleLogout}
                       className="w-full text-left flex items-center gap-2 px-4 py-3 rounded-lg text-red-300 hover:text-red-200 hover:bg-red-500/10 transition"

@@ -1,5 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { ResponsiveContainer, Treemap, Tooltip as ReTooltip } from "recharts";
+import {
+  Cpu, Building2, FlaskConical, Banknote, Stethoscope, Car, PlugZap, Radio,
+  ShoppingBag, Hammer, Plane, Smartphone, Box, Paintbrush, Factory, Pill,
+  Home, Shield, Layers, ShoppingCart, Package, Flame, Boxes
+} from "lucide-react";
 
+/* ---------- Types ---------- */
 interface StockData {
   _id: string;
   trading_symbol: string;
@@ -10,125 +17,169 @@ interface StockData {
   change?: number;
   [key: string]: any;
 }
-
 interface SectorData {
   name: string;
-  size: number;
+  size: number; // avg % change
   topGainers: StockData[];
   topLosers: StockData[];
-  showBelow?: boolean;
 }
 
-// Helper to deduplicate array by a key (trading_symbol)
+/* ---------- Helpers ---------- */
 function uniqueBy<T, K extends keyof T>(arr: T[], key: K): T[] {
   const seen = new Set();
-  return arr.filter(item => {
-    const val = item[key];
-    if (seen.has(val)) return false;
-    seen.add(val);
+  return arr.filter((item) => {
+    const v = item[key];
+    if (seen.has(v)) return false;
+    seen.add(v);
     return true;
   });
 }
+const cleanSymbol = (s: string) => s.replace(/-[A-Z]{3}-\d{4}-FUT$/i, "");
 
+/** Dark-first defaults (your app defaults to dark) */
+function readThemeVars() {
+  const scope = (document.querySelector(".theme-scope") as HTMLElement) || document.documentElement;
+  const cs = getComputedStyle(scope);
+  const pick = (k: string, fb: string) => (cs.getPropertyValue(k).trim() || fb);
+  return {
+    fg:    pick("--fg", "#e5e7eb"),
+    muted: pick("--muted", "#94a3b8"),
+    tip:   pick("--tip", "#0f172a"),
+    tipbr: pick("--tipbr", "rgba(148,163,184,0.25)"),
+    card:  pick("--card-bg", "#0f172a"),
+    brd:   pick("--border", "rgba(148,163,184,0.25)"),
+  };
+}
+
+/* === vivid sector colors (stronger than before) === */
+function colorForPct(pct: number) {
+  // clamp to ±4% and use vivid stops with easing so mid values pop
+  const v = Math.max(-4, Math.min(4, pct));
+  const ease = (x: number) => Math.pow(x, 0.6);
+
+  if (v > 0) {
+    // bright → deep emerald
+    return lerpColor("#22c55e", "#065f46", ease(v / 4));
+  }
+  if (v < 0) {
+    // bright → deep red
+    return lerpColor("#ef4444", "#7f1d1d", ease(Math.abs(v) / 4));
+  }
+  return "#6b7280"; // neutral
+}
+function lerpColor(a: string, b: string, t: number) {
+  const pa = hexToRgb(a), pb = hexToRgb(b);
+  const mix = (x: number, y: number) => Math.round(x + (y - x) * t);
+  return `rgb(${mix(pa.r, pb.r)}, ${mix(pa.g, pb.g)}, ${mix(pa.b, pb.b)})`;
+}
+function hexToRgb(hex: string) {
+  const m = hex.replace("#", "");
+  const full = m.length === 3 ? m.split("").map((c) => c + c).join("") : m;
+  const n = parseInt(full, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+/** Sector icons (version-safe) */
+const sectorIcon: Record<string, React.FC<{ size?: number; color?: string }>> = {
+  technology: Cpu, it: Cpu, software: Smartphone,
+  communication: Radio, telecom: Radio, telecommunication: Radio,
+  finance: Banknote, financial: Banknote, financialservices: Banknote, banking: Banknote, bank: Banknote, insurance: Shield,
+  healthcare: Stethoscope, hospital: Stethoscope, pharma: Pill, pharmaceutical: Pill,
+  industrial: Factory, industrials: Factory, capitalgoods: Factory, construction: Hammer, infrastructure: Building2,
+  consumer: ShoppingBag, retail: ShoppingBag, fmcg: ShoppingCart, qsr: ShoppingCart, quickservice: ShoppingCart,
+  energy: PlugZap, utilities: PlugZap, oilgas: Flame, oil: Flame, gas: Flame,
+  materials: Boxes, metals: Boxes, cement: Package, chemicals: FlaskConical, paints: Paintbrush,
+  realestate: Home, real: Home,
+  automotive: Car, auto: Car, aviation: Plane, transport: Plane, airline: Plane, tourism: Plane,
+  conglomerate: Layers, hospitality: Home, textiles: Package,
+};
+
+function pickIconFor(name?: string) {
+  const key = (name ?? "unknown").toString().toLowerCase().replace(/[^a-z]/g, "");
+  if (sectorIcon[key]) return sectorIcon[key];
+  for (const [k, Icon] of Object.entries(sectorIcon)) if (key.includes(k)) return Icon;
+  return Box;
+}
+function tinyLabel(name: string) {
+  const words = (name.match(/[A-Za-z0-9]+/g) || []).slice(0, 3);
+  if (!words.length) return "";
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  return words.map((w) => w[0]).join("").toUpperCase().slice(0, 4);
+}
+
+/* ---------- Component ---------- */
 const Heat_Map: React.FC = () => {
   const [data, setData] = useState<SectorData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hoveredSector, setHoveredSector] = useState<SectorData | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+
+  // watch theme container and force a redraw when it changes
+  const [themeTick, setThemeTick] = useState(0);
+  useEffect(() => {
+    const el = document.querySelector(".theme-scope");
+    if (!el) return;
+    const obs = new MutationObserver(() => setThemeTick((t) => t + 1));
+    obs.observe(el, { attributes: true, attributeFilter: ["style", "class", "data-theme"] });
+    return () => obs.disconnect();
+  }, []);
+  const vars = readThemeVars();
+  const themeKey = `${vars.card}|${vars.fg}|${vars.brd}|${themeTick}`;
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch("https://api.upholictech.com/api/heatmap");
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
-      }
-      // console.log(response);
+      const response = await fetch("https://api.upholictech.com/api/heatmap", { cache: "no-store" });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
 
       const stocks: StockData[] = await response.json();
-      if (!Array.isArray(stocks)) {
-        throw new Error("API response is not an array");
-      }
+      if (!Array.isArray(stocks)) throw new Error("API response is not an array");
 
-      // Only stocks with valid trading_symbol, LTP, and close
-      const validStocks = stocks.filter((stock) => {
-        const symbol = stock.trading_symbol;
-        const ltpVal = stock.LTP ?? stock.ltp;
-        const closeVal = stock.close ?? stock.Close;
-        if (typeof symbol !== "string" || symbol.trim() === "") return false;
-        if (symbol.endsWith("-OI")) return false;
-        const closeNum = parseFloat(closeVal);
-        const ltpNum = parseFloat(ltpVal);
-        return !isNaN(closeNum) && !isNaN(ltpNum) && closeNum > 0;
+      const valid = stocks.filter((s) => {
+        const sym = s.trading_symbol;
+        const ltpVal = s.LTP ?? (s as any).ltp;
+        const closeVal = s.close ?? (s as any).Close;
+        if (typeof sym !== "string" || !sym.trim() || sym.endsWith("-OI")) return false;
+        const c = parseFloat(closeVal), l = parseFloat(ltpVal);
+        return Number.isFinite(c) && Number.isFinite(l) && c > 0;
+      });
+      if (!valid.length) throw new Error("No valid stocks found with proper prices.");
+
+      const withChange = valid.map((s) => {
+        const c = parseFloat(s.close), l = parseFloat(s.LTP);
+        const change = ((l - c) / c) * 100;
+        return { ...s, change, sector: s.sector, trading_symbol: s.trading_symbol };
       });
 
-      if (validStocks.length === 0) {
-        throw new Error("No valid stocks found with proper prices.");
-      }
-
-      // Calculate percentage change for each stock
-      const stocksWithChanges = validStocks.map((stock) => {
-        const closePrice = parseFloat(stock.close);
-        const ltp = parseFloat(stock.LTP);
-        const change = ((ltp - closePrice) / closePrice) * 100;
-        return {
-          ...stock,
-          change,
-          sector: stock.sector,
-          trading_symbol: stock.trading_symbol,
-        };
+      const sectorMap: Record<string, { sum: number; count: number; stocks: StockData[] }> = {};
+      withChange.forEach((s) => {
+        const sec = s.sector || "Unknown";
+        if (!sectorMap[sec]) sectorMap[sec] = { sum: 0, count: 0, stocks: [] };
+        sectorMap[sec].sum += s.change ?? 0;
+        sectorMap[sec].count += 1;
+        sectorMap[sec].stocks.push(s);
       });
 
-      // Group by sector and find top gainers/losers per sector
-      const sectorMap: Record<
-        string,
-        { sum: number; count: number; stocks: StockData[] }
-      > = {};
-
-      stocksWithChanges.forEach((stock) => {
-        const sector = stock.sector || "Unknown";
-        if (!sectorMap[sector]) {
-          sectorMap[sector] = { sum: 0, count: 0, stocks: [] };
-        }
-        sectorMap[sector].sum += stock.change ?? 0;
-        sectorMap[sector].count += 1;
-        sectorMap[sector].stocks.push(stock);
-      });
-
-      const sectorAverages = Object.entries(sectorMap)
-        .map(([sector, { sum, count, stocks }]) => {
-          const avgChange = sum / count;
-
-          // Deduplicate by trading_symbol (so no repeats)
-          const uniqueStocks = uniqueBy(stocks, "trading_symbol");
-
-          // Top gainers: unique, >0 change, sorted desc, up to 3
-          const topGainers = uniqueStocks
-            .filter(s => (s.change ?? 0) > 0)
+      const sectors: SectorData[] = Object.entries(sectorMap)
+        .map(([name, { sum, count, stocks }]) => {
+          const avg = sum / count;
+          const unique = uniqueBy(stocks, "trading_symbol");
+          const topGainers = unique
+            .filter((s) => (s.change ?? 0) > 0)
             .sort((a, b) => (b.change ?? 0) - (a.change ?? 0))
             .slice(0, 3);
-
-          // Top losers: unique, <0 change, sorted asc, up to 3
-          const topLosers = uniqueStocks
-            .filter(s => (s.change ?? 0) < 0)
+          const topLosers = unique
+            .filter((s) => (s.change ?? 0) < 0)
             .sort((a, b) => (a.change ?? 0) - (b.change ?? 0))
             .slice(0, 3);
-
-          return {
-            name: sector,
-            size: parseFloat(avgChange.toFixed(2)),
-            topGainers,
-            topLosers
-          };
+          return { name: name || "Unknown", size: parseFloat(avg.toFixed(2)), topGainers, topLosers };
         })
         .sort((a, b) => b.size - a.size);
 
-      setData(sectorAverages);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setData(sectors);
+    } catch (e: any) {
+      setError(e?.message || "Unknown error");
       setData([]);
     } finally {
       setLoading(false);
@@ -136,233 +187,291 @@ const Heat_Map: React.FC = () => {
   };
 
   useEffect(() => {
-    // Initial fetch
     fetchData();
-
-    // Set up auto-refresh every 1 min
-    const intervalId = setInterval(fetchData, 60000); 
-
-    // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
+    const id = setInterval(fetchData, 60_000);
+    return () => clearInterval(id);
   }, []);
 
-  // Enhanced color function with better gradients
-  const getColor = (value: number) => {
-    if (value >= 3) return "#059669"; // Emerald-700
-    if (value >= 1.5) return "#10b981"; // Emerald-500
-    if (value > 0) return "#6ee7b7"; // Emerald-300
-    if (value === 0) return "#6b7280"; // Gray-500
-    if (value >= -1.5) return "#fca5a5"; // Red-300
-    if (value >= -3) return "#ef4444"; // Red-500
-    return "#dc2626"; // Red-600
-  };
-
-  const getTextColor = (value: number) => {
-    if (Math.abs(value) >= 1.5) return "#ffffff";
-    return "#1f2937";
-  };
-
-  const cleanSymbol = (symbol: string) => {
-    return symbol.replace(/-[A-Z]{3}-\d{4}-FUT$/i, "");
-  };
-
-  const handleMouseEnter = (sector: SectorData, event: React.MouseEvent, index: number) => {
-    const target = event.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    const containerRect = target.closest('.heatmap-container')?.getBoundingClientRect();
-    
-    if (containerRect) {
-      // Calculate position relative to the container
-      const x = rect.left - containerRect.left + rect.width / 2;
-      const y = rect.top - containerRect.top;
-      
-      // Determine if tooltip should appear above or below based on row
-      const row = Math.floor(index / columns);
-      const showBelow = row < 2; // First 2 rows show tooltip below
-      
-      setHoveredSector({ ...sector, showBelow });
-      setTooltipPosition({ x, y });
-    }
-  };
-
-  const handleMouseLeave = () => {
-    setHoveredSector(null);
-  };
+  const treemapData = useMemo(() => {
+    if (!data.length) return [];
+    const vals = data.map((d) => d.size);
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const span = Math.max(0.0001, max - min);
+    const weight = (v: number) => 0.8 + ((v - min) / span) * 7.2; // 0.8..8.0
+    return data.map((d) => ({
+      name: d.name || "Unknown",
+      value: weight(d.size),
+      pct: Number.isFinite(d.size) ? d.size : 0,
+      topGainers: d.topGainers ?? [],
+      topLosers: d.topLosers ?? [],
+    }));
+  }, [data]);
 
   if (loading) {
     return (
-      <div className="w-full max-w-6xl h-96 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6 rounded-xl shadow-2xl flex justify-center items-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-lg font-medium">Loading sector heatmap...</p>
+      <div className="w-full rounded-xl grid place-items-center"
+           style={{ height: 540, background: vars.card, color: vars.fg, border: `1px solid ${vars.brd}` }}>
+        <div className="flex items-center gap-3">
+          <div className="w-6 h-6 rounded-full border-2 border-current border-t-transparent animate-spin" />
+          <span>Loading sector heatmap…</span>
         </div>
       </div>
     );
   }
-
   if (error) {
     return (
-      <div className="w-full max-w-6xl h-96 bg-gradient-to-br from-red-900 via-red-800 to-red-900 text-white p-6 rounded-xl shadow-2xl flex flex-col justify-center items-center text-center">
-        <div className="bg-red-500 rounded-full p-3 mb-4">
-          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-bold mb-2">Error Loading Data</h2>
-        <p className="text-red-200 mb-4">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors duration-200 shadow-lg"
-        >
-          Retry
-        </button>
+      <div className="w-full rounded-xl grid place-items-center text-center p-6"
+           style={{ height: 540, background: vars.card, color: vars.fg, border: `1px solid ${vars.brd}` }}>
+        <div style={{ color: "#ef4444" }} className="font-medium mb-2">Error loading data</div>
+        <div style={{ color: vars.muted }}>{error}</div>
       </div>
     );
   }
-
-  if (data.length === 0) {
+  if (!treemapData.length) {
     return (
-      <div className="w-full max-w-6xl h-96 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6 rounded-xl shadow-2xl flex justify-center items-center text-center">
-        <p className="text-lg">No sector data available</p>
+      <div className="w-full rounded-xl grid place-items-center"
+           style={{ height: 540, background: vars.card, color: vars.fg, border: `1px solid ${vars.brd}` }}>
+        No sector data available
       </div>
     );
   }
 
-  const columns = Math.min(5, data.length);
+  const Node: React.FC<any> = (props) => {
+    const { x, y, width, height } = props;
+    const name: string = props?.name || props?.payload?.name || "Unknown";
+    const pct: number = Number.isFinite(props?.pct) ? props.pct : Number(props?.payload?.pct) || 0;
+    const Icon = pickIconFor(name);
+    const fill = colorForPct(pct);
 
-  return (
-    <div className="w-full max-w-6xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl p-2 shadow-2xl relative heatmap-container">
-      {/* Header */}
-      <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold text-white mb-2">
-          Sector Performance Heatmap
-        </h1>
-      </div>
+    const tiny  = width < 70 || height < 44;
+    const small = width < 120 || height < 64;
+    const iconSize = tiny ? 16 : small ? 20 : 24;     // <<< bigger icons
+    const textColor = Math.abs(pct) >= 1.5 ? "#ffffff" : "#ffffff";
+    const pad = 4;
+    const border = "rgba(0,0,0,0.35)";
 
-      {/* Heatmap Grid */}
-      <div
-        className="grid gap-0.5  overflow-hidden"
-        style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
-      >
-        {data.map((item, index) => (
+    return (
+      <g aria-label={`${name} ${pct.toFixed(1)} percent`}>
+        <rect
+          x={x} y={y} width={width} height={height}
+          fill={fill} rx={0} ry={0}
+          stroke={border} strokeWidth={1}
+          strokeLinejoin="bevel" strokeLinecap="butt"
+          vectorEffect="non-scaling-stroke" shapeRendering="crispEdges"
+        />
+        <foreignObject
+          x={x + pad}
+          y={y + pad}
+          width={Math.max(0, width - pad * 2)}
+          height={Math.max(0, height - pad * 2)}
+        >
           <div
-            key={index}
-            className="flex flex-col items-center justify-center cursor-pointer relative transition-all duration-300  hover:shadow-lg "
             style={{
-              backgroundColor: getColor(item.size),
-              color: getTextColor(item.size),
-              aspectRatio: "1.6",
-              padding: "0px",
+              width: "100%", height: "100%",
+              display: "flex", flexDirection: "column",
+              justifyContent: tiny ? "center" : "space-between",
+              alignItems: tiny ? "center" : "stretch",
+              color: textColor,
+              fontFamily:
+                "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial",
             }}
-            onMouseEnter={(e) => handleMouseEnter(item, e, index)}
-            onMouseLeave={handleMouseLeave}
           >
             <div
-              className="font-semibold text-xs leading-tight w-full text-center overflow-hidden text-ellipsis "
-              title={item.name}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                justifyContent: tiny ? "center" : "flex-start",
+              }}
             >
-              {item.name}
+              <Icon size={iconSize} color={textColor} />
+              {tiny ? (
+                <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: 0.3 }}>
+                  {tinyLabel(name)}
+                </span>
+              ) : (
+                <span
+                  title={name}
+                  style={{
+                    fontWeight: 700,
+                    fontSize: small ? 12 : 14,
+                    lineHeight: 1.1,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {name}
+                </span>
+              )}
             </div>
-            <div className="font-semibold text-sm">
-              {item.size > 0 ? "+" : ""}
-              {item.size.toFixed(1)}%
-            </div>
+
+            {!tiny && (
+              <div style={{ alignSelf: "flex-end", fontWeight: 700, fontSize: small ? 12 : 14 }}>
+                {pct > 0 ? "+" : ""}
+                {pct.toFixed(1)}%
+              </div>
+            )}
           </div>
-        ))}
+        </foreignObject>
+      </g>
+    );
+  };
+
+  const Tip: React.FC<any> = ({ active, payload }) => {
+    if (!active || !payload?.length) return null;
+    const p = payload[0]?.payload ?? {};
+    const name: string = p?.name || "Unknown";
+    const pct: number = Number.isFinite(p?.pct) ? p.pct : 0;
+    const gainers: StockData[] = Array.isArray(p?.topGainers) ? p.topGainers : [];
+    const losers: StockData[] = Array.isArray(p?.topLosers) ? p.topLosers : [];
+
+    return (
+      <div
+        style={{
+          background: vars.tip,
+          color: vars.fg,
+          border: `1px solid ${vars.tipbr}`,
+          borderRadius: 12,
+          padding: 10,
+          minWidth: 220,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        }}
+      >
+        <div style={{ borderBottom: `1px solid ${vars.tipbr}`, paddingBottom: 6, marginBottom: 6 }}>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>{name}</div>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 12,
+              color: pct >= 0 ? "#22c55e" : "#ef4444",
+            }}
+          >
+            {pct > 0 ? "+" : ""}
+            {pct.toFixed(2)}%
+          </div>
+        </div>
+
+        {gainers.length ? (
+          <div style={{ marginBottom: 6 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                color: "#22c55e",
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: 9999, background: "#22c55e" }} />
+              Top Gainers
+            </div>
+            {gainers.map((s, i) => (
+              <div
+                key={`g-${i}`}
+                style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: vars.muted,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {cleanSymbol(s.trading_symbol)}
+                </span>
+                <span style={{ fontSize: 12, color: "#22c55e", fontWeight: 700 }}>
+                  +{(s.change ?? 0).toFixed(1)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {losers.length ? (
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                color: "#ef4444",
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: 9999, background: "#ef4444" }} />
+              Top Losers
+            </div>
+            {losers.map((s, i) => (
+              <div
+                key={`l-${i}`}
+                style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: vars.muted,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {cleanSymbol(s.trading_symbol)}
+                </span>
+                <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 800 }}>
+                  {(s.change ?? 0).toFixed(1)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="w-full rounded-xl"
+      style={{
+        height: 540,
+        background: vars.card,
+        color: vars.fg,
+        border: `1px solid ${vars.brd}`,
+        boxShadow: "0 8px 28px rgba(0,0,0,.25)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "10px 12px 0 12px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <h2 style={{ fontWeight: 700, fontSize: 16 }}>Sector Performance Heatmap</h2>
+        <div style={{ fontSize: 12, color: vars.muted }}>Bigger tile ⇒ stronger positive sector</div>
       </div>
 
-      {/* Enhanced Tooltip */}
-      {hoveredSector && (
-        <div
-          className="absolute bg-white rounded-xl shadow-2xl border border-gray-200 p-1 w-38 z-50 pointer-events-none"
-          style={{
-            left: `${tooltipPosition.x}px`,
-            top: hoveredSector.showBelow 
-              ? `${tooltipPosition.y + 60}px` 
-              : `${tooltipPosition.y - 10}px`,
-            transform: hoveredSector.showBelow 
-              ? "translate(-50%, -15%)" 
-              : "translate(-50%, -80%)",
-          }}
-        >
-          {/* Header */}
-          <div className="text-center mb-1 pb-1 border-b border-gray-100">
-            <div className="font-bold text-gray-800 text-base mb-1">
-              {hoveredSector.name}
-            </div>
-            <div className={`text-sm font-bold ${hoveredSector.size >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {hoveredSector.size > 0 ? "+" : ""}
-              {hoveredSector.size.toFixed(2)}%
-            </div>
-          </div>
-
-          {/* Top Gainers */}
-          {hoveredSector.topGainers.length > 0 && (
-            <div className="mb-2">
-              <div className="flex items-center gap-1 mb-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-xs font-medium text-green-700 uppercase tracking-wide">
-                  Top Gainers
-                </span>
-              </div>
-              {hoveredSector.topGainers.map((stock, idx) => {
-                const displayName = cleanSymbol(stock.trading_symbol);
-                return (
-                  <div key={`gain-${idx}`} className="flex justify-between items-center py-1 px-2 bg-green-50 rounded mb-1">
-                    <span className="text-xs font-medium text-gray-700 truncate flex-1 mr-2" title={displayName}>
-                      {displayName}
-                    </span>
-                    <span className="text-xs font-medium text-green-600 whitespace-nowrap">
-                      +{stock.change?.toFixed(1)}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Top Losers */}
-          {hoveredSector.topLosers.length > 0 && (
-            <div className="mb-2">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span className="text-xs font-medium text-red-700 uppercase tracking-wide">
-                  Top Losers
-                </span>
-              </div>
-              {hoveredSector.topLosers.map((stock, idx) => {
-                const displayName = cleanSymbol(stock.trading_symbol);
-                return (
-                  <div key={`loss-${idx}`} className="flex justify-between items-center py-1 px-2 bg-red-50 rounded mb-1">
-                    <span className="text-xs font-medium text-gray-700 truncate flex-1 mr-2" title={displayName}>
-                      {displayName}
-                    </span>
-                    <span className="text-xs font-bold text-red-600 ">
-                      {stock.change?.toFixed(1)}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* No Data Message */}
-          {hoveredSector.topGainers.length === 0 && hoveredSector.topLosers.length === 0 && (
-            <div className="text-xs text-gray-500 italic text-center py-4">
-              No individual stock data available for this sector
-            </div>
-          )}
-
-          {/* Tooltip Arrow - Dynamic positioning */}
-          <div 
-            className={`absolute left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 drop-shadow-sm ${
-              hoveredSector.showBelow 
-                ? 'bottom-full border-b-8 border-l-transparent border-r-transparent border-b-white'
-                : 'top-full border-t-8 border-l-transparent border-r-transparent border-t-white'
-            }`}
-          ></div>
-        </div>
-      )}
+      <div style={{ width: "100%", height: "500px" }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <Treemap
+            key={themeKey} // ← force redraw on theme change
+            data={treemapData}
+            dataKey="value"
+            aspectRatio={4 / 3}
+            content={<Node />}
+            stroke="none"
+            style={{ shapeRendering: "crispEdges" }}
+            animationDuration={400}
+            isAnimationActive
+          >
+            <ReTooltip content={<Tip />} wrapperStyle={{ outline: "none" }} />
+          </Treemap>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 };
