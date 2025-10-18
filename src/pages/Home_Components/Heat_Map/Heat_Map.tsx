@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { ResponsiveContainer, Treemap, Tooltip as ReTooltip } from "recharts";
 import {
   Cpu, Building2, FlaskConical, Banknote, Stethoscope, Car, PlugZap, Radio,
@@ -23,6 +23,20 @@ interface SectorData {
   topGainers: StockData[];
   topLosers: StockData[];
 }
+type BulkResp = { stocks: StockData[]; lastISO?: string | null };
+
+type Props = { panel?: "card" | "fullscreen" };
+
+/* ---------- Config (re-use your app vars) ---------- */
+const API_BASE =
+  (import.meta as any).env?.VITE_API_BASE ||
+  (import.meta as any).env?.VITE_API_URL ||
+  "https://api.upholictech.com/api";
+
+const REFRESH_MS = 180_000; // 3 minutes
+const BULK_URL = `${API_BASE.replace(/\/$/, "")}/heatmap/bulk?sinceMin=1440`;
+const STORAGE_KEY = "heatmap.bulk.v1";
+const STORAGE_ETAG_KEY = "heatmap.bulk.v1.etag";
 
 /* ---------- Helpers ---------- */
 function uniqueBy<T, K extends keyof T>(arr: T[], key: K): T[] {
@@ -51,21 +65,13 @@ function readThemeVars() {
   };
 }
 
-/* === vivid sector colors (stronger than before) === */
+/* === vivid sector colors === */
 function colorForPct(pct: number) {
-  // clamp to ±4% and use vivid stops with easing so mid values pop
   const v = Math.max(-4, Math.min(4, pct));
   const ease = (x: number) => Math.pow(x, 0.6);
-
-  if (v > 0) {
-    // bright → deep emerald
-    return lerpColor("#22c55e", "#065f46", ease(v / 4));
-  }
-  if (v < 0) {
-    // bright → deep red
-    return lerpColor("#ef4444", "#7f1d1d", ease(Math.abs(v) / 4));
-  }
-  return "#6b7280"; // neutral
+  if (v > 0) return lerpColor("#22c55e", "#065f46", ease(v / 4));
+  if (v < 0) return lerpColor("#ef4444", "#7f1d1d", ease(Math.abs(v) / 4));
+  return "#6b7280";
 }
 function lerpColor(a: string, b: string, t: number) {
   const pa = hexToRgb(a), pb = hexToRgb(b);
@@ -79,7 +85,7 @@ function hexToRgb(hex: string) {
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 
-/** Sector icons (version-safe) */
+/** Sector icons */
 const sectorIcon: Record<string, React.FC<{ size?: number; color?: string }>> = {
   technology: Cpu, it: Cpu, software: Smartphone,
   communication: Radio, telecom: Radio, telecommunication: Radio,
@@ -93,7 +99,6 @@ const sectorIcon: Record<string, React.FC<{ size?: number; color?: string }>> = 
   automotive: Car, auto: Car, aviation: Plane, transport: Plane, airline: Plane, tourism: Plane,
   conglomerate: Layers, hospitality: Home, textiles: Package,
 };
-
 function pickIconFor(name?: string) {
   const key = (name ?? "unknown").toString().toLowerCase().replace(/[^a-z]/g, "");
   if (sectorIcon[key]) return sectorIcon[key];
@@ -108,12 +113,13 @@ function tinyLabel(name: string) {
 }
 
 /* ---------- Component ---------- */
-const Heat_Map: React.FC = () => {
+const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
   const [data, setData] = useState<SectorData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasData, setHasData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // watch theme container and force a redraw when it changes
+  // theme tick to re-render when theme vars change
   const [themeTick, setThemeTick] = useState(0);
   useEffect(() => {
     const el = document.querySelector(".theme-scope");
@@ -125,72 +131,123 @@ const Heat_Map: React.FC = () => {
   const vars = readThemeVars();
   const themeKey = `${vars.card}|${vars.fg}|${vars.brd}|${themeTick}`;
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const controllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
 
-      const response = await fetch("https://api.upholictech.com/api/heatmap", { cache: "no-store" });
-      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+  const buildSectors = (stocks: StockData[]) => {
+    const valid = stocks.filter((s) => {
+      const sym = s.trading_symbol;
+      const ltpVal = s.LTP ?? (s as any).ltp;
+      const closeVal = s.close ?? (s as any).Close;
+      if (typeof sym !== "string" || !sym.trim() || sym.endsWith("-OI")) return false;
+      const c = parseFloat(closeVal), l = parseFloat(ltpVal);
+      return Number.isFinite(c) && Number.isFinite(l) && c > 0;
+    });
 
-      const stocks: StockData[] = await response.json();
-      if (!Array.isArray(stocks)) throw new Error("API response is not an array");
+    const withChange = valid.map((s) => {
+      const c = parseFloat(s.close), l = parseFloat(s.LTP);
+      const change = ((l - c) / c) * 100;
+      return { ...s, change, sector: s.sector, trading_symbol: s.trading_symbol };
+    });
 
-      const valid = stocks.filter((s) => {
-        const sym = s.trading_symbol;
-        const ltpVal = s.LTP ?? (s as any).ltp;
-        const closeVal = s.close ?? (s as any).Close;
-        if (typeof sym !== "string" || !sym.trim() || sym.endsWith("-OI")) return false;
-        const c = parseFloat(closeVal), l = parseFloat(ltpVal);
-        return Number.isFinite(c) && Number.isFinite(l) && c > 0;
-      });
-      if (!valid.length) throw new Error("No valid stocks found with proper prices.");
+    const sectorMap: Record<string, { sum: number; count: number; stocks: StockData[] }> = {};
+    withChange.forEach((s) => {
+      const sec = s.sector || "Unknown";
+      if (!sectorMap[sec]) sectorMap[sec] = { sum: 0, count: 0, stocks: [] };
+      sectorMap[sec].sum += s.change ?? 0;
+      sectorMap[sec].count += 1;
+      sectorMap[sec].stocks.push(s);
+    });
 
-      const withChange = valid.map((s) => {
-        const c = parseFloat(s.close), l = parseFloat(s.LTP);
-        const change = ((l - c) / c) * 100;
-        return { ...s, change, sector: s.sector, trading_symbol: s.trading_symbol };
-      });
+    const sectors: SectorData[] = Object.entries(sectorMap)
+      .map(([name, { sum, count, stocks }]) => {
+        const avg = sum / count;
+        const unique = uniqueBy(stocks, "trading_symbol");
+        const topGainers = unique
+          .filter((x) => (x.change ?? 0) > 0)
+          .sort((a, b) => (b.change ?? 0) - (a.change ?? 0))
+          .slice(0, 3);
+        const topLosers = unique
+          .filter((x) => (x.change ?? 0) < 0)
+          .sort((a, b) => (a.change ?? 0) - (b.change ?? 0))
+          .slice(0, 3);
+        return { name: name || "Unknown", size: parseFloat(avg.toFixed(2)), topGainers, topLosers };
+      })
+      .sort((a, b) => b.size - a.size);
 
-      const sectorMap: Record<string, { sum: number; count: number; stocks: StockData[] }> = {};
-      withChange.forEach((s) => {
-        const sec = s.sector || "Unknown";
-        if (!sectorMap[sec]) sectorMap[sec] = { sum: 0, count: 0, stocks: [] };
-        sectorMap[sec].sum += s.change ?? 0;
-        sectorMap[sec].count += 1;
-        sectorMap[sec].stocks.push(s);
-      });
-
-      const sectors: SectorData[] = Object.entries(sectorMap)
-        .map(([name, { sum, count, stocks }]) => {
-          const avg = sum / count;
-          const unique = uniqueBy(stocks, "trading_symbol");
-          const topGainers = unique
-            .filter((s) => (s.change ?? 0) > 0)
-            .sort((a, b) => (b.change ?? 0) - (a.change ?? 0))
-            .slice(0, 3);
-          const topLosers = unique
-            .filter((s) => (s.change ?? 0) < 0)
-            .sort((a, b) => (a.change ?? 0) - (b.change ?? 0))
-            .slice(0, 3);
-          return { name: name || "Unknown", size: parseFloat(avg.toFixed(2)), topGainers, topLosers };
-        })
-        .sort((a, b) => b.size - a.size);
-
-      setData(sectors);
-    } catch (e: any) {
-      setError(e?.message || "Unknown error");
-      setData([]);
-    } finally {
-      setLoading(false);
-    }
+    return sectors;
   };
 
+  const fetchData = useCallback(async () => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
+    try {
+      // 1) instant fast-path from sessionStorage
+      const cached = sessionStorage.getItem(STORAGE_KEY);
+      if (cached && !hasData) {
+        try {
+          const json = JSON.parse(cached) as BulkResp;
+          const sectors = buildSectors(Array.isArray(json?.stocks) ? json.stocks : []);
+          if (mountedRef.current) {
+            setData(sectors);
+            setLoading(false);
+            setHasData(true);
+          }
+        } catch {}
+      }
+
+      // 2) conditional GET with ETag
+      const etag = sessionStorage.getItem(STORAGE_ETAG_KEY) || "";
+      const resp = await fetch(BULK_URL, {
+        signal: controller.signal,
+        cache: "no-store", // we rely on our own sessionStorage + ETag
+        headers: etag ? { "If-None-Match": etag } : {},
+      });
+
+      if (resp.status === 304) {
+        if (mountedRef.current) {
+          setError(null);
+          setLoading(false);
+          setHasData(true);
+        }
+        return;
+      }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+      const json: BulkResp = await resp.json();
+      const newTag = resp.headers.get("ETag") || "";
+
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(json));
+        if (newTag) sessionStorage.setItem(STORAGE_ETAG_KEY, newTag);
+      } catch {}
+
+      const sectors = buildSectors(Array.isArray(json?.stocks) ? json.stocks : []);
+      if (!mountedRef.current) return;
+      setData(sectors);
+      setError(null);
+      setLoading(false);
+      setHasData(true);
+    } catch (e: any) {
+      if (e?.name === "AbortError") return;
+      if (!mountedRef.current) return;
+      setError(e?.message || "Unknown error");
+      setLoading(false);
+    }
+  }, [hasData]);
+
   useEffect(() => {
+    mountedRef.current = true;
     fetchData();
-    const id = setInterval(fetchData, 60_000);
-    return () => clearInterval(id);
-  }, []);
+    const id = setInterval(fetchData, REFRESH_MS);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(id);
+      controllerRef.current?.abort();
+    };
+  }, [fetchData]);
 
   const treemapData = useMemo(() => {
     if (!data.length) return [];
@@ -207,21 +264,35 @@ const Heat_Map: React.FC = () => {
     }));
   }, [data]);
 
-  if (loading) {
+  /* ---------- skeletons / errors ---------- */
+  if (loading && !hasData) {
     return (
-      <div className="w-full rounded-xl grid place-items-center"
-           style={{ height: 540, background: vars.card, color: vars.fg, border: `1px solid ${vars.brd}` }}>
+      <div
+        className="w-full rounded-xl grid place-items-center"
+        style={{
+          height: panel === "fullscreen" ? "100%" : 540,
+          background: vars.card,
+          color: vars.fg,
+          border: `1px solid ${vars.brd}`,
+        }}
+      >
         <div className="flex items-center gap-3">
           <div className="w-6 h-6 rounded-full border-2 border-current border-t-transparent animate-spin" />
-          <span>Loading sector heatmap…</span>
         </div>
       </div>
     );
   }
-  if (error) {
+  if (error && !hasData) {
     return (
-      <div className="w-full rounded-xl grid place-items-center text-center p-6"
-           style={{ height: 540, background: vars.card, color: vars.fg, border: `1px solid ${vars.brd}` }}>
+      <div
+        className="w-full rounded-xl grid place-items-center text-center p-6"
+        style={{
+          height: panel === "fullscreen" ? "100%" : 540,
+          background: vars.card,
+          color: vars.fg,
+          border: `1px solid ${vars.brd}`,
+        }}
+      >
         <div style={{ color: "#ef4444" }} className="font-medium mb-2">Error loading data</div>
         <div style={{ color: vars.muted }}>{error}</div>
       </div>
@@ -229,13 +300,21 @@ const Heat_Map: React.FC = () => {
   }
   if (!treemapData.length) {
     return (
-      <div className="w-full rounded-xl grid place-items-center"
-           style={{ height: 540, background: vars.card, color: vars.fg, border: `1px solid ${vars.brd}` }}>
+      <div
+        className="w-full rounded-xl grid place-items-center"
+        style={{
+          height: panel === "fullscreen" ? "100%" : 540,
+          background: vars.card,
+          color: vars.fg,
+          border: `1px solid ${vars.brd}`,
+        }}
+      >
         No sector data available
       </div>
     );
   }
 
+  /* ---------- node + tooltip renderers ---------- */
   const Node: React.FC<any> = (props) => {
     const { x, y, width, height } = props;
     const name: string = props?.name || props?.payload?.name || "Unknown";
@@ -245,8 +324,8 @@ const Heat_Map: React.FC = () => {
 
     const tiny  = width < 70 || height < 44;
     const small = width < 120 || height < 64;
-    const iconSize = tiny ? 16 : small ? 20 : 24;     // <<< bigger icons
-    const textColor = Math.abs(pct) >= 1.5 ? "#ffffff" : "#ffffff";
+    const iconSize = tiny ? 16 : small ? 20 : 24;
+    const textColor = "#ffffff";
     const pad = 4;
     const border = "rgba(0,0,0,0.35)";
 
@@ -338,13 +417,7 @@ const Heat_Map: React.FC = () => {
       >
         <div style={{ borderBottom: `1px solid ${vars.tipbr}`, paddingBottom: 6, marginBottom: 6 }}>
           <div style={{ fontWeight: 800, fontSize: 14 }}>{name}</div>
-          <div
-            style={{
-              fontWeight: 700,
-              fontSize: 12,
-              color: pct >= 0 ? "#22c55e" : "#ef4444",
-            }}
-          >
+          <div style={{ fontWeight: 700, fontSize: 12, color: pct >= 0 ? "#22c55e" : "#ef4444" }}>
             {pct > 0 ? "+" : ""}
             {pct.toFixed(2)}%
           </div>
@@ -352,33 +425,13 @@ const Heat_Map: React.FC = () => {
 
         {gainers.length ? (
           <div style={{ marginBottom: 6 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                color: "#22c55e",
-                fontSize: 11,
-                fontWeight: 700,
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#22c55e", fontSize: 11, fontWeight: 700 }}>
               <span style={{ width: 8, height: 8, borderRadius: 9999, background: "#22c55e" }} />
               Top Gainers
             </div>
             {gainers.map((s, i) => (
-              <div
-                key={`g-${i}`}
-                style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}
-              >
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: vars.muted,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
+              <div key={`g-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}>
+                <span style={{ fontSize: 12, color: vars.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {cleanSymbol(s.trading_symbol)}
                 </span>
                 <span style={{ fontSize: 12, color: "#22c55e", fontWeight: 700 }}>
@@ -391,33 +444,13 @@ const Heat_Map: React.FC = () => {
 
         {losers.length ? (
           <div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                color: "#ef4444",
-                fontSize: 11,
-                fontWeight: 700,
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#ef4444", fontSize: 11, fontWeight: 700 }}>
               <span style={{ width: 8, height: 8, borderRadius: 9999, background: "#ef4444" }} />
               Top Losers
             </div>
             {losers.map((s, i) => (
-              <div
-                key={`l-${i}`}
-                style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}
-              >
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: vars.muted,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
+              <div key={`l-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}>
+                <span style={{ fontSize: 12, color: vars.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {cleanSymbol(s.trading_symbol)}
                 </span>
                 <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 800 }}>
@@ -431,34 +464,40 @@ const Heat_Map: React.FC = () => {
     );
   };
 
+  /* ---------- layout: card vs fullscreen ---------- */
   return (
     <div
       className="w-full rounded-xl"
       style={{
-        height: 540,
+        height: panel === "fullscreen" ? "100%" : 540,
         background: vars.card,
         color: vars.fg,
         border: `1px solid ${vars.brd}`,
         boxShadow: "0 8px 28px rgba(0,0,0,.25)",
         overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
+      {/* header */}
       <div
         style={{
           padding: "10px 12px 0 12px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flex: "0 0 auto",
         }}
       >
         <h2 style={{ fontWeight: 700, fontSize: 16 }}>Sector Performance Heatmap</h2>
         <div style={{ fontSize: 12, color: vars.muted }}>Bigger tile ⇒ stronger positive sector</div>
       </div>
 
-      <div style={{ width: "100%", height: "500px" }}>
+      {/* chart area */}
+      <div style={{ width: "100%", flex: "1 1 0", minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <Treemap
-            key={themeKey} // ← force redraw on theme change
+            key={themeKey}
             data={treemapData}
             dataKey="value"
             aspectRatio={4 / 3}

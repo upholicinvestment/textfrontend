@@ -4,6 +4,16 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
 const Hero: React.FC = () => {
+  const handleHowItWorksClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const el = document.getElementById("how-it-works");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      // keep the hash in the URL so users can share/refresh
+      window.history.pushState({}, "", "#how-it-works");
+    }
+  };
+
   return (
     <section className="relative isolate overflow-hidden min-h-[calc(100vh-4rem)]">
       {/* Background video */}
@@ -26,11 +36,11 @@ const Hero: React.FC = () => {
         }}
       />
 
-      {/* Enhanced dark overlay for better text visibility */}
+      {/* Overlay */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/40 via-black/30 to-black/50" />
       <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-5xl h-[55vh] md:h-[50vh] bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.65)_0%,rgba(0,0,0,0.4)_50%,rgba(0,0,0,0.1)_75%)]" />
 
-      {/* Centered content */}
+      {/* Content */}
       <div className="relative mx-auto max-w-7xl px-6 min-h-[calc(100vh-4rem)] flex items-center justify-center">
         <div className="max-w-3xl text-center">
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.9),0_8px_32px_rgba(0,0,0,0.7),0_1px_4px_rgba(0,0,0,1)]">
@@ -60,14 +70,17 @@ const Hero: React.FC = () => {
               </Link>
             </motion.div>
 
-            <Link
-              to="/docs/fno-khazana"
+            {/* Smooth-scroll anchor to the section below */}
+            <a
+              href="#how-it-works"
+              onClick={handleHowItWorksClick}
               className="inline-flex items-center rounded-full px-6 py-3 font-medium
                          bg-black/35 hover:bg-black/45 border border-white/20 text-white
                          backdrop-blur-[2px] transition focus:outline-none focus:ring-4 focus:ring-white/30"
+              aria-label="Scroll to how it works"
             >
               How it works
-            </Link>
+            </a>
           </div>
         </div>
       </div>

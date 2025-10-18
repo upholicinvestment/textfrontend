@@ -1,3 +1,5 @@
+// src/pages/Home_Components/Adv_Dec/Avd_Dec.tsx
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   AreaChart,
   Area,
@@ -8,30 +10,43 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { motion } from "framer-motion";
-import { useEffect, useRef, useState, useCallback } from "react";
 
-interface ChartData {
+/* ----------------------------- Types ----------------------------- */
+interface SeriesPoint {
+  timestamp: string;
   time: string;
-  advances: number;
-  declines: number;
-}
-
-interface MarketBreadthCurrent {
   advances: number;
   declines: number;
   total: number;
 }
-
-interface MarketBreadthData {
-  current: MarketBreadthCurrent;
-  chartData: ChartData[];
+interface BulkResp {
+  current: { advances: number; declines: number; total: number };
+  rows: Record<string, SeriesPoint[]>;
+  lastISO?: string | null;
 }
 
-const REFRESH_MS = 10_000; // ⏱️ poll every 10s
-const API_URL = "https://api.upholictech.com/api/advdec?bin=5"; // you can tweak bin
+type Props = { panel?: "card" | "fullscreen" };
 
-const Avd_Dec: React.FC = () => {
-  const [data, setData] = useState<MarketBreadthData | null>(null);
+/* ---------------------------- Settings --------------------------- */
+const REFRESH_MS = 180_000;
+const API_BASE =
+  (import.meta as any).env?.VITE_API_BASE ||
+  (import.meta as any).env?.VITE_API_URL ||
+  "https://api.upholictech.com/api";
+
+// Fetch 24h & multiple bins at once
+const INTERVALS = [3, 5, 15, 30];
+const ACTIVE_BIN = 5; // which bin the chart shows
+
+const BULK_URL = `${String(API_BASE).replace(/\/$/, "")}/advdec/bulk?intervals=${INTERVALS.join(
+  ","
+)}&sinceMin=1440`;
+const STORAGE_KEY = "advdec.bulk.v1";
+const STORAGE_ETAG_KEY = "advdec.bulk.v1.etag";
+
+/* ----------------------------- Component ----------------------------- */
+const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
+  const [data, setData] = useState<BulkResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -41,7 +56,7 @@ const Avd_Dec: React.FC = () => {
 
   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <motion.div
-      className="w-full max-w-5xl min-h-[300px] rounded-2xl shadow-xl p-6"
+      className="w-full min-h-[300px] rounded-2xl shadow-xl p-6"
       initial={{ opacity: 0, y: 50 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
@@ -49,6 +64,9 @@ const Avd_Dec: React.FC = () => {
         background: "var(--card-bg)",
         color: "var(--fg)",
         border: "1px solid var(--border)",
+        ...(panel === "fullscreen"
+          ? { display: "flex", flexDirection: "column", height: "100%", maxWidth: "none" }
+          : null),
       }}
     >
       {children}
@@ -61,17 +79,44 @@ const Avd_Dec: React.FC = () => {
     controllerRef.current = controller;
 
     try {
-      const url = `${API_URL}&_=${Date.now()}`; // cache-buster
-      const resp = await fetch(url, {
+      // 1) Fast path from sessionStorage (non-blocking UI)
+      const cached = sessionStorage.getItem(STORAGE_KEY);
+      if (cached) {
+        try {
+          const json = JSON.parse(cached) as BulkResp;
+          if (mountedRef.current) {
+            setData(json);
+            setLoading(false);
+          }
+        } catch {}
+      }
+
+      // 2) Conditional GET with ETag
+      const etag = sessionStorage.getItem(STORAGE_ETAG_KEY) || "";
+      const resp = await fetch(BULK_URL, {
         signal: controller.signal,
         cache: "no-store",
+        headers: etag ? { "If-None-Match": etag } : {},
       });
+
+      if (resp.status === 304) {
+        if (mountedRef.current) {
+          setLastUpdated(new Date());
+          setError(null);
+          setLoading(false);
+        }
+        return;
+      }
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-      const json: MarketBreadthData = await resp.json();
-      if (!json || typeof json !== "object" || !json.current || !json.chartData) {
-        throw new Error("Invalid payload");
-      }
+      const json: BulkResp = await resp.json();
+
+      // Save to storage
+      const newTag = resp.headers.get("ETag") || "";
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(json));
+        if (newTag) sessionStorage.setItem(STORAGE_ETAG_KEY, newTag);
+      } catch {}
 
       if (!mountedRef.current) return;
       setData(json);
@@ -79,7 +124,7 @@ const Avd_Dec: React.FC = () => {
       setError(null);
       setLoading(false);
     } catch (e: any) {
-      if (e?.name === "AbortError") return; // expected on refresh/unmount
+      if (e?.name === "AbortError") return;
       if (!mountedRef.current) return;
       setError(e?.message || "Failed to load data");
       setLoading(false);
@@ -102,6 +147,12 @@ const Avd_Dec: React.FC = () => {
     setError(null);
     fetchData();
   };
+
+  // Pick the active series (bin) for the chart
+  const series = useMemo<SeriesPoint[]>(
+    () => (data?.rows?.[String(ACTIVE_BIN)] || []),
+    [data]
+  );
 
   if (loading) {
     return (
@@ -151,6 +202,8 @@ const Avd_Dec: React.FC = () => {
     );
   }
 
+  const current = data?.current || { advances: 0, declines: 0, total: 0 };
+
   return (
     <Wrapper>
       <div className="flex items-center justify-between mb-4">
@@ -166,32 +219,35 @@ const Avd_Dec: React.FC = () => {
         <div>
           <span style={{ color: "var(--muted)" }}>Advances: </span>
           <span className="font-semibold" style={{ color: "#10B981" }}>
-            {data?.current?.advances ?? "--"}
+            {current.advances ?? "--"}
           </span>
         </div>
         <div>
           <span style={{ color: "var(--muted)" }}>Declines: </span>
           <span className="font-semibold" style={{ color: "#EF4444" }}>
-            {data?.current?.declines ?? "--"}
+            {current.declines ?? "--"}
           </span>
         </div>
         <div>
           <span style={{ color: "var(--muted)" }}>Total: </span>
           <span className="font-semibold" style={{ color: "#60A5FA" }}>
-            {data?.current?.total ?? "--"}
+            {current.total ?? "--"}
           </span>
         </div>
       </div>
 
-      <div style={{ minHeight: 220, width: "100%", position: "relative" }}>
-        <ResponsiveContainer width="100%" height={300}>
-          {data?.chartData?.length ? (
-            <AreaChart data={data.chartData} margin={{ right: 20, left: -20 }}>
-              <XAxis
-                dataKey="time"
-                stroke="var(--axis)"
-                tick={{ fill: "var(--axis)", fontSize: 10 }}
-              />
+      <div
+        style={{
+          minHeight: 220,
+          width: "100%",
+          position: "relative",
+          ...(panel === "fullscreen" ? { flex: "1 1 0%" } : null),
+        }}
+      >
+        <ResponsiveContainer width="100%" height={panel === "fullscreen" ? "100%" : 300}>
+          {series.length ? (
+            <AreaChart data={series} margin={{ right: 20, left: -20 }}>
+              <XAxis dataKey="time" stroke="var(--axis)" tick={{ fill: "var(--axis)", fontSize: 10 }} />
               <YAxis
                 allowDecimals={false}
                 stroke="var(--axis)"
@@ -208,7 +264,7 @@ const Avd_Dec: React.FC = () => {
                 labelStyle={{ color: "var(--fg)" }}
                 formatter={(value: number, name: string) => [
                   value,
-                  name === "advances" ? "Advances" : "Declines",
+                  name === "advances" ? "Advances" : name === "declines" ? "Declines" : name,
                 ]}
                 labelFormatter={(label) => `Time: ${label}`}
               />

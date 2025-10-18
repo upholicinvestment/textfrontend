@@ -2,7 +2,7 @@ import Navbar from '../../../components/layout/Navbar/Navbar'
 import Hero from './Hero'
 import FnoKhazanaIntro from './FnoKhazanaIntro'
 import Footer from '../../../components/layout/Footer/Footer'
-import FnoIntroStoryrail from './FnoIntroStoryrail'
+// import FnoIntroStoryrail from './FnoIntroStoryrail'
 // import FnoLiveHighlights from './FnoLiveHighlights'
 
 const Main = () => {
@@ -11,7 +11,7 @@ const Main = () => {
         <Navbar/>
         <Hero/>
         <FnoKhazanaIntro/>
-        <FnoIntroStoryrail/>
+        {/* <FnoIntroStoryrail/> */}
         <Footer/>
     </div>
   )

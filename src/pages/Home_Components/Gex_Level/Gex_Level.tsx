@@ -1,11 +1,11 @@
-// components/Gex2DHorizontalChart.tsx
+// client/src/pages/NiftyGexLevelsPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 
 /* ========= Config ========= */
 const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+  import.meta.env.VITE_API_BASE_URL || "https://api.upholictech.com/api";
 const REFRESH_MS = 180_000; // 3 minutes
 
 /* ========= Sizing ========= */
@@ -32,22 +32,18 @@ type GexResponse = {
 };
 
 type TickPoint = { x: number; y: number };
-type TicksApiResp = {
-  symbol: string;
-  expiry: string;
-  trading_day_ist: string;
-  from?: string;
-  to?: string;
-  points: TickPoint[];
-  count?: number;
-};
-
-/* ========= Helpers ========= */
-
 
 /* ========= Weighting (OI > VOL) ========= */
 const OI_WEIGHT = 2;
 const VOL_WEIGHT = 1;
+
+/* ---------- sessionStorage + ETag (bulk) ---------- */
+const BULK_URL = `${API_BASE.replace(/\/$/, "")}/gex/nifty/bulk`;
+const SS_DAY = (exp: string) => `nifty.gex.bulk.v1.day.${exp || "default"}`;
+const SS_PAYLOAD = (exp: string, day: string) =>
+  `nifty.gex.bulk.v1.${exp || "default"}.${day || "today"}`;
+const SS_ETAG = (exp: string, day: string) =>
+  `nifty.gex.bulk.v1.${exp || "default"}.${day || "today"}.etag`;
 
 /* ---------- Theme detection + palettes ---------- */
 function useIsDark(): boolean {
@@ -60,7 +56,9 @@ function useIsDark(): boolean {
   useEffect(() => {
     const mm = window.matchMedia?.("(prefers-color-scheme: dark)");
     const onMedia = (e: MediaQueryListEvent) =>
-      setIsDark(e.matches || document.documentElement.classList.contains("dark"));
+      setIsDark(
+        e.matches || document.documentElement.classList.contains("dark")
+      );
     mm?.addEventListener?.("change", onMedia);
 
     const obs = new MutationObserver(() =>
@@ -123,8 +121,8 @@ function getThemeColors(isDark: boolean): ThemeSet {
       flipLine: "#f59e0b",
       flipBg: "rgba(245,158,11,.16)",
       flipText: "#fde68a",
-      headerFg: "#F9FAFB", // Changed to brighter color for better visibility
-      subFg: "#E5E7EB", // Changed to brighter color for better visibility
+      headerFg: "#F9FAFB",
+      subFg: "#E5E7EB",
     };
   }
   return {
@@ -162,7 +160,7 @@ function getThemeColors(isDark: boolean): ThemeSet {
 
 /* ---------- Lines selection ---------- */
 type LineMark = { strike: number; label: "R1" | "R2" | "S1" | "S2"; color: string; side: "ce" | "pe"; };
-const finite = (n: any): n is number => typeof n === "number" && Number.isFinite(n);
+const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
 
 function rankMap(rows: GexRow[], key: "gex_oi_raw" | "gex_vol_raw", desc: boolean): Map<number, number> {
   const sorted = [...rows].sort((a, b) => (desc ? b[key] - a[key] : a[key] - b[key]));
@@ -178,7 +176,11 @@ function rankMapAbs(rows: GexRow[], key: "gex_oi_raw"): Map<number, number> {
 }
 function pickLinesByRaw(rows: GexRow[]): { red: LineMark[]; green: LineMark[] } {
   const valid = rows.filter(
-    (r) => finite(r.strike) && finite(r.gex_oi_raw) && finite(r.gex_vol_raw) && !(r.gex_oi_raw === 0 && r.gex_vol_raw === 0)
+    (r) =>
+      finite(r.strike) &&
+      finite(r.gex_oi_raw) &&
+      finite(r.gex_vol_raw) &&
+      !(r.gex_oi_raw === 0 && r.gex_vol_raw === 0)
   );
   const pos = valid.filter((r) => r.gex_oi_raw > 0 && r.gex_vol_raw > 0);
   const neg = valid.filter((r) => r.gex_oi_raw < 0 && r.gex_vol_raw < 0);
@@ -232,7 +234,8 @@ function pickZeroGammaStrike(rows: GexRow[], r1?: number, s1?: number): number |
 }
 
 /* ========= Component ========= */
-export default function NiftyGexLevelsPage() {
+/** Added optional `panel` to support fullscreen from ChartMapping */
+export default function NiftyGexLevelsPage({ panel = "card" }: { panel?: "card" | "fullscreen" }) {
   const isDark = useIsDark();
   const C = useMemo(() => getThemeColors(isDark), [isDark]);
 
@@ -254,7 +257,7 @@ export default function NiftyGexLevelsPage() {
 
   const [niftyPoints, setNiftyPoints] = useState<TickPoint[]>([]);
   const [fromMs, setFromMs] = useState<number | null>(null);
-  const [toMs, setToMs] = useState<number | null>(null);
+  const [, setToMs] = useState<number | null>(null);
 
   // Apex dropdown styles (theme aware)
   useEffect(() => {
@@ -275,84 +278,139 @@ export default function NiftyGexLevelsPage() {
     };
   }, [C.panelBg, C.panelFg, C.panelBorder]);
 
-  /* -------- Fetch rows & initial spot -------- */
+  /* -------- Bulk fetch: rows + ticks + ETag + sessionStorage -------- */
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         setLoading(true);
         setErr("");
-        const qs = activeExpiry ? `?expiry=${activeExpiry}` : urlExpiry ? `?expiry=${urlExpiry}` : "";
-        const res = await fetch(`${API_BASE}/gex/nifty/cache${qs}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const j: any = await res.json();
+
+        const exp = activeExpiry || urlExpiry || "";
+        const params = new URLSearchParams();
+        if (exp) params.set("expiry", exp);
+        params.set("scope", "today"); // default; switch to 'since' & sinceMin=1440 for 24h backfill if you want
+        const bulkUrl = `${BULK_URL}?${params.toString()}`;
+
+        // 1) Fast path: sessionStorage by (expiry, day)
+        const storedDay = sessionStorage.getItem(SS_DAY(exp)) || "";
+        if (storedDay) {
+          const cached = sessionStorage.getItem(SS_PAYLOAD(exp, storedDay));
+          if (cached) {
+            try {
+              const j = JSON.parse(cached);
+              if (!cancelled && j?.gex && j?.ticks) {
+                const rows: GexRow[] = (j.gex.rows || []).map((r: ApiRow) => ({
+                  strike: Number(r?.strike ?? 0),
+                  gex_oi_raw: Number(r?.gex_oi_raw ?? 0),
+                  gex_vol_raw: Number(r?.gex_vol_raw ?? 0),
+                  ce_oi: Number(r?.ce_oi ?? 0),
+                  pe_oi: Number(r?.pe_oi ?? 0),
+                  ce_vol: Number(r?.ce_vol ?? 0),
+                  pe_vol: Number(r?.pe_vol ?? 0),
+                }));
+                setGex({
+                  symbol: j.gex.symbol || "NIFTY",
+                  expiry: j.gex.expiry,
+                  spot: Number(j.gex.spot ?? 0),
+                  rows,
+                  updated_at: j.gex.updated_at,
+                });
+
+                const pts: TickPoint[] = (j.ticks.points || [])
+                  .map((p: any) => ({ x: Number(p.x), y: Number(p.y) }))
+                  .filter((p: TickPoint) => Number.isFinite(p.x) && Number.isFinite(p.y))
+                  .sort((a: TickPoint, b: TickPoint) => a.x - b.x);
+
+                setNiftyPoints(pts);
+                const f = j.ticks.from ? Date.parse(j.ticks.from) : NaN;
+                const t = j.ticks.to ? Date.parse(j.ticks.to) : NaN;
+                setFromMs(Number.isFinite(f) ? f : null);
+                setToMs(Number.isFinite(t) ? t : null);
+                if (pts.length) setGex((prev) => (prev ? { ...prev, spot: pts[pts.length - 1].y } : prev));
+                setLoading(false);
+              }
+            } catch {}
+          }
+        }
+
+        // 2) Conditional GET with ETag
+        const etag = storedDay ? sessionStorage.getItem(SS_ETAG(exp, storedDay)) || "" : "";
+        const resp = await fetch(`${bulkUrl}&_=${Date.now()}`, {
+          cache: "no-store",
+          headers: etag ? { "If-None-Match": etag } : {},
+        });
+
+        if (resp.status === 304) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        const j = await resp.json();
+        const day: string = j?.day || resp.headers.get("X-GEX-Day") || "";
+
+        if (day && day !== storedDay) {
+          if (storedDay) {
+            sessionStorage.removeItem(SS_PAYLOAD(exp, storedDay));
+            sessionStorage.removeItem(SS_ETAG(exp, storedDay));
+          }
+          sessionStorage.setItem(SS_DAY(exp), day);
+        }
+
+        const newTag = resp.headers.get("ETag") || "";
+        try {
+          sessionStorage.setItem(SS_PAYLOAD(exp, day), JSON.stringify(j));
+          if (newTag) sessionStorage.setItem(SS_ETAG(exp, day), newTag);
+        } catch {}
+
         if (cancelled) return;
 
+        // paint from network
+        const rows: GexRow[] = (j?.gex?.rows || []).map((r: ApiRow) => ({
+          strike: Number(r?.strike ?? 0),
+          gex_oi_raw: Number(r?.gex_oi_raw ?? 0),
+          gex_vol_raw: Number(r?.gex_vol_raw ?? 0),
+          ce_oi: Number(r?.ce_oi ?? 0),
+          pe_oi: Number(r?.pe_oi ?? 0),
+          ce_vol: Number(r?.ce_vol ?? 0),
+          pe_vol: Number(r?.pe_vol ?? 0),
+        }));
         const normalizedExpiry: string =
-          (j.expiry as string) || activeExpiry || urlExpiry || new Date().toISOString().slice(0, 10);
+          j?.gex?.expiry || activeExpiry || urlExpiry || new Date().toISOString().slice(0, 10);
         setActiveExpiry(normalizedExpiry);
 
-        const rows: GexRow[] = Array.isArray(j.rows)
-          ? (j.rows as ApiRow[])
-              .map((r): GexRow => ({
-                strike: Number(r?.strike ?? 0),
-                gex_oi_raw: Number(r?.gex_oi_raw ?? 0),
-                gex_vol_raw: Number(r?.gex_vol_raw ?? 0),
-                ce_oi: Number(r?.ce_oi ?? 0),
-                pe_oi: Number(r?.pe_oi ?? 0),
-                ce_vol: Number(r?.ce_vol ?? 0),
-                pe_vol: Number(r?.pe_vol ?? 0),
-              }))
-              .filter((r) => Number.isFinite(r.strike))
-          : [];
-
         setGex({
-          symbol: (j.symbol as string) ?? "NIFTY",
+          symbol: j?.gex?.symbol || "NIFTY",
           expiry: normalizedExpiry,
-          spot: Number(j.spot ?? 0),
+          spot: Number(j?.gex?.spot ?? 0),
           rows,
-          updated_at: j.updated_at as string | undefined,
+          updated_at: j?.gex?.updated_at,
         });
-      } catch (e: any) {
-        setErr(e.message || String(e));
-      } finally {
-        setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [urlExpiry, activeExpiry, refreshTick]);
 
-  /* -------- Fetch NIFTY ticks -------- */
-  useEffect(() => {
-    if (!activeExpiry) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch(`${API_BASE}/gex/nifty/ticks?expiry=${activeExpiry}`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const j: TicksApiResp = await r.json();
-        if (cancelled) return;
-
-        const pts = (j.points || [])
-          .map((p) => ({ x: Number(p.x), y: Number(p.y) }))
-          .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
-          .sort((a, b) => a.x - b.x);
+        const pts: TickPoint[] = (j?.ticks?.points || [])
+          .map((p: any) => ({ x: Number(p.x), y: Number(p.y) }))
+          .filter((p: TickPoint) => Number.isFinite(p.x) && Number.isFinite(p.y))
+          .sort((a: TickPoint, b: TickPoint) => a.x - b.x);
 
         setNiftyPoints(pts);
-
-        const f = j.from ? Date.parse(j.from) : NaN;
-        const t = j.to ? Date.parse(j.to) : NaN;
+        const f = j?.ticks?.from ? Date.parse(j.ticks.from) : NaN;
+        const t = j?.ticks?.to ? Date.parse(j.ticks.to) : NaN;
         setFromMs(Number.isFinite(f) ? f : null);
         setToMs(Number.isFinite(t) ? t : null);
-
-        if (pts.length) {
-          const last = pts[pts.length - 1];
-          setGex((prev) => (prev ? { ...prev, spot: last.y } : prev));
+        if (pts.length) setGex((prev) => (prev ? { ...prev, spot: pts[pts.length - 1].y } : prev));
+        setLoading(false);
+      } catch (e: any) {
+        if (!cancelled) {
+          setErr(e?.message || "Failed to load");
+          setLoading(false);
         }
-      } catch { /* ignore transient */ }
+      }
     })();
-    return () => { cancelled = true; };
-  }, [activeExpiry, refreshTick]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeExpiry, urlExpiry, refreshTick]);
 
   /* ---------- Lines ---------- */
   const { red: redLines, green: greenLines } = useMemo(
@@ -367,8 +425,9 @@ export default function NiftyGexLevelsPage() {
   }, [gex?.rows, redLines, greenLines]);
 
   /* ---------- Axis ranges ---------- */
-  const haveTicks = niftyPoints.length > 0;
-  const yFromTicks = haveTicks ? niftyPoints.map((p) => p.y) : [];
+  const niftyPointsArr = niftyPoints;
+  const haveTicks = niftyPointsArr.length > 0;
+  const yFromTicks = haveTicks ? niftyPointsArr.map((p) => p.y) : [];
   const lineLevels = [
     ...redLines.map((l) => l.strike),
     ...greenLines.map((l) => l.strike),
@@ -387,23 +446,28 @@ export default function NiftyGexLevelsPage() {
   const yMin = Math.floor(rawMin - nPad);
   const yMax = Math.ceil(rawMax + nPad);
 
-  const fallbackStart = (() => { const d = new Date(); d.setHours(9, 0, 0, 0); return d.getTime(); })();
-  const xMin = fromMs ?? fallbackStart;
-  const xMax = toMs ?? Math.max(Date.now(), xMin + 60_000);
+  /* 👉 Force full market session on the X axis (09:15–15:30 of the trading day) */
+  const baseForSession =
+    (fromMs ?? (niftyPointsArr.length ? niftyPointsArr[0].x : Date.now()));
+  const sessionStart = (() => { const d = new Date(baseForSession); d.setHours(9, 15, 0, 0);  return d.getTime(); })();
+  const sessionEnd   = (() => { const d = new Date(baseForSession); d.setHours(15, 30, 0, 0); return d.getTime(); })();
 
-  const series = [{ name: "NIFTY Spot", data: niftyPoints }] as any;
+  const xMin = sessionStart;
+  const xMax = sessionEnd;
 
-  /* ---------- Annotations (labels only: R1/R2/S1/S2; legend carries the meaning) ---------- */
+  const series = [{ name: "NIFTY Spot", data: niftyPointsArr }] as any;
+
+  /* ---------- Annotations ---------- */
   const yAxisAnnotations = [
     ...redLines.filter(l => l.label === "R1").map(l => ({
       y: l.strike,
       yAxisIndex: 0,
-      borderColor: C.annRedLine,
+      borderColor: getThemeColors(isDark).annRedLine,
       borderWidth: 2.5,
       strokeDashArray: 0,
       label: {
         text: `R1 @ ${l.strike}`,
-        style: { background: C.annRedBg, color: C.annRedText, fontSize: "10px" },
+        style: { background: getThemeColors(isDark).annRedBg, color: getThemeColors(isDark).annRedText, fontSize: "10px" },
         position: "right",
         offsetX: 10,
       },
@@ -411,12 +475,12 @@ export default function NiftyGexLevelsPage() {
     ...redLines.filter(l => l.label === "R2").map(l => ({
       y: l.strike,
       yAxisIndex: 0,
-      borderColor: C.annRed2Line,
+      borderColor: getThemeColors(isDark).annRed2Line,
       borderWidth: 2.5,
       strokeDashArray: 0,
       label: {
         text: `R2 @ ${l.strike}`,
-        style: { background: C.annRed2Bg, color: C.annRedText, fontSize: "10px" },
+        style: { background: getThemeColors(isDark).annRed2Bg, color: getThemeColors(isDark).annRedText, fontSize: "10px" },
         position: "right",
         offsetX: 10,
       },
@@ -424,12 +488,12 @@ export default function NiftyGexLevelsPage() {
     ...greenLines.filter(l => l.label === "S1").map(l => ({
       y: l.strike,
       yAxisIndex: 0,
-      borderColor: C.annGreenLine,
+      borderColor: getThemeColors(isDark).annGreenLine,
       borderWidth: 2.5,
       strokeDashArray: 0,
       label: {
         text: `S1 @ ${l.strike}`,
-        style: { background: C.annGreenBg, color: C.annGreenText, fontSize: "10px" },
+        style: { background: getThemeColors(isDark).annGreenBg, color: getThemeColors(isDark).annGreenText, fontSize: "10px" },
         position: "right",
         offsetX: 10,
       },
@@ -437,12 +501,12 @@ export default function NiftyGexLevelsPage() {
     ...greenLines.filter(l => l.label === "S2").map(l => ({
       y: l.strike,
       yAxisIndex: 0,
-      borderColor: C.annGreen2Line,
+      borderColor: getThemeColors(isDark).annGreen2Line,
       borderWidth: 2.5,
       strokeDashArray: 0,
       label: {
         text: `S2 @ ${l.strike}`,
-        style: { background: C.annGreen2Bg, color: C.annGreenText, fontSize: "10px" },
+        style: { background: getThemeColors(isDark).annGreen2Bg, color: getThemeColors(isDark).annGreenText, fontSize: "10px" },
         position: "right",
         offsetX: 10,
       },
@@ -450,12 +514,12 @@ export default function NiftyGexLevelsPage() {
     ...(zgStrike ? [{
       y: zgStrike,
       yAxisIndex: 0,
-      borderColor: C.flipLine,
+      borderColor: getThemeColors(isDark).flipLine,
       borderWidth: 2.5,
       strokeDashArray: 6,
       label: {
         text: `Flip @ ${zgStrike}`,
-        style: { background: C.flipBg, color: C.flipText, fontSize: "10px" },
+        style: { background: getThemeColors(isDark).flipBg, color: getThemeColors(isDark).flipText, fontSize: "10px" },
         position: "right",
         offsetX: 10,
       },
@@ -465,7 +529,7 @@ export default function NiftyGexLevelsPage() {
   const options: ApexOptions = {
     chart: {
       type: "line",
-      height: CHART_H,
+      height: panel === "fullscreen" ? "100%" : CHART_H,
       toolbar: { show: true },
       animations: { enabled: false },
       background: C.bg,
@@ -478,7 +542,7 @@ export default function NiftyGexLevelsPage() {
     legend: { show: false },
     xaxis: {
       type: "datetime",
-      labels: { datetimeUTC: false },
+      labels: { datetimeUTC: false, style: { colors: '#777' } },
       min: xMin,
       max: xMax,
       tickAmount: 6,
@@ -492,7 +556,7 @@ export default function NiftyGexLevelsPage() {
       crosshairs: {
         show: true,
         position: "back",
-        stroke: { color: C.crosshair, width: 1.5, dashArray: 0 },
+        stroke: { color: '#777', width: 1.5, dashArray: 0 },
       },
     },
     yaxis: {
@@ -502,8 +566,8 @@ export default function NiftyGexLevelsPage() {
       max: yMax,
       tickAmount: 5,
       axisBorder: { show: true, color: C.axisBorder },
-      labels: { style: { colors: C.axis } },
-      title: { text: "NIFTY", style: { color: C.axisTitle } },
+      labels: { style: { colors: '#777' } },
+      title: { text: "NIFTY", style: { color: '#777' } },
       tooltip: { enabled: true },
     },
     grid: {
@@ -533,9 +597,9 @@ export default function NiftyGexLevelsPage() {
     noData: { text: "Loading NIFTY line…" },
   };
 
-  const chartKey = `${xMin}-${xMax}-${niftyPoints.length}-${C.line}`;
+  const chartKey = `${xMin}-${xMax}-${niftyPointsArr.length}-${C.line}-${panel}`;
 
-  /* ---------- Legend (under x-axis, no background) ---------- */
+  /* ---------- Legend ---------- */
   const legendItems = [
     { color: "#ef4444", text: "strong sell" },
     { color: "#fca5a5", text: "sell" },
@@ -545,23 +609,23 @@ export default function NiftyGexLevelsPage() {
   ];
 
   return (
-    <div className="p-2 md:p-3">
+    <div className="p-2 md:p-3" style={panel === "fullscreen" ? { height: "100%" } : undefined}>
       {/* Header */}
       <div
         className="mb-2 flex items-center gap-2 flex-wrap"
-        style={{ position: "relative", zIndex: 50 }}
+        style={{ position: "relative" }}
       >
         <h1
           className="text-lg font-semibold"
           style={{
-            color: '#777777',
+            color: "#777777",
             textShadow: isDark ? "0 1px 1px rgba(0,0,0,.6)" : "none",
             mixBlendMode: "normal",
           }}
         >
           NIFTY — CE/PE Γ levels
         </h1>
-        <span className="text-xs" style={{ color: '#777777' }}>
+        <span className="text-xs" style={{ color: "#777777" }}>
           Expiry: {gex?.expiry ?? "-"}
         </span>
         {loading && <span className="text-xs" style={{ color: C.subFg }}>Loading…</span>}
@@ -569,20 +633,29 @@ export default function NiftyGexLevelsPage() {
       </div>
 
       {/* Chart */}
-      <Chart key={chartKey} options={options} series={series} type="line" height={CHART_H} />
+      <div style={panel === "fullscreen" ? { height: "100%", width: "100%" } : undefined}>
+        <Chart
+          key={chartKey}
+          options={options}
+          series={series}
+          type="line"
+          height={panel === "fullscreen" ? "100%" : CHART_H}
+          width="100%"
+        />
+      </div>
 
-      {/* Legend BELOW x-axis (no background) */}
+      {/* Legend */}
       <div
         className="mt-2 flex items-center justify-center gap-4 flex-wrap text-[11px]"
-        style={{ color: C.fg }} // Use the theme's foreground color
+        style={{ color: C.fg }}
       >
         {legendItems.map((it) => (
           <div key={it.text} className="flex items-center gap-2 whitespace-nowrap">
             <span className="inline-block h-2 w-2 rounded-full" style={{ background: it.color }} />
-            <span style={{color: '#777777'}}>{it.text}</span>
+            <span style={{ color: "#808080" }}>{it.text}</span>
           </div>
         ))}
       </div>
     </div>
   );
-} 
+}

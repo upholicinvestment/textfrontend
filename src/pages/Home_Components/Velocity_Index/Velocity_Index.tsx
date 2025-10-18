@@ -1,13 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
+// src/pages/Home_Components/Velocity_Index/VelocityIndex.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { RotateCw, Loader2 } from "lucide-react";
 
 /* ============ Types ============ */
 type Row = {
   volatility: number;
-  time: string; // HH:MM:SS IST (we'll render HH:MM)
+  time: string; // e.g. "HH:MM:SS IST"
   signal: "Bullish" | "Bearish";
   spot: number;
 };
+type IntervalKey = 3 | 5 | 15 | 30;
+type RowsByInterval = Record<IntervalKey, Row[]>;
+
+/* ============ Panel prop (for fullscreen support) ============ */
+type Props = { panel?: "card" | "fullscreen" };
 
 /* ============ API base ============ */
 const RAW_BASE =
@@ -22,7 +28,7 @@ function buildUrl(path: string, params: Record<string, any>) {
   const cleaned = String(path).replace(/^\/+/, "");
   const u = new URL(cleaned, API_WITH_API + "/");
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null) u.searchParams.set(k, String(v));
+    if (v !== undefined && v !== null && v !== "") u.searchParams.set(k, String(v));
   });
   return u.toString();
 }
@@ -57,282 +63,286 @@ function toHHMM(t?: string): string {
   return `${h}:${m[2]}`;
 }
 
+// helper to convert small CSS fragments to React style objects
+function toStyle(css: string): React.CSSProperties {
+  const s: Record<string, string> = {};
+  css
+    .split(";")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .forEach((decl) => {
+      const [k, v] = decl.split(":").map((y) => y.trim());
+      if (!k || !v) return;
+      const camel = k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      (s as any)[camel] = v;
+    });
+  return s;
+}
+
+const INTERVALS: IntervalKey[] = [3, 5, 15, 30];
+const SS_KEY = (u: number) => `vi.bulk.v1.${u}`;
+
 /* ============ Component ============ */
-const VelocityIndex: React.FC = () => {
+const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
   const [underlying] = useState<number>(13);
-  const [expiry] = useState<string>("2025-10-14");
-  // const [unit, setUnit] = useState<"bps" | "pct" | "points">("bps");
-  const [intervalMin, setIntervalMin] = useState<number>(3); // auto-refresh minutes
+  const [intervalMin, setIntervalMin] = useState<IntervalKey>(3);
 
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rowsByInterval, setRowsByInterval] = useState<RowsByInterval>({
+    3: [],
+    5: [],
+    15: [],
+    30: [],
+  });
   const [loading, setLoading] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false); // prevents initial “No data” flash in fullscreen
   const [err, setErr] = useState<string | null>(null);
+  const [resolvedExpiry, setResolvedExpiry] = useState<string | null>(null);
 
-  // Build request URL (NO 'limit' → no cap on rows)
-  const url = useMemo(
+  const etagRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Bulk endpoint — server resolves expiry automatically
+  const bulkUrl = useMemo(
     () =>
-      buildUrl("oc/rows", {
+      buildUrl("oc/rows/bulk", {
         underlying,
-        expiry,
-        // limit, // intentionally omitted to remove server-side cap
-        intervalMin,
+        segment: "IDX_I",
+        intervals: INTERVALS.join(","), // "3,5,15,30"
+        sinceMin: 390, // ~full trading day
         mode: "level",
-        windowSteps: 5,
-        classify: 1,
+        unit: "bps",
+        expiry: "auto",
       }),
-    [underlying, expiry, /*limit,*/ intervalMin]
+    [underlying]
   );
 
-  // Fetcher
-  const fetchRows = async () => {
+  // Hydrate from sessionStorage for instant paint
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(SS_KEY(underlying));
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (cached?.rows) {
+          setRowsByInterval({
+            3: cached.rows["3"] || [],
+            5: cached.rows["5"] || [],
+            15: cached.rows["15"] || [],
+            30: cached.rows["30"] || [],
+          });
+          setResolvedExpiry(cached.expiry || null);
+          etagRef.current = cached.etag || null;
+          setHasFetched(true);
+        }
+      }
+    } catch {}
+  }, [underlying]);
+
+  // Fetcher (bulk + ETag)
+  const fetchBulk = async () => {
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
     try {
       setLoading(true);
       setErr(null);
       const token = getAuthToken();
-      const res = await fetch(url, {
+      const res = await fetch(bulkUrl, {
         headers: {
           Accept: "application/json",
+          ...(etagRef.current ? { "If-None-Match": etagRef.current } : {}),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         credentials: "include",
+        signal: ctrl.signal,
+        cache: "no-store",
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as Row[];
-      setRows(Array.isArray(data) ? data : []);
+
+      // If nothing changed, keep current UI
+      if (res.status === 304) {
+        setHasFetched(true);
+        return;
+      }
+
+      const etag = res.headers.get("ETag");
+      if (etag) etagRef.current = etag;
+
+      const hdrExpiry = res.headers.get("X-Resolved-Expiry");
+      if (hdrExpiry) setResolvedExpiry(hdrExpiry);
+
+      if (!res.ok) {
+        let reason = `HTTP ${res.status}`;
+        try {
+          const j = await res.json();
+          if (j?.error === "no_active_expiry") reason = "No active expiry found.";
+        } catch {}
+        throw new Error(reason);
+      }
+
+      const data = await res.json();
+      const rows: RowsByInterval = {
+        3: data?.rows?.["3"] || [],
+        5: data?.rows?.["5"] || [],
+        15: data?.rows?.["15"] || [],
+        30: data?.rows?.["30"] || [],
+      };
+
+      setRowsByInterval(rows);
+      setResolvedExpiry(String(data?.expiry || "") || null);
+
+      // persist to sessionStorage for instant future loads
+      sessionStorage.setItem(
+        SS_KEY(underlying),
+        JSON.stringify({
+          rows,
+          expiry: data?.expiry || null,
+          etag: etagRef.current,
+          t: Date.now(),
+        })
+      );
+      setHasFetched(true);
     } catch (e: any) {
+      if (e?.name === "AbortError") return;
       setErr(e?.message || "Failed to fetch");
+      setHasFetched(true);
     } finally {
       setLoading(false);
     }
   };
 
-  // Initial + on URL change
+  // Initial + when URL changes (underlying)
   useEffect(() => {
-    fetchRows();
+    fetchBulk();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  }, [bulkUrl]);
 
-  // Auto-refresh (interval-driven)
+  // Background refresh every 60s
   useEffect(() => {
-    const refreshMs = Math.max(1, intervalMin) * 60_000;
-    const id = setInterval(fetchRows, refreshMs);
+    const id = setInterval(fetchBulk, 60_000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intervalMin, url]);
+  }, [bulkUrl]);
+
+  const rows = rowsByInterval[intervalMin] || [];
+
+  // In fullscreen we show overlay until first payload arrives
+  const showOverlay = panel === "fullscreen" ? loading || !hasFetched : loading;
 
   return (
-    <div className="w-full h-full flex flex-col gap-3">
-      {/* Styles */}
+    <div
+      className="w-full h-full flex flex-col gap-3"
+      style={panel === "fullscreen" ? { height: "100%" } : undefined}
+    >
+      {/* Theme-leaning styles (hooked to your .theme-scope vars) */}
       <style>{`
-  /* CSS Variables for light/dark mode */
-  :root {
-    --vi-bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --vi-input-bg: #f8f9ff;
-    --vi-input-border: #a5b4fc;
-    --vi-input-text: #1e1b4b;
-    --vi-input-focus: #6366f1;
-    --vi-label-text: #4338ca;
-    --vi-table-bg: #fefeff;
-    --vi-table-header-bg: linear-gradient(180deg, #e0e7ff 0%, #c7d2fe 100%);
-    --vi-table-header-text: #312e81;
-    --vi-table-border: #c7d2fe;
-    --vi-table-row-hover: #f5f3ff;
-    --vi-table-row-alt: #faf5ff;
-    --vi-button-bg: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
-    --vi-button-border: #6366f1;
-    --vi-button-hover: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-    --vi-button-text: #ffffff;
-    --vi-select-arrow: #4338ca;
-    --vi-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.1), 0 2px 4px -1px rgba(99, 102, 241, 0.06);
-    --vi-icon-color: #4338ca;
-  }
+:root, .theme-scope {
+  --vi-surface: var(--card-bg);
+  --vi-fg: var(--fg);
+  --vi-muted: var(--muted);
+  --vi-brd: var(--border);
+  --vi-accent: #6366f1;
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --vi-input-bg: #1f2937;
-      --vi-input-border: #4b5563;
-      --vi-input-text: #f9fafb;
-      --vi-input-focus: #60a5fa;
-      --vi-label-text: #d1d5db;
-      --vi-table-bg: #111827;
-      --vi-table-header-bg: #1f2937;
-      --vi-table-header-text: #f3f4f6;
-      --vi-table-border: #374151;
-      --vi-table-row-hover: #1f2937;
-      --vi-button-bg: #1f2937;
-      --vi-button-border: #4b5563;
-      --vi-button-hover: #374151;
-      --vi-select-arrow: #d1d5db;
-      --vi-icon-color: #d1d5db;
-      --vi-header-title: white;
-    }
-  }
+  --vi-head-grad-1: rgba(99,102,241,0.10);
+  --vi-head-grad-2: rgba(99,102,241,0.06);
+  --vi-row-hover: rgba(148,163,184,0.08);
+}
 
-  .vi-chip { 
-    background: var(--vi-table-bg); 
-    border: 1px solid var(--vi-table-border); 
-    border-radius: 8px; 
-  }
+.vi-chip {
+  background: var(--vi-surface);
+  border: 1px solid var(--vi-brd);
+  color: var(--vi-fg);
+  border-radius: 8px;
+}
 
-  .vi-input, .vi-select {
-    border: 2px solid var(--vi-input-border);
-    background: var(--vi-input-bg);
-    color: var(--vi-input-text);
-    border-radius: 8px;
-    padding: 10px 14px;
-    height: 42px;
-    width: 100%;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
+.vi-select, .vi-input {
+  border: 1.5px solid var(--vi-brd);
+  background: var(--vi-surface);
+  color: var(--vi-fg);
+  border-radius: 10px;
+  padding: 10px 14px;
+  height: 42px;
+  font-size: 14px; font-weight: 500;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.vi-select:focus, .vi-input:focus {
+  outline: none;
+  border-color: var(--vi-accent);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+}
+.vi-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
 
-  .vi-input:focus, .vi-select:focus {
-    outline: none;
-    border-color: var(--vi-input-focus);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
+.vi-label {
+  font-size: 12px; font-weight: 600;
+  color: var(--vi-muted);
+  margin-bottom: 6px; letter-spacing: .025em;
+  text-transform: uppercase;
+}
 
-  .vi-input:hover, .vi-select:hover {
-    border-color: var(--vi-input-focus);
-  }
+.no-scrollbar::-webkit-scrollbar{ display:none; }
+.no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
 
-  .vi-select {
-    appearance: none;
-    cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 36px;
-  }
+.vi-thead {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--vi-surface); /* solid base so it never looks transparent */
+}
+.vi-thead th {
+  background: linear-gradient(180deg, var(--vi-head-grad-1), var(--vi-head-grad-2)), var(--vi-surface);
+  color: var(--vi-fg);
+  font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; font-size: 11px;
+  border-bottom: 1px solid var(--vi-brd);
+}
 
-  @media (prefers-color-scheme: dark) {
-    .vi-select {
-      background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    }
-  }
+.vi-vlines th + th, .vi-vlines td + td { border-left: 1px solid var(--vi-brd); }
+.vi-vlines tbody td { border-bottom: 1px solid var(--vi-brd); }
+.vi-vlines tbody tr:last-child td { border-bottom: none; }
+.vi-table-row { transition: background-color .12s ease; }
+.vi-table-row:hover { background-color: var(--vi-row-hover); }
 
-  .vi-select option {
-    background: var(--vi-input-bg);
-    color: var(--vi-input-text);
-    padding: 8px;
-  }
+.vi-iconbtn {
+  width: 42px; height: 42px; border-radius: 10px;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--vi-brd);
+  background: var(--vi-surface); color: var(--vi-fg);
+  cursor: pointer; transition: transform .15s ease, box-shadow .15s ease, border-color .15s;
+}
+.vi-iconbtn:hover:not(:disabled) {
+  border-color: var(--vi-accent);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+  transform: translateY(-1px);
+}
+.vi-iconbtn:disabled { opacity: .65; cursor: not-allowed; }
 
-  .vi-label { 
-    font-size: 12px; 
-    font-weight: 600;
-    color: gray; 
-    margin-bottom: 6px; 
-    letter-spacing: 0.025em;
-    text-transform: uppercase;
-  }
+@keyframes vi-spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+.vi-spin { animation: vi-spin .9s linear infinite; color: var(--vi-muted); }
 
-  .no-scrollbar::-webkit-scrollbar{ display:none; }
-  .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
+.vi-header-title { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: var(--vi-fg); }
+      `}</style>
 
-  /* Sticky header */
-  .vi-thead { 
-    position: sticky; 
-    top: 0; 
-    z-index: 10; 
-    background: var(--vi-table-header-bg);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-  .vi-thead th { 
-    background: var(--vi-table-header-bg); 
-    color: var(--vi-table-header-text); 
-    font-weight: 700; 
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    font-size: 11px;
-  }
-
-  /* Vertical column lines */
-  .vi-vlines th + th, .vi-vlines td + td {
-    border-left: 1px solid var(--vi-table-border);
-  }
-
-  /* EXTRA: Horizontal lines across the row cells (clean separators) */
-  .vi-vlines tbody td {
-    border-bottom: 1px solid var(--vi-table-border);
-  }
-  .vi-vlines tbody tr:last-child td {
-    border-bottom: none; /* tidy end */
-  }
-
-  /* Table rows */
-  .vi-table-row {
-    border-top: 1px solid var(--vi-table-border);
-    transition: background-color 0.15s ease;
-  }
-
-  .vi-table-row:hover {
-    background-color: var(--vi-table-row-hover);
-  }
-
-  /* Icon button + spinner */
-  .vi-iconbtn {
-    width: 42px; 
-    height: 42px; 
-    border-radius: 8px;
-    display: grid; 
-    place-items: center;
-    border: 2px solid var(--vi-button-border); 
-    background: #E0E0E0; 
-    color: var(--vi-icon-color);
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .vi-iconbtn:hover:not(:disabled) {
-    background: var(--vi-button-hover);
-    border-color: var(--vi-input-focus);
-    transform: translateY(-1px);
-    color: var(--vi-input-text);
-  }
-
-  .vi-iconbtn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .vi-iconbtn svg { 
-    width: 18px; 
-    height: 18px; 
-    display: block; 
-    color: currentColor;
-  }
-  
-  @keyframes vi-spin { 
-    from { transform: rotate(0deg); } 
-    to { transform: rotate(360deg); } 
-  }
-  
-  .vi-spin { 
-    animation: vi-spin 0.9s linear infinite; 
-    color: var(--vi-icon-color);
-  }
-
-  /* Header title styles */
-  .vi-header-title {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-  }
-`}</style>
-
-      {/* Controls - Header with title on left, controls on right */}
+      {/* Header */}
       <div className="relative z-10 flex items-center justify-between mb-1">
-        {/* Title on left */}
-        <h1 className="vi-header-title">Volatility Index</h1>
-        
+        <div className="flex items-center gap-3">
+          <h1 className="vi-header-title">Volatility Index</h1>
+          {resolvedExpiry && (
+            <span className="px-2 py-1 text-xs vi-chip" title="Resolved automatically from server">
+              Expiry: <strong>{resolvedExpiry}</strong>
+            </span>
+          )}
+        </div>
+
         {/* Controls on right */}
         <div className="flex items-end gap-2">
           <div className="flex flex-col w-32">
+            <label className="vi-label">Interval</label>
             <select
               value={intervalMin}
-              onChange={(e) => setIntervalMin(Number(e.target.value))}
+              onChange={(e) => setIntervalMin(Number(e.target.value) as IntervalKey)}
               className="vi-select"
             >
               <option value={3}>3 min</option>
@@ -342,34 +352,52 @@ const VelocityIndex: React.FC = () => {
             </select>
           </div>
 
-          <button
-            onClick={fetchRows}
-            className="vi-iconbtn"
-            aria-label="Refresh"
-            title="Refresh"
-            disabled={loading}
-          >
-            {!loading ? (
-              <RotateCw strokeWidth={2} />
-            ) : (
-              <Loader2 className="vi-spin" strokeWidth={2} />
-            )}
-          </button>
+          <div className="flex flex-col">
+            <label className="vi-label">&nbsp;</label>
+            <button
+              onClick={fetchBulk}
+              className="vi-iconbtn"
+              aria-label="Refresh"
+              title="Refresh"
+              disabled={loading}
+            >
+              {!loading ? <RotateCw strokeWidth={2} /> : <Loader2 className="vi-spin" strokeWidth={2} />}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table wrapper */}
       <div
         className="relative rounded-xl border no-scrollbar overflow-y-auto"
         style={{
-          borderColor: "var(--border)",
-          maxHeight: 350,
+          borderColor: "var(--vi-brd)",
+          maxHeight: panel === "fullscreen" ? "100%" : 350,
           background: "transparent",
+          ...(panel === "fullscreen" ? { flex: "1 1 0%" } : null),
         }}
+        aria-busy={showOverlay}
       >
+        {/* Loading overlay (prevents 'No data' flash on expand) */}
+        {showOverlay && (
+          <div
+            className="absolute inset-0 grid place-items-center"
+            style={{
+              background: "rgba(0,0,0,.03)",
+              backdropFilter: "blur(1px)",
+              zIndex: 2,
+            }}
+          >
+            <div className="flex items-center gap-3" style={{ color: "var(--vi-muted)" }}>
+              <div className="w-6 h-6 rounded-full border-2 border-current border-t-transparent animate-spin" />
+              <span>Loading…</span>
+            </div>
+          </div>
+        )}
+
         <table
           className="w-full table-fixed text-[13px] vi-vlines"
-          style={{ borderCollapse: "separate", borderSpacing: 0 }}
+          style={{ borderCollapse: "separate", borderSpacing: 0, color: "var(--vi-fg)" }}
         >
           <colgroup>
             <col style={{ width: "22%" }} />
@@ -391,17 +419,17 @@ const VelocityIndex: React.FC = () => {
             {rows.map((r, i) => {
               const volTone =
                 r.volatility > 0
-                  ? "color: #34d399"
+                  ? "color: #22c55e"
                   : r.volatility < 0
-                  ? "color: #fb7185"
-                  : "color: var(--fg)";
+                  ? "color: #ef4444"
+                  : "color: var(--vi-fg)";
               const chipStyle =
                 r.signal === "Bullish"
-                  ? "background: rgba(16,185,129,0.12); color:#34d399; border:1px solid rgba(16,185,129,0.28);"
-                  : "background: rgba(244,63,94,0.12); color:#fb7185; border:1px solid rgba(244,63,94,0.28);";
+                  ? "background: rgba(16,185,129,0.12); color:#22c55e; border:1px solid rgba(16,185,129,0.28);"
+                  : "background: rgba(244,63,94,0.12); color:#ef4444; border:1px solid rgba(244,63,94,0.28);";
               return (
-                <tr key={i} className="border-t" style={{ borderColor: "var(--border)" }}>
-                  <td className="px-3 py-2 font-mono text-center" style={{ ...toStyle(volTone) }}>
+                <tr key={i} className="vi-table-row">
+                  <td className="px-3 py-2 font-mono text-center" style={toStyle(volTone)}>
                     {fmt(r.volatility)}
                   </td>
                   <td className="px-3 py-2 font-mono text-center">{toHHMM(r.time)}</td>
@@ -418,10 +446,11 @@ const VelocityIndex: React.FC = () => {
               );
             })}
 
-            {!rows.length && !loading && (
+            {/* Only show 'No data' when not overlaying & after at least one fetch */}
+            {!showOverlay && rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center" style={{ color: "var(--muted)" }}>
-                  No data
+                <td colSpan={4} className="px-3 py-6 text-center" style={{ color: "var(--vi-muted)" }}>
+                  {err ? "No data (API error)" : "No data"}
                 </td>
               </tr>
             )}
@@ -430,28 +459,12 @@ const VelocityIndex: React.FC = () => {
       </div>
 
       {err && (
-        <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
+        <div className="text-xs mt-1" style={{ color: "var(--vi-muted)" }}>
           {err}
         </div>
       )}
     </div>
   );
 };
-
-// helper to convert small CSS fragments to React style objects
-function toStyle(css: string): React.CSSProperties {
-  const s: any = {};
-  css
-    .split(";")
-    .map((x) => x.trim())
-    .filter(Boolean)
-    .forEach((decl) => {
-      const [k, v] = decl.split(":").map((y) => y.trim());
-      if (!k || !v) return;
-      const camel = k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      s[camel] = v;
-    });
-  return s;
-}
 
 export default VelocityIndex;
