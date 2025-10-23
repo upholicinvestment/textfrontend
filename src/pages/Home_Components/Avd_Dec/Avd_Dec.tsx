@@ -32,7 +32,7 @@ const REFRESH_MS = 180_000;
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
-  "http://localhost:8000/api";
+  "https://api.upholictech.com/api";
 
 // Fetch 24h & multiple bins at once
 const INTERVALS = [3, 5, 15, 30];

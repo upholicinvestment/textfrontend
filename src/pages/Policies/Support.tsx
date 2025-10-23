@@ -28,7 +28,7 @@ const MapIcon = () => (
 );
 
 const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8000";
+  (import.meta as any).env?.VITE_API_BASE_URL || "https://api.upholictech.com";
 
 export default function ContactUsPage(): React.ReactElement {
   const [form, setForm] = useState<FormState>({

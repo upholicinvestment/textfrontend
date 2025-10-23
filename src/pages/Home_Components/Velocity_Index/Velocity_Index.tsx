@@ -19,7 +19,7 @@ type Props = { panel?: "card" | "fullscreen" };
 const RAW_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
-  "http://localhost:8000/api";
+  "https://api.upholictech.com/api";
 
 const API_BASE = String(RAW_BASE).replace(/\/$/, "");
 const API_WITH_API = /\/api$/i.test(API_BASE) ? API_BASE : API_BASE + "/api";

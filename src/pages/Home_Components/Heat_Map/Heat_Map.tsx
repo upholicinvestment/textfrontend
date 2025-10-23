@@ -31,7 +31,7 @@ type Props = { panel?: "card" | "fullscreen" };
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
-  "http://localhost:8000/api";
+  "https://api.upholictech.com/api";
 
 const REFRESH_MS = 180_000; // 3 minutes
 const BULK_URL = `${API_BASE.replace(/\/$/, "")}/heatmap/bulk?sinceMin=1440`;

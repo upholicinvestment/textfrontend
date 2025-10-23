@@ -6,6 +6,7 @@ import {
   LinearScale,
   LineElement,
   PointElement,
+  LineController,
   Title,
   Tooltip as CJTooltip,
   Legend as CJLegend,
@@ -14,7 +15,7 @@ import { Chart } from "react-chartjs-2";
 import type { ChartData, ChartOptions, ScaleOptionsByType } from "chart.js";
 import { motion } from "framer-motion";
 
-ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, CJTooltip, CJLegend);
+ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, CJTooltip, CJLegend, LineController);
 
 /* --- types ... (unchanged) --- */
 type ATMPoint = { timestamp: string; callOI: number; putOI: number };
@@ -32,7 +33,7 @@ type Props = { panel?: "card" | "fullscreen" };
 const RAW_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
-  "http://localhost:8000";
+  "https://api.upholictech.com";
 const API_BASE = String(RAW_BASE).replace(/\/$/, "") + "/api";
 const BULK_URL = `${API_BASE}/oi/bulk?intervals=3,15,30,60&sinceMin=1440`;
 const STORAGE_KEY = "oi.bulk.v1";
