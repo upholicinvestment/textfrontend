@@ -6,7 +6,7 @@ import {
 } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.upholictech/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.upholictech.com/api";
 const ROWS = 5;
 
 // Expired/scan tunables
@@ -446,13 +446,24 @@ export default function AdminDashboard() {
   const panel = cls(theme, "bg-[#0f1233]/90", "bg-white");
   const border = cls(theme, "border-white/10", "border-black/10");
   const faint = cls(theme, "text-white/40", "text-black/40");
-  const hoverPanel = cls(theme, "hover:bg-white/5", "hover:bg-black/[0.03]");
+  const hoverPanel = cls(theme, "hover:bg-white/5", "hover:bg-black/[0.03]"); // keep same result in both themes
   const inputBg = cls(theme, "bg-white/5", "bg-black/[0.04]");
   const divider = cls(theme, "border-white/10", "border-black/10");
   const rowBorder = cls(theme, "border-white/5", "border-black/10");
   const subtleBadgeBg = cls(theme, "bg-purple-500/15", "bg-purple-500/10");
   const subtleBadgeText = cls(theme, "text-purple-300", "text-purple-600");
   const experienceBadge = cls(theme, "bg-blue-500/20 text-blue-300", "bg-blue-500/15 text-blue-600");
+
+  // Button class helpers (make enabled buttons full-opacity)
+  const btnSm = (enabled: boolean) =>
+    `px-3 py-1.5 rounded border text-sm ${border} ${
+      enabled ? `${hoverPanel} ${text}` : `${text} opacity-40 cursor-not-allowed`
+    }`;
+
+  const btnMd = (enabled: boolean) =>
+    `px-4 py-2 rounded-lg border text-sm font-medium ${border} ${
+      enabled ? `${hoverPanel} ${text} hover:scale-105` : `${text} opacity-40 cursor-not-allowed`
+    }`;
 
   const usersHasMore = (usersResp?.page || 1) * (usersResp?.pageSize || ROWS) < (usersResp?.total || 0);
   const usersHasPrev = (usersResp?.page || 1) > 1;
@@ -563,8 +574,8 @@ export default function AdminDashboard() {
             </table>
 
             <div className="flex items-center justify-end gap-2 mt-4">
-              <button disabled={!usersHasPrev} onClick={() => setPage((p) => Math.max(1, p - 1))} className={`px-3 py-1.5 rounded border text-sm ${border} ${usersHasPrev ? hoverPanel : "opacity-40 cursor-not-allowed"} ${text}/80}`}>← Prev</button>
-              <button disabled={!usersHasMore} onClick={() => setPage((p) => p + 1)} className={`px-3 py-1.5 rounded border text-sm ${border} ${usersHasMore ? hoverPanel : "opacity-40 cursor-not-allowed"} ${text}/80}`}>Next →</button>
+              <button disabled={!usersHasPrev} onClick={() => setPage((p) => Math.max(1, p - 1))} className={btnSm(usersHasPrev)}>← Prev</button>
+              <button disabled={!usersHasMore} onClick={() => setPage((p) => p + 1)} className={btnSm(usersHasMore)}>Next →</button>
             </div>
           </div>
         </div>
@@ -611,8 +622,8 @@ export default function AdminDashboard() {
                 </table>
 
                 <div className="flex items-center justify-end gap-2 mt-4">
-                  <button disabled={!hasPrevRenewals} onClick={() => setRenewalsPage((p) => Math.max(1, p - 1))} className={`px-3 py-1.5 rounded border text-sm ${border} ${hasPrevRenewals ? hoverPanel : "opacity-40 cursor-not-allowed"} ${text}/80}`}>← Prev</button>
-                  <button disabled={!moreRenewals} onClick={() => setRenewalsPage((p) => p + 1)} className={`px-3 py-1.5 rounded border text-sm ${border} ${moreRenewals ? hoverPanel : "opacity-40 cursor-not-allowed"} ${text}/80}`}>Next →</button>
+                  <button disabled={!hasPrevRenewals} onClick={() => setRenewalsPage((p) => Math.max(1, p - 1))} className={btnSm(hasPrevRenewals)}>← Prev</button>
+                  <button disabled={!moreRenewals} onClick={() => setRenewalsPage((p) => p + 1)} className={btnSm(moreRenewals)}>Next →</button>
                 </div>
               </>
             )}
@@ -629,7 +640,7 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-2 text-sm">
               <span className={subtext}>Days:</span>
               <input type="number" min={1} value={expiredDays} onChange={(e) => setExpiredDays(parseInt(e.target.value || "1", 10))} className={`w-20 ${inputBg} border ${border} rounded-lg px-3 py-1.5 text-sm ${text} outline-none`} />
-              <button onClick={() => setExpiredReloadKey((k) => k + 1)} className={`ml-2 px-3 py-1.5 rounded border text-sm ${border} ${hoverPanel} ${text}/80`} title="Reload">Refresh</button>
+              <button onClick={() => setExpiredReloadKey((k) => k + 1)} className={`ml-2 ${btnSm(true)}`} title="Reload">Refresh</button>
             </div>
           </div>
           <div className="p-5 overflow-x-auto">
@@ -669,8 +680,8 @@ export default function AdminDashboard() {
                 </table>
 
                 <div className="flex items-center justify-end gap-2 mt-4">
-                  <button disabled={!hasPrevExpired} onClick={() => setExpiredPage((p) => Math.max(1, p - 1))} className={`px-3 py-1.5 rounded border text-sm ${border} ${hasPrevExpired ? hoverPanel : "opacity-40 cursor-not-allowed"} ${text}/80}`}>← Prev</button>
-                  <button disabled={!moreExpired} onClick={() => setExpiredPage((p) => p + 1)} className={`px-3 py-1.5 rounded border text-sm ${border} ${moreExpired ? hoverPanel : "opacity-40 cursor-not-allowed"} ${text}/80}`}>Next →</button>
+                  <button disabled={!hasPrevExpired} onClick={() => setExpiredPage((p) => Math.max(1, p - 1))} className={btnSm(hasPrevExpired)}>← Prev</button>
+                  <button disabled={!moreExpired} onClick={() => setExpiredPage((p) => p + 1)} className={btnSm(moreExpired)}>Next →</button>
                 </div>
               </>
             )}
@@ -860,8 +871,8 @@ export default function AdminDashboard() {
                     {apps?.total || 0} applications
                   </div>
                   <div className="flex items-center gap-2">
-                    <button disabled={!appsHasPrev} onClick={() => setAppsPage((p) => Math.max(1, p - 1))} className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${appsHasPrev ? `${border} ${hoverPanel} ${text}/80 hover:scale-105` : "opacity-40 cursor-not-allowed"}`}>← Previous</button>
-                    <button disabled={!appsHasMore} onClick={() => setAppsPage((p) => p + 1)} className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${appsHasMore ? `${border} ${hoverPanel} ${text}/80 hover:scale-105` : "opacity-40 cursor-not-allowed"}`}>Next →</button>
+                    <button disabled={!appsHasPrev} onClick={() => setAppsPage((p) => Math.max(1, p - 1))} className={btnMd(appsHasPrev)}>← Previous</button>
+                    <button disabled={!appsHasMore} onClick={() => setAppsPage((p) => p + 1)} className={btnMd(appsHasMore)}>Next →</button>
                   </div>
                 </div>
               )}
@@ -946,8 +957,8 @@ export default function AdminDashboard() {
                     {resumes?.total || 0} resumes
                   </div>
                   <div className="flex items-center gap-2">
-                    <button disabled={!resumesHasPrev} onClick={() => setResumesPage((p) => Math.max(1, p - 1))} className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${resumesHasPrev ? `${border} ${hoverPanel} ${text}/80 hover:scale-105` : "opacity-40 cursor-not-allowed"}`}>← Previous</button>
-                    <button disabled={!resumesHasMore} onClick={() => setResumesPage((p) => p + 1)} className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${resumesHasMore ? `${border} ${hoverPanel} ${text}/80 hover:scale-105` : "opacity-40 cursor-not-allowed"}`}>Next →</button>
+                    <button disabled={!resumesHasPrev} onClick={() => setResumesPage((p) => Math.max(1, p - 1))} className={btnMd(resumesHasPrev)}>← Previous</button>
+                    <button disabled={!resumesHasMore} onClick={() => setResumesPage((p) => p + 1)} className={btnMd(resumesHasMore)}>Next →</button>
                   </div>
                 </div>
               )}
