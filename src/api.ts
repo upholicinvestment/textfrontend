@@ -8,7 +8,7 @@ import axios, {
 export const API_BASE =
   import.meta.env.VITE_API_BASE ??
   import.meta.env.VITE_API_URL ??
-  "https://api.upholictech.com/api";
+  "http://localhost:8000/api";
 
 const TOKEN_KEYS = ["token", "accessToken", "jwt", "authToken"];
 

@@ -5,7 +5,7 @@ import type { ApexOptions } from "apexcharts";
 
 /* ========= Config ========= */
 const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "https://api.upholictech.com/api";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 const REFRESH_MS = 180_000; // 3 minutes
 
 /* ========= Sizing ========= */

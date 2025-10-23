@@ -32,7 +32,7 @@ type Props = { panel?: "card" | "fullscreen" };
 const RAW_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
-  "https://api.upholictech.com";
+  "http://localhost:8000";
 const API_BASE = String(RAW_BASE).replace(/\/$/, "") + "/api";
 const BULK_URL = `${API_BASE}/oi/bulk?intervals=3,15,30,60&sinceMin=1440`;
 const STORAGE_KEY = "oi.bulk.v1";

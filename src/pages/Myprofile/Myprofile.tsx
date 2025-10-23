@@ -172,7 +172,7 @@ const RISK_PROFILE_OPTIONS = ["Conservative","Moderate","Aggressive"];
 const INSTRUMENT_OPTIONS = ["Index Options","Stock Options","Futures","Equity (Cash)","Commodities","Currency"];
 
 /** ---------- Config ---------- **/
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.upholictech.com/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 const THEME_KEY = "theme";
 const REMINDERS_KEY = "reminders:v1";
 

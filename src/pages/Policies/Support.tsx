@@ -28,7 +28,7 @@ const MapIcon = () => (
 );
 
 const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL || "https://api.upholictech.com";
+  (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8000";
 
 export default function ContactUsPage(): React.ReactElement {
   const [form, setForm] = useState<FormState>({
@@ -99,21 +99,20 @@ export default function ContactUsPage(): React.ReactElement {
     }
     try {
       setOtpSending(true);
-      const r = await fetch(`${API_BASE}/api/otp/send`, {
+      const r = await fetch(`${API_BASE}/api/otp/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: form.phone, purpose: "signup" }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
-        // Try to read wait seconds from backend message
-        const wait = (typeof data?.error === "string" && /(\d+)s/.exec(data.error)?.[1]) || null;
-        if (wait) startCooldown(parseInt(wait, 10));
-        throw new Error(data?.error || "Failed to send OTP");
+        // backend uses { message }, not { error }
+        const msg = (data && data.message) || "Failed to send OTP";
+        if (r.status === 429) startCooldown(45);
+        throw new Error(msg);
       }
       setOtpSent(true);
-      toast.success("OTP sent to your phone.");
-      // Show a resend cooldown (45s default). Backend will also protect with 429.
+      toast.success(data?.message || "OTP sent to your phone.");
       startCooldown(45);
     } catch (e: any) {
       toast.error(e?.message || "OTP send failed");
@@ -127,26 +126,26 @@ export default function ContactUsPage(): React.ReactElement {
       toast.warn("Enter a valid 10-digit phone number first.");
       return;
     }
-    if (!/^\d{4,8}$/.test(otp)) {
+    if (!/^\d{6}$/.test(otp)) {
       toast.warn("Enter the 6-digit OTP.");
       return;
     }
     try {
       setOtpVerifying(true);
-      const r = await fetch(`${API_BASE}/api/otp/verify`, {
+      const r = await fetch(`${API_BASE}/api/otp/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: form.phone, otp }),
       });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data?.error || "OTP verification failed");
+      if (!r.ok) throw new Error(data?.message || "OTP verification failed");
       setOtpVerified(true);
       setCooldown(0);
       if (timerRef.current) {
         window.clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      toast.success("Phone verified ✅");
+      toast.success(data?.message || "Phone verified ✅");
     } catch (e: any) {
       setOtpVerified(false);
       toast.error(e?.message || "Incorrect OTP");
@@ -181,7 +180,7 @@ export default function ContactUsPage(): React.ReactElement {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       phone: form.phone.trim(),
-      otp: otp.trim(), // include for servers that enforce OTP at /api/ads
+      otp: otp.trim(),
     };
     if (form.message.trim()) payload.message = form.message.trim();
 
@@ -401,8 +400,8 @@ export default function ContactUsPage(): React.ReactElement {
                     className="ctl"
                     name="otp"
                     inputMode="numeric"
-                    pattern="^[0-9]{4,8}$"
-                    maxLength={8}
+                    pattern="^[0-9]{6}$"
+                    maxLength={6}
                     placeholder="Enter OTP"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
@@ -412,7 +411,7 @@ export default function ContactUsPage(): React.ReactElement {
                     type="button"
                     className="btn"
                     onClick={verifyOtp}
-                    disabled={otpVerifying || !/^\d{4,8}$/.test(otp)}
+                    disabled={otpVerifying || !/^\d{6}$/.test(otp)}
                   >
                     {otpVerifying ? "Verifying…" : "Verify OTP"}
                   </button>

@@ -35,7 +35,7 @@ import Algo_Similator_Home from '../pages/Algo_Simulator/Algo_Home/Algo_Similato
 import FiiDiiHome from '../pages/Fii_Dii/Fii_Dii_Home/FiiDiiHome';
 import MyProfile from '../pages/Myprofile/Myprofile';
 import RequireEntitlement from './RequireEntitlement'; // ⬅️ NEW
-// import Support from '../pages/Policies/Support';
+import Support from '../pages/Policies/Support';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -63,7 +63,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/contact-us" element={<ContactUs />} />
         <Route path="/algo-simulator" element={<Algo_Similator_Home />} />
         <Route path='/fii-dii-fno-home' element={<FiiDiiHome/>} />
-        {/* <Route path='/support' element={<Support/>} /> */}
+        <Route path='/support' element={<Support/>} />
         {/* <Route path="/fundamental-scanner" element={<ScannerDashboard />} /> */}
         {/* Guest-only: login & signup (keeps your purchase allowance logic) */}
         <Route element={<GuestRoute />}>
