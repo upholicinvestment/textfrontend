@@ -184,43 +184,36 @@ export default function ContactUsPage(): React.ReactElement {
     };
     if (form.message.trim()) payload.message = form.message.trim();
 
-    // ✅ Resolve as soon as we know the HTTP status is OK (don’t wait for body)
-    const submitPromise = fetch(`${API_BASE}/api/ads`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).then(async (res) => {
+    // Use a controllable loading toast so it never gets stuck
+    const tId = toast.loading("Submitting your request…", {
+      position: "top-right",
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      transition: Slide,
+      theme: "light",
+    });
+
+    try {
+      const res = await fetch(`${API_BASE}/api/ads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         throw new Error(text || res.statusText);
       }
-      return true; // success; no dependency on JSON body
-    });
 
-    try {
-      await toast.promise(
-        submitPromise,
-        {
-          pending: "Submitting your request…",
-          success: "Your request has been submitted",
-          error: {
-            render({ data }) {
-              const err = data as Error;
-              return `Failed: ${err.message || "Server error"}`;
-            },
-          },
-        },
-        {
-          position: "top-right",
-          autoClose: 2500,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          transition: Slide,
-          theme: "light",
-        }
-      );
+      // Success: update & close the toast
+      toast.update(tId, {
+        render: "Your request has been submitted",
+        type: "success",
+        isLoading: false,
+        autoClose: 2500,
+        hideProgressBar: false,
+      });
 
       // Reset form & OTP state
       setForm({ firstName: "", lastName: "", phone: "", message: "" });
@@ -228,8 +221,14 @@ export default function ContactUsPage(): React.ReactElement {
       setOtpSent(false);
       setOtpVerified(false);
       setCooldown(0);
-    } catch {
-      // handled by toast
+    } catch (err: any) {
+      toast.update(tId, {
+        render: `Failed: ${err?.message || "Server error"}`,
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+        hideProgressBar: false,
+      });
     } finally {
       setSubmitting(false);
     }
