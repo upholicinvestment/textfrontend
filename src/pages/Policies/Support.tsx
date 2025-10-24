@@ -17,7 +17,7 @@ const MailIcon = () => (
 );
 const PhoneIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-    <path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.06 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 5.18 2 2 0 0 1 4.11 3h2a2 2 0 0 1 2 1.72c.12.89.32 1.76.59 2.6a2 2 0 0 1-.45 2.11L7.09 10a16 16 0 0 0 6 6l.57-1.17a2 2 0 0 1 2.11-.45c.84.27 1.71.47 2.6.59A2 2 0 0 1 22 16.92z" stroke="currentColor" strokeWidth="1.6"/>
+    <path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.06 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 5.18 2 2 0  0 1 4.11 3h2a2 2 0 0 1 2 1.72c.12.89.32 1.76.59 2.6a2 2 0 0 1-.45 2.11L7.09 10a16 16 0 0 0 6 6l.57-1.17a2 2 0 0 1 2.11-.45c.84.27 1.71.47 2.6.59A2 2 0 0 1 22 16.92z" stroke="currentColor" strokeWidth="1.6"/>
   </svg>
 );
 const MapIcon = () => (
@@ -29,6 +29,8 @@ const MapIcon = () => (
 
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE_URL || "https://api.upholictech.com";
+
+const TOAST_CONTAINER_ID = "root-toasts";
 
 export default function ContactUsPage(): React.ReactElement {
   const [form, setForm] = useState<FormState>({
@@ -94,7 +96,7 @@ export default function ContactUsPage(): React.ReactElement {
 
   const sendOtp = async () => {
     if (!/^\d{10}$/.test(form.phone)) {
-      toast.warn("Enter a valid 10-digit phone number first.");
+      toast.warn("Enter a valid 10-digit phone number first.", { containerId: TOAST_CONTAINER_ID });
       return;
     }
     try {
@@ -111,10 +113,10 @@ export default function ContactUsPage(): React.ReactElement {
         throw new Error(msg);
       }
       setOtpSent(true);
-      toast.success(data?.message || "OTP sent to your phone.");
+      toast.success(data?.message || "OTP sent to your phone.", { containerId: TOAST_CONTAINER_ID });
       startCooldown(45);
     } catch (e: any) {
-      toast.error(e?.message || "OTP send failed");
+      toast.error(e?.message || "OTP send failed", { containerId: TOAST_CONTAINER_ID });
     } finally {
       setOtpSending(false);
     }
@@ -122,11 +124,11 @@ export default function ContactUsPage(): React.ReactElement {
 
   const verifyOtp = async () => {
     if (!/^\d{10}$/.test(form.phone)) {
-      toast.warn("Enter a valid 10-digit phone number first.");
+      toast.warn("Enter a valid 10-digit phone number first.", { containerId: TOAST_CONTAINER_ID });
       return;
     }
     if (!/^\d{6}$/.test(otp)) {
-      toast.warn("Enter the 6-digit OTP.");
+      toast.warn("Enter the 6-digit OTP.", { containerId: TOAST_CONTAINER_ID });
       return;
     }
     try {
@@ -144,10 +146,10 @@ export default function ContactUsPage(): React.ReactElement {
         window.clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      toast.success(data?.message || "OTP verified successfully.");
+      toast.success(data?.message || "OTP verified successfully.", { containerId: TOAST_CONTAINER_ID });
     } catch (e: any) {
       setOtpVerified(false);
-      toast.error(e?.message || "Incorrect OTP");
+      toast.error(e?.message || "Incorrect OTP", { containerId: TOAST_CONTAINER_ID });
     } finally {
       setOtpVerifying(false);
     }
@@ -156,10 +158,10 @@ export default function ContactUsPage(): React.ReactElement {
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!form.firstName.trim()) return void toast.warn("First name is required.");
-    if (!form.lastName.trim())  return void toast.warn("Last name is required.");
-    if (!/^\d{10}$/.test(form.phone)) return void toast.warn("Phone number must be exactly 10 digits.");
-    if (!otpVerified) return void toast.warn("Please verify the OTP before submitting.");
+    if (!form.firstName.trim()) return void toast.warn("First name is required.", { containerId: TOAST_CONTAINER_ID });
+    if (!form.lastName.trim())  return void toast.warn("Last name is required.", { containerId: TOAST_CONTAINER_ID });
+    if (!/^\d{10}$/.test(form.phone)) return void toast.warn("Phone number must be exactly 10 digits.", { containerId: TOAST_CONTAINER_ID });
+    if (!otpVerified) return void toast.warn("Please verify the OTP before submitting.", { containerId: TOAST_CONTAINER_ID });
 
     setSubmitting(true);
 
@@ -184,6 +186,7 @@ export default function ContactUsPage(): React.ReactElement {
       }
 
       toast.success("Your request has been submitted", {
+        containerId: TOAST_CONTAINER_ID,
         position: "top-right",
         autoClose: 2500,
         transition: Slide,
@@ -198,6 +201,7 @@ export default function ContactUsPage(): React.ReactElement {
       setCooldown(0);
     } catch (err: any) {
       toast.error(`Failed: ${err?.message || "Server error"}`, {
+        containerId: TOAST_CONTAINER_ID,
         position: "top-right",
         autoClose: 3000,
         transition: Slide,
@@ -210,7 +214,17 @@ export default function ContactUsPage(): React.ReactElement {
 
   return (
     <div className="contact-page">
-      <ToastContainer />
+      {/* Single, stable container to prevent close errors */}
+      <ToastContainer
+        containerId={TOAST_CONTAINER_ID}
+        position="top-right"
+        closeOnClick={false}
+        closeButton={false}
+        draggable
+        transition={Slide}
+        limit={1}
+        theme="light"
+      />
 
       <style>{`
         :root{
