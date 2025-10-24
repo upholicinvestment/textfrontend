@@ -1,6 +1,6 @@
 // src/pages/Home_Components/Velocity_Index/VelocityIndex.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { RotateCw, Loader2 } from "lucide-react";
+import { RotateCw } from "lucide-react";
 
 /* ============ Types ============ */
 type Row = {
@@ -93,8 +93,8 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
     15: [],
     30: [],
   });
-  const [loading, setLoading] = useState(false);
-  const [hasFetched, setHasFetched] = useState(false); // prevents initial “No data” flash in fullscreen
+  const [, setLoading] = useState(false); // kept, but not shown in UI
+  const [hasFetched, setHasFetched] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [resolvedExpiry, setResolvedExpiry] = useState<string | null>(null);
 
@@ -224,9 +224,6 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
   }, [bulkUrl]);
 
   const rows = rowsByInterval[intervalMin] || [];
-
-  // In fullscreen we show overlay until first payload arrives
-  const showOverlay = panel === "fullscreen" ? loading || !hasFetched : loading;
 
   return (
     <div
@@ -359,9 +356,8 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
               className="vi-iconbtn"
               aria-label="Refresh"
               title="Refresh"
-              disabled={loading}
             >
-              {!loading ? <RotateCw strokeWidth={2} /> : <Loader2 className="vi-spin" strokeWidth={2} />}
+              <RotateCw strokeWidth={2} />
             </button>
           </div>
         </div>
@@ -376,24 +372,9 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
           background: "transparent",
           ...(panel === "fullscreen" ? { flex: "1 1 0%" } : null),
         }}
-        aria-busy={showOverlay}
+        aria-busy={false}
       >
-        {/* Loading overlay (prevents 'No data' flash on expand) */}
-        {showOverlay && (
-          <div
-            className="absolute inset-0 grid place-items-center"
-            style={{
-              background: "rgba(0,0,0,.03)",
-              backdropFilter: "blur(1px)",
-              zIndex: 2,
-            }}
-          >
-            <div className="flex items-center gap-3" style={{ color: "var(--vi-muted)" }}>
-              <div className="w-6 h-6 rounded-full border-2 border-current border-t-transparent animate-spin" />
-              <span>Loading…</span>
-            </div>
-          </div>
-        )}
+        {/* (Loading overlay removed) */}
 
         <table
           className="w-full table-fixed text-[13px] vi-vlines"
@@ -446,8 +427,8 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
               );
             })}
 
-            {/* Only show 'No data' when not overlaying & after at least one fetch */}
-            {!showOverlay && rows.length === 0 && (
+            {/* Only show 'No data' after at least one fetch */}
+            {rows.length === 0 && hasFetched && (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center" style={{ color: "var(--vi-muted)" }}>
                   {err ? "No data (API error)" : "No data"}

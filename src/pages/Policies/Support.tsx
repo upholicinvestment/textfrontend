@@ -184,16 +184,17 @@ export default function ContactUsPage(): React.ReactElement {
     };
     if (form.message.trim()) payload.message = form.message.trim();
 
+    // ✅ Resolve as soon as we know the HTTP status is OK (don’t wait for body)
     const submitPromise = fetch(`${API_BASE}/api/ads`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).then(async (res) => {
       if (!res.ok) {
-        const text = await res.text();
+        const text = await res.text().catch(() => "");
         throw new Error(text || res.statusText);
       }
-      return res.json();
+      return true; // success; no dependency on JSON body
     });
 
     try {
@@ -449,7 +450,12 @@ export default function ContactUsPage(): React.ReactElement {
         {/* Right: image + quick contact */}
         <aside>
           <div className="image-card" aria-hidden="true">
-            <img className="hero-img" src="stock.jpg" alt="Contact illustration" />
+            <img
+              className="hero-img"
+              src="https://images.pexels.com/photos/6802052/pexels-photo-6802052.jpeg"
+              alt="Contact illustration"
+              loading="lazy"
+            />
           </div>
 
           <div className="info-card" aria-label="Quick contact">

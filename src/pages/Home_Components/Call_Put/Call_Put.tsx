@@ -120,7 +120,6 @@ export default function Call_Put({ panel = "card" }: Props) {
   const [interval, setIntervalOpt] = useState<IntervalOpt>("3m");
 
   const [bulk, setBulk] = useState<OIBulkPayload | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
   const [err, setErr] = useState<string | null>(null);
   const [hasFetched, setHasFetched] = useState(false);
 
@@ -160,7 +159,6 @@ export default function Call_Put({ panel = "card" }: Props) {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
-      setLoading(true);
       setErr(null);
 
       // Serve cached (if valid) ASAP
@@ -174,7 +172,6 @@ export default function Call_Put({ panel = "card" }: Props) {
               setBulk(normalized);
               setHasFetched(true);
             });
-            setLoading(false);
           }
         } catch {}
       }
@@ -188,7 +185,6 @@ export default function Call_Put({ panel = "card" }: Props) {
       });
 
       if (res.status === 304) {
-        setLoading(false);
         setHasFetched(true);
         return;
       }
@@ -200,7 +196,6 @@ export default function Call_Put({ panel = "card" }: Props) {
       if (!normalized) {
         setErr(raw?.error || "No data available");
         setHasFetched(true);
-        setLoading(false);
         return;
       }
 
@@ -216,8 +211,6 @@ export default function Call_Put({ panel = "card" }: Props) {
       });
     } catch (e: any) {
       if (e?.name !== "AbortError") setErr(e?.message || "Failed to load data");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -391,9 +384,7 @@ export default function Call_Put({ panel = "card" }: Props) {
       ? "relative w-full h-full rounded-xl overflow-hidden"
       : "relative w-full h-[410px] md:h-[430px] lg:h-[440px] rounded-xl overflow-hidden";
 
-  const showOverlay = panel === "fullscreen" && (loading || (!hasFetched && !err));
-  const showEmpty = !labels.length && !loading && (panel === "fullscreen" ? hasFetched : true);
-
+  const showEmpty = !labels.length && (panel === "fullscreen" ? hasFetched : true);
   const chartAreaTopOffset = isMobile ? 64 : 0;
 
   return (
@@ -464,23 +455,7 @@ export default function Call_Put({ panel = "card" }: Props) {
 
         {/* Chart area */}
         <div className="absolute left-0 right-0 bottom-0" style={{ top: chartAreaTopOffset }}>
-          {showOverlay && (
-            <div
-              className="absolute inset-0 grid place-items-center z-20"
-              style={{ background: "rgba(0,0,0,.03)", backdropFilter: "blur(1px)", color: vars.muted }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                <span>Loading…</span>
-              </div>
-            </div>
-          )}
-
-          {loading && panel !== "fullscreen" ? (
-            <div className="w-full h-full grid place-items-center" style={{ color: vars.muted }}>
-              Loading…
-            </div>
-          ) : err ? (
+          {err ? (
             <div className="w-full h-full grid place-items-center" style={{ color: "#f87171" }}>
               {err}
             </div>
