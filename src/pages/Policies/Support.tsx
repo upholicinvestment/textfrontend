@@ -106,7 +106,6 @@ export default function ContactUsPage(): React.ReactElement {
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
-        // backend uses { message }, not { error }
         const msg = (data && data.message) || "Failed to send OTP";
         if (r.status === 429) startCooldown(45);
         throw new Error(msg);
@@ -145,7 +144,7 @@ export default function ContactUsPage(): React.ReactElement {
         window.clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      toast.success(data?.message || "Phone verified ✅");
+      toast.success(data?.message || "OTP verified successfully.");
     } catch (e: any) {
       setOtpVerified(false);
       toast.error(e?.message || "Incorrect OTP");
@@ -157,22 +156,10 @@ export default function ContactUsPage(): React.ReactElement {
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!form.firstName.trim()) {
-      toast.warn("First name is required.");
-      return;
-    }
-    if (!form.lastName.trim()) {
-      toast.warn("Last name is required.");
-      return;
-    }
-    if (!/^\d{10}$/.test(form.phone)) {
-      toast.warn("Phone number must be exactly 10 digits.");
-      return;
-    }
-    if (!otpVerified) {
-      toast.warn("Please verify the OTP before submitting.");
-      return;
-    }
+    if (!form.firstName.trim()) return void toast.warn("First name is required.");
+    if (!form.lastName.trim())  return void toast.warn("Last name is required.");
+    if (!/^\d{10}$/.test(form.phone)) return void toast.warn("Phone number must be exactly 10 digits.");
+    if (!otpVerified) return void toast.warn("Please verify the OTP before submitting.");
 
     setSubmitting(true);
 
@@ -183,16 +170,6 @@ export default function ContactUsPage(): React.ReactElement {
       otp: otp.trim(),
     };
     if (form.message.trim()) payload.message = form.message.trim();
-
-    // Use a controllable loading toast so it never gets stuck
-    const tId = toast.loading("Submitting your request…", {
-      position: "top-right",
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      transition: Slide,
-      theme: "light",
-    });
 
     try {
       const res = await fetch(`${API_BASE}/api/ads`, {
@@ -206,13 +183,11 @@ export default function ContactUsPage(): React.ReactElement {
         throw new Error(text || res.statusText);
       }
 
-      // Success: update & close the toast
-      toast.update(tId, {
-        render: "Your request has been submitted",
-        type: "success",
-        isLoading: false,
+      toast.success("Your request has been submitted", {
+        position: "top-right",
         autoClose: 2500,
-        hideProgressBar: false,
+        transition: Slide,
+        theme: "light",
       });
 
       // Reset form & OTP state
@@ -222,12 +197,11 @@ export default function ContactUsPage(): React.ReactElement {
       setOtpVerified(false);
       setCooldown(0);
     } catch (err: any) {
-      toast.update(tId, {
-        render: `Failed: ${err?.message || "Server error"}`,
-        type: "error",
-        isLoading: false,
+      toast.error(`Failed: ${err?.message || "Server error"}`, {
+        position: "top-right",
         autoClose: 3000,
-        hideProgressBar: false,
+        transition: Slide,
+        theme: "light",
       });
     } finally {
       setSubmitting(false);
