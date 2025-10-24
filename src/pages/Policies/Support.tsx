@@ -449,7 +449,7 @@ export default function ContactUsPage(): React.ReactElement {
         {/* Right: image + quick contact */}
         <aside>
           <div className="image-card" aria-hidden="true">
-            <img className="hero-img" src="stock.jpeg" alt="Contact illustration" />
+            <img className="hero-img" src="stock.jpg" alt="Contact illustration" />
           </div>
 
           <div className="info-card" aria-label="Quick contact">
