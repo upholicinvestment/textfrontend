@@ -7,7 +7,7 @@ export type RowsByInterval = Record<3 | 5 | 15 | 30, Row[]>;
 const KEY = (u: number) => `vi.bulk.v1.${u}`;
 
 function apiBase() {
-  const raw = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || "https://api.upholictech.com/api";
+  const raw = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || "http://localhost:8000/api";
   const b = String(raw).replace(/\/$/, "");
   return /\/api$/i.test(b) ? b : b + "/api";
 }
