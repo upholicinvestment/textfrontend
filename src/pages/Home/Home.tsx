@@ -1,7 +1,11 @@
+// src/pages/Home/Home.tsx  (or your current Home file)
+
 import Navbar from "../../../src/components/layout/Navbar/Navbar";
 import Footer from "../../components/layout/Footer/Footer";
 import Orb from "../../Orb/Orb";
+// import News from "./News";
 // import PriceScroll from "../PriceScroll/PriceScroll";
+import BundleWizard from "../../Orb/BundlePopup"
 
 const Home = () => {
   return (
@@ -17,9 +21,13 @@ const Home = () => {
       {/* <div className=" inset-0 -z-10 pointer-events-none"> */}
       <Orb />
       {/* </div> */}
-
+      {/* {<News/>} */}
       {/* Footer */}
       <Footer />
+
+      {/* Bundle Popup (render once, overlays the page) */}
+      <BundleWizard />
+      {/* If you track entitlements, you can pass: <BundlePopup hasBundle={true} /> */}
     </div>
   );
 };
