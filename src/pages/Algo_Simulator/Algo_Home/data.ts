@@ -4,7 +4,7 @@ export const PRODUCTS: Product[] = [
   {
     key: "option_scalper_pro",
     name: "Option Scalper PRO",
-    priceMonthly: 14999, //14999
+    priceMonthly: 1, //14999
     tagline: "Latency-tuned scalps on liquid weekly options.",
     description:
       "Intraday precision with volatility filters, micro-pullback entries, and strict risk control. Built for high-liquidity NIFTY weeklies.",
@@ -20,7 +20,7 @@ export const PRODUCTS: Product[] = [
   {
     key: "starter_scalping",
     name: "Starter Scalping",
-    priceMonthly: 5999, //5999
+    priceMonthly: 1, //5999
     tagline: "Simple rules. Swift execution. Perfect for beginners.",
     description:
       "Core scalping logic with fewer toggles, strong guardrails, and battle-tested defaults. Great starter system for NIFTY intraday.",
@@ -36,7 +36,7 @@ export const PRODUCTS: Product[] = [
   {
     key: "sniper_algo",
     name: "Sniper Algo",
-    priceMonthly: 9999,    //9999
+    priceMonthly: 1,    //9999
     tagline: "Precision entries. High R:R. Lower frequency.",
     description:
       "Targets precision entries around HTF structure and volatility compression on NIFTY. Fewer trades, higher average R:R, staged exits.",

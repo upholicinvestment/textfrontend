@@ -27,13 +27,11 @@ ChartJS.register(
 );
 
 /* ---------- Types ---------- */
-type ATMPoint = { timestamp: string; callOI: number; putOI: number };
+type ATMPoint = { timestamp: string; callOI: number; putOI: number; atmStrike?: number };
 type OverallPoint = { timestamp: string; callOI: number; putOI: number };
-type OIBulkPayload = {
-  expiry: string | null;
-  atm: { step: number; atmStrike: number | null; rows: Record<string, ATMPoint[]> };
-  overall: { rows: Record<string, OverallPoint[]> };
-};
+type AtmResp = { expiry?: string | null; step?: number; atmStrike?: number | null; series: ATMPoint[] };
+type OverallResp = { expiry?: string | null; step?: number; series: OverallPoint[] };
+
 type Tab = "ATM" | "OVERALL";
 type IntervalOpt = "3m" | "15m" | "30m" | "1h";
 type Props = { panel?: "card" | "fullscreen" };
@@ -44,9 +42,6 @@ const RAW_BASE =
   (import.meta as any).env?.VITE_API_URL ||
   "https://api.upholictech.com";
 const API_BASE = String(RAW_BASE).replace(/\/$/, "") + "/api";
-const BULK_URL = `${API_BASE}/oi/bulk?intervals=3,15,30,60&sinceMin=1440`;
-const STORAGE_KEY = "oi.bulk.v1";
-const STORAGE_ETAG_KEY = "oi.bulk.v1.etag";
 const AUTO_REFRESH_MS = 180_000;
 
 /* ---------- Helpers ---------- */
@@ -96,30 +91,15 @@ function readThemeVars() {
   };
 }
 
-/* ---------- Normalizer (reject error payloads) ---------- */
-function normalizeBulk(json: any): OIBulkPayload | null {
-  if (!json || typeof json !== "object") return null;
-  if ("error" in json) return null;
-
-  const safeRows = (obj: any) => (obj && typeof obj === "object" ? obj : {});
-  return {
-    expiry: typeof json?.expiry === "string" ? json.expiry : null,
-    atm: {
-      step: Number(json?.atm?.step ?? 50),
-      atmStrike:
-        Number.isFinite(Number(json?.atm?.atmStrike)) ? Number(json.atm.atmStrike) : null,
-      rows: safeRows(json?.atm?.rows),
-    },
-    overall: { rows: safeRows(json?.overall?.rows) },
-  };
-}
-
 /* ============================== Component =============================== */
 export default function Call_Put({ panel = "card" }: Props) {
   const [tab, setTab] = useState<Tab>("ATM");
   const [interval, setIntervalOpt] = useState<IntervalOpt>("3m");
 
-  const [bulk, setBulk] = useState<OIBulkPayload | null>(null);
+  const [atmSeries, setAtmSeries] = useState<ATMPoint[]>([]);
+  const [overallSeries, setOverallSeries] = useState<OverallPoint[]>([]);
+  const [meta, setMeta] = useState<{ expiry?: string | null; step?: number; atmStrike?: number | null }>({});
+
   const [err, setErr] = useState<string | null>(null);
   const [hasFetched, setHasFetched] = useState(false);
 
@@ -153,105 +133,70 @@ export default function Call_Put({ panel = "card" }: Props) {
     setHasFetched(false);
   }, [tab, interval, panel]);
 
-  /* -------------------------- Bulk fetch + cache ------------------------- */
-  const fetchBulk = async () => {
+  /* -------------------------- Fetch per-tab, per-interval ------------------------- */
+  const fetchCurrent = async () => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
       setErr(null);
+      const minutes = toMinutes(interval);
+      const url =
+        tab === "ATM"
+          ? `${API_BASE}/nifty/atm?interval=${minutes}&sinceMin=1440`
+          : `${API_BASE}/nifty/overall?interval=${minutes}&sinceMin=1440`;
 
-      // Serve cached (if valid) ASAP
-      const cached = sessionStorage.getItem(STORAGE_KEY);
-      if (cached) {
-        try {
-          const maybe = JSON.parse(cached);
-          const normalized = normalizeBulk(maybe);
-          if (normalized) {
-            rafRef.current = requestAnimationFrame(() => {
-              setBulk(normalized);
-              setHasFetched(true);
-            });
-          }
-        } catch {}
-      }
-
-      const etag = sessionStorage.getItem(STORAGE_ETAG_KEY) || "";
-      const res = await fetch(BULK_URL, {
-        method: "GET",
-        headers: etag ? { "If-None-Match": etag } : {},
-        cache: "no-store",
-        signal: ctrl.signal,
-      });
-
-      if (res.status === 304) {
-        setHasFetched(true);
-        return;
-      }
+      const res = await fetch(url, { method: "GET", signal: ctrl.signal, cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
       const raw = await res.json();
-      const normalized = normalizeBulk(raw);
 
-      if (!normalized) {
-        setErr(raw?.error || "No data available");
-        setHasFetched(true);
-        return;
+      if (tab === "ATM") {
+        const body = raw as AtmResp;
+        setAtmSeries(Array.isArray(body.series) ? body.series : []);
+        setMeta({ expiry: body.expiry ?? null, step: body.step ?? 50, atmStrike: body.atmStrike ?? null });
+      } else {
+        const body = raw as OverallResp;
+        setOverallSeries(Array.isArray(body.series) ? body.series : []);
+        setMeta({ expiry: body.expiry ?? null, step: body.step ?? 50, atmStrike: null });
       }
 
-      const newTag = res.headers.get("ETag") || "";
-      try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-        if (newTag) sessionStorage.setItem(STORAGE_ETAG_KEY, newTag);
-      } catch {}
-
-      rafRef.current = requestAnimationFrame(() => {
-        setBulk(normalized);
-        setHasFetched(true);
-      });
+      setHasFetched(true);
     } catch (e: any) {
       if (e?.name !== "AbortError") setErr(e?.message || "Failed to load data");
     }
   };
 
   useEffect(() => {
-    fetchBulk();
+    fetchCurrent();
     if (tickRef.current) clearInterval(tickRef.current);
-    tickRef.current = setInterval(fetchBulk, AUTO_REFRESH_MS);
+    tickRef.current = setInterval(fetchCurrent, AUTO_REFRESH_MS);
     return () => {
       abortRef.current?.abort();
       if (tickRef.current) clearInterval(tickRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, []);
+  }, [tab, interval]);
 
   /* ----------------------------- Transform ------------------------------- */
-  const minutes = useMemo(() => toMinutes(interval), [interval]);
 
   const { labels, ce, pe, latestAtmStrike } = useMemo(() => {
-    if (!bulk) {
+    const series = tab === "ATM" ? atmSeries : overallSeries;
+    if (!series || !series.length) {
       return {
         labels: [] as string[],
         ce: [] as number[],
         pe: [] as number[],
-        latestAtmStrike: null as number | null,
+        latestAtmStrike: meta.atmStrike ?? null,
       };
     }
-    const key = String(minutes);
-    const rowsObj =
-      tab === "ATM"
-        ? (bulk?.atm?.rows ?? ({} as Record<string, ATMPoint[]>))
-        : (bulk?.overall?.rows ?? ({} as Record<string, OverallPoint[]>));
-
-    const series = rowsObj[key] ?? [];
 
     const labels = series.map((p) => toLabelIST(p.timestamp));
-    const ce = series.map((p) => p.callOI ?? 0);
-    const pe = series.map((p) => p.putOI ?? 0);
-    const latestAtmStrike = tab === "ATM" ? bulk?.atm?.atmStrike ?? null : null;
+    const ce = series.map((p: any) => Number(p.callOI ?? 0));
+    const pe = series.map((p: any) => Number(p.putOI ?? 0));
+    const latestAtmStrike = tab === "ATM" ? (meta.atmStrike ?? null) : null;
 
     return { labels, ce, pe, latestAtmStrike };
-  }, [bulk, tab, minutes]);
+  }, [atmSeries, overallSeries, tab, meta]);
 
   const chartData: ChartData<"line"> = useMemo(
     () => ({
@@ -335,8 +280,8 @@ export default function Call_Put({ panel = "card" }: Props) {
           borderColor: vars.tipbr,
           borderWidth: 1,
           callbacks:
-            tab === "ATM" && bulk?.atm?.atmStrike
-              ? { afterLabel: () => `ATM: ${bulk!.atm!.atmStrike}` }
+            tab === "ATM" && latestAtmStrike != null
+              ? { afterLabel: () => `ATM: ${latestAtmStrike}` }
               : {},
         },
       },
@@ -366,7 +311,7 @@ export default function Call_Put({ panel = "card" }: Props) {
         },
       },
     }),
-    [tab, bulk, yScaleExtras, overallStepSize, vars, themeKey, isMobile]
+    [tab, latestAtmStrike, yScaleExtras, overallStepSize, vars, themeKey, isMobile]
   );
 
   /* ----------------------------- UI ---------------------------- */
@@ -438,16 +383,16 @@ export default function Call_Put({ panel = "card" }: Props) {
         </div>
 
         {/* Bottom meta badge */}
-        {tab === "ATM" && latestAtmStrike != null && (
+        {tab === "ATM" && meta.atmStrike != null && (
           <div
             className="absolute bottom-2 left-2 z-10 text-[11px] md:text-xs px-2 py-1 rounded"
             style={{ background: vars.card, border: `1px solid ${vars.brd}`, color: vars.muted }}
           >
             Latest ATM:&nbsp;
-            <span style={{ color: vars.fg, fontWeight: 600 }}>{latestAtmStrike}</span>
-            {bulk?.expiry ? (
+            <span style={{ color: vars.fg, fontWeight: 600 }}>{meta.atmStrike}</span>
+            {meta.expiry ? (
               <>
-                &nbsp;| Expiry:&nbsp;<span style={{ color: vars.fg }}>{bulk.expiry}</span>
+                &nbsp;| Expiry:&nbsp;<span style={{ color: vars.fg }}>{meta.expiry}</span>
               </>
             ) : null}
           </div>
@@ -461,7 +406,7 @@ export default function Call_Put({ panel = "card" }: Props) {
             </div>
           ) : labels.length ? (
             <Chart
-              key={`${themeKey}-${panel}-${isMobile ? "m" : "d"}`}
+              key={`${themeKey}-${panel}-${isMobile ? "m" : "d"}-${tab}-${interval}`}
               type="line"
               data={chartData}
               options={options}

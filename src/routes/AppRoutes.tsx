@@ -44,7 +44,7 @@ const AppRoutes: React.FC = () => {
         {/* Public routes */}
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/fno-khazana-charts" element={<Layout />} />
+        <Route path="/fno" element={<Layout />} />
         <Route path="/fno-khazana" element={<Main/>} />
         <Route path="/fii-dii-activity" element={<Fii_Dii_Activity />} />
         <Route path="/fii-dii-fno" element={<Fii_Dii_Fno />} />

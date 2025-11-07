@@ -8,14 +8,26 @@ export const componentLabelMap: Record<
 > = {
   journaling: { label: "Journaling", icon: <BookOpen className="h-4 w-4" /> },
   fii_dii_data: { label: "FII/DII Data", icon: <Building2 className="h-4 w-4" /> },
+
+  // <-- ADDED: FNO Khazana
+  fno_khazana: { label: "FNO Khazana", icon: <Building2 className="h-4 w-4" /> },
 };
 
 export const componentRouteMap: Record<string, string> = {
   journaling: "/journal",
   fii_dii_data: "/fii-dii",
+
+  // <-- ADDED: route for FNO
+  fno_khazana: "/fno",
 };
 
-export const bundleComponentKeys = ["journaling", "fii_dii_data"];
+export const bundleComponentKeys = [
+  "journaling",
+  "fii_dii_data",
+
+  // <-- ADDED: include FNO as part of the bundle
+  "fno_khazana",
+];
 
 export const prettyINR = (n?: number | null) =>
   typeof n === "number" ? `₹${n.toLocaleString("en-IN")}` : undefined;

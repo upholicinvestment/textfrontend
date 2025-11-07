@@ -13,16 +13,15 @@ import { motion } from "framer-motion";
 
 /* ----------------------------- Types ----------------------------- */
 interface SeriesPoint {
-  timestamp: string;
+  timestamp?: string;
   time: string;
   advances: number;
   declines: number;
-  total: number;
+  total?: number;
 }
-interface BulkResp {
+interface Resp {
   current: { advances: number; declines: number; total: number };
-  rows: Record<string, SeriesPoint[]>;
-  lastISO?: string | null;
+  chartData: SeriesPoint[];
 }
 
 type Props = { panel?: "card" | "fullscreen" };
@@ -32,21 +31,18 @@ const REFRESH_MS = 180_000;
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
-  "https://api.upholictech.com";
+  "https://api.upholictech.com/api";
 
-// Fetch 24h & multiple bins at once
-const INTERVALS = [3, 5, 15, 30];
-const ACTIVE_BIN = 5; // which bin the chart shows
+// Which bin to request from server
+const ACTIVE_BIN = 5;
+const DEFAULT_SINCE_MIN = 1440; // 24h
 
-const BULK_URL = `${String(API_BASE).replace(/\/$/, "")}/advdec/bulk?intervals=${INTERVALS.join(
-  ","
-)}&sinceMin=1440`;
-const STORAGE_KEY = "advdec.bulk.v1";
-const STORAGE_ETAG_KEY = "advdec.bulk.v1.etag";
+const BUILD_URL = (bin = ACTIVE_BIN, sinceMin = DEFAULT_SINCE_MIN, expiry?: string) =>
+  `${String(API_BASE).replace(/\/$/, "")}/advdec?bin=${bin}&sinceMin=${sinceMin}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}`;
 
 /* ----------------------------- Component ----------------------------- */
 const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
-  const [data, setData] = useState<BulkResp | null>(null);
+  const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -79,44 +75,16 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
     controllerRef.current = controller;
 
     try {
-      // 1) Fast path from sessionStorage (non-blocking UI)
-      const cached = sessionStorage.getItem(STORAGE_KEY);
-      if (cached) {
-        try {
-          const json = JSON.parse(cached) as BulkResp;
-          if (mountedRef.current) {
-            setData(json);
-            setLoading(false);
-          }
-        } catch {}
-      }
-
-      // 2) Conditional GET with ETag
-      const etag = sessionStorage.getItem(STORAGE_ETAG_KEY) || "";
-      const resp = await fetch(BULK_URL, {
+      const url = BUILD_URL(ACTIVE_BIN, DEFAULT_SINCE_MIN);
+      const resp = await fetch(url, {
         signal: controller.signal,
         cache: "no-store",
-        headers: etag ? { "If-None-Match": etag } : {},
+        headers: {},
       });
 
-      if (resp.status === 304) {
-        if (mountedRef.current) {
-          setLastUpdated(new Date());
-          setError(null);
-          setLoading(false);
-        }
-        return;
-      }
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-      const json: BulkResp = await resp.json();
-
-      // Save to storage
-      const newTag = resp.headers.get("ETag") || "";
-      try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(json));
-        if (newTag) sessionStorage.setItem(STORAGE_ETAG_KEY, newTag);
-      } catch {}
+      const json: Resp = await resp.json();
 
       if (!mountedRef.current) return;
       setData(json);
@@ -150,7 +118,7 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
 
   // Pick the active series (bin) for the chart
   const series = useMemo<SeriesPoint[]>(
-    () => (data?.rows?.[String(ACTIVE_BIN)] || []),
+    () => data?.chartData || [],
     [data]
   );
 

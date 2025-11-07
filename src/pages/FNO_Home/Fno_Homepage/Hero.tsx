@@ -1,18 +1,70 @@
 // src/components/hero.tsx
-import React from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import api from "../../../api";
+import { AuthContext } from "../../../context/AuthContext";
 
 const Hero: React.FC = () => {
-  const handleHowItWorksClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    const el = document.getElementById("how-it-works");
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      // keep the hash in the URL so users can share/refresh
-      window.history.pushState({}, "", "#how-it-works");
-    }
-  };
+  const { user } = useContext(AuthContext);
+  const [hasFno, setHasFno] = useState<boolean | null>(null); // null = unknown/loading
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadEntitlements = async () => {
+      // If no logged-in user, we won't call API (go to signup)
+      if (!user?.id) {
+        setHasFno(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        // mirror the same endpoint you use elsewhere to fetch user products
+        // pass userId so backend can resolve entitlements
+        const r = await api.get("/users/me/products", { params: { userId: user.id } });
+        const items: any[] = Array.isArray(r.data?.items) ? r.data.items : [];
+
+        // Owned keys are expected to be available as `key` on each product item
+        const ownedKeys = new Set(items.map((p) => (p.key || "").toString().toLowerCase()));
+
+        // Direct ownership of FNO product
+        if (ownedKeys.has("fno_khazana")) {
+          if (!cancelled) setHasFno(true);
+        } else {
+          // Another possible pattern: user might have components as separate products.
+          // So also check component names if provided (robust check).
+          const hasComponent = items.some((p) => {
+            if (Array.isArray(p.components)) {
+              return p.components.map((c: string) => String(c).toLowerCase()).includes("fno_khazana");
+            }
+            return false;
+          });
+          if (!cancelled) setHasFno(Boolean(hasComponent));
+        }
+      } catch (err) {
+        // assume not owned on error
+        if (!cancelled) setHasFno(false);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadEntitlements();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Decide CTA target + label
+  const target = user && hasFno ? "/fno" : "/signup";
+  const label =
+    user && hasFno
+      ? "Open FNO Dashboard"
+      : user && hasFno === false
+      ? "Sign up to access FNO"
+      : "Get FNO Khazana";
 
   return (
     <section className="relative isolate overflow-hidden min-h-[calc(100vh-4rem)]">
@@ -54,16 +106,21 @@ const Hero: React.FC = () => {
 
           <div className="mt-8 flex items-center justify-center gap-3">
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+              {/* Use Link so navigation stays client-side */}
               <Link
-                to="/fno-khazana-charts"
-                className="group inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-white
-                           bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500
-                           shadow-[0_8px_30px_rgba(99,102,241,0.35)]
-                           hover:shadow-[0_12px_46px_rgba(99,102,241,0.55)]
-                           focus:outline-none focus:ring-4 focus:ring-violet-300/40 transition-all"
-                aria-label="Open FNO Khazana dashboard"
+                to={target}
+                className={`group inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-white
+                           ${user && hasFno ? "bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 shadow-[0_8px_30px_rgba(99,102,241,0.35)] hover:shadow-[0_12px_46px_rgba(99,102,241,0.55)]" :
+                             "bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500/70 opacity-95 hover:opacity-100"
+                           }
+                           focus:outline-none focus:ring-4 focus:ring-violet-300/40 transition-all`}
+                aria-label={label}
               >
-                Launch FNO Khazana
+                {/* Loading indicator (small) */}
+                {loading ? (
+                  <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : null}
+                <span>{user && hasFno ? "Open FNO Dashboard" : user && hasFno === false ? "Sign up to access FNO" : "Get FNO Khazana"}</span>
                 <svg className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
@@ -73,7 +130,14 @@ const Hero: React.FC = () => {
             {/* Smooth-scroll anchor to the section below */}
             <a
               href="#how-it-works"
-              onClick={handleHowItWorksClick}
+              onClick={(e) => {
+                e.preventDefault();
+                const el = document.getElementById("how-it-works");
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  window.history.pushState({}, "", "#how-it-works");
+                }
+              }}
               className="inline-flex items-center rounded-full px-6 py-3 font-medium
                          bg-black/35 hover:bg-black/45 border border-white/20 text-white
                          backdrop-blur-[2px] transition focus:outline-none focus:ring-4 focus:ring-white/30"

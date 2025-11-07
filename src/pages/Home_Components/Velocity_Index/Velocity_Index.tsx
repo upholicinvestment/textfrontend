@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { RotateCw } from "lucide-react";
 
 /* ============ Types ============ */
@@ -32,23 +32,6 @@ function buildUrl(path: string, params: Record<string, any>) {
   return u.toString();
 }
 
-/* ============ Optional JWT ============ */
-const TOKEN_KEYS = ["token", "accessToken", "jwt", "authToken"];
-function getAuthToken(): string | null {
-  for (const k of TOKEN_KEYS) {
-    const v = localStorage.getItem(k);
-    if (!v) continue;
-    try {
-      const obj = JSON.parse(v);
-      if (obj && typeof obj === "object" && "token" in obj) {
-        return String((obj as any).token).replace(/^Bearer\s+/i, "");
-      }
-    } catch {}
-    return v.replace(/^Bearer\s+/i, "");
-  }
-  return null;
-}
-
 /* ============ Helpers ============ */
 const fmt = (x?: number, d = 2) =>
   typeof x === "number" && isFinite(x) ? x.toFixed(d) : "—";
@@ -77,131 +60,95 @@ function toStyle(css: string): React.CSSProperties {
   return s;
 }
 
-const INTERVALS: IntervalKey[] = [3, 5, 15, 30];
-const SS_KEY = (u: number) => `vi.bulk.v1.${u}`;
 
-/* ============ Component ============ */
 const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
   const [underlying] = useState<number>(13);
   const [intervalMin, setIntervalMin] = useState<IntervalKey>(3);
 
   const [rowsByInterval, setRowsByInterval] = useState<RowsByInterval>({ 3: [], 5: [], 15: [], 30: [] });
-  const [, setLoading] = useState(false);
-  const [hasFetched, setHasFetched] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [hasFetched, setHasFetched] = useState<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
-  const [resolvedExpiry, setResolvedExpiry] = useState<string | null>(null);
-
-  const etagRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const bulkUrl = useMemo(
-    () =>
-      buildUrl("oc/rows/bulk", {
-        underlying,
-        segment: "IDX_I",
-        intervals: INTERVALS.join(","),
-        sinceMin: 390,
-        mode: "level",
-        unit: "bps",
-        expiry: "auto",
-      }),
-    [underlying]
-  );
-
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(SS_KEY(underlying));
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (cached?.rows) {
-          setRowsByInterval({
-            3: cached.rows["3"] || [],
-            5: cached.rows["5"] || [],
-            15: cached.rows["15"] || [],
-            30: cached.rows["30"] || [],
-          });
-          setResolvedExpiry(cached.expiry || null);
-          etagRef.current = cached.etag || null;
-          setHasFetched(true);
-        }
-      }
-    } catch {}
-  }, [underlying]);
-
-  const fetchBulk = async () => {
+  const fetchRowsFor = async (min: IntervalKey) => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+
+    const prevRows = rowsByInterval[min] || [];
+
     try {
       setLoading(true);
       setErr(null);
-      const token = getAuthToken();
-      const res = await fetch(bulkUrl, {
-        headers: {
-          Accept: "application/json",
-          ...(etagRef.current ? { "If-None-Match": etagRef.current } : {}),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
+
+      const url = buildUrl("oc/rows", {
+        underlying,
+        segment: "IDX_I",
+        intervalMin: min,
+        limit: 500,
+        mode: "level",
+        unit: "bps",
+        expiry: "auto",
+      });
+
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
         signal: ctrl.signal,
         cache: "no-store",
       });
-
-      if (res.status === 304) {
-        setHasFetched(true);
-        return;
-      }
-
-      const etag = res.headers.get("ETag");
-      if (etag) etagRef.current = etag;
-
-      const hdrExpiry = res.headers.get("X-Resolved-Expiry");
-      if (hdrExpiry) setResolvedExpiry(hdrExpiry);
 
       if (!res.ok) {
         let reason = `HTTP ${res.status}`;
         try {
           const j = await res.json();
-          if (j?.error === "no_active_expiry") reason = "No active expiry found.";
+          if (j?.error) reason = j.error + (j?.detail ? `: ${j.detail}` : "");
         } catch {}
-        throw new Error(reason);
+        // keep previously shown rows for this interval when available
+        if (prevRows?.length) {
+          setErr(`API error (${reason}) — showing previous rows`);
+          setHasFetched(true);
+          setLoading(false);
+          return;
+        }
+        setErr(reason);
+        setHasFetched(true);
+        setLoading(false);
+        return;
       }
 
       const data = await res.json();
-      const rows: RowsByInterval = {
-        3: data?.rows?.["3"] || [],
-        5: data?.rows?.["5"] || [],
-        15: data?.rows?.["15"] || [],
-        30: data?.rows?.["30"] || [],
-      };
+      // multiHandler returns an array of rows (for the requested interval)
+      const rows: Row[] = Array.isArray(data) ? data : Array.isArray(data?.rows) ? data.rows : [];
 
-      setRowsByInterval(rows);
-      setResolvedExpiry(String(data?.expiry || "") || null);
-
-      sessionStorage.setItem(
-        SS_KEY(underlying),
-        JSON.stringify({ rows, expiry: data?.expiry || null, etag: etagRef.current, t: Date.now() })
-      );
+      setRowsByInterval((prev) => ({ ...prev, [min]: rows }));
       setHasFetched(true);
+      setLoading(false);
     } catch (e: any) {
       if (e?.name === "AbortError") return;
-      setErr(e?.message || "Failed to fetch");
+      console.error("fetchRowsFor error", e);
+      if ((rowsByInterval[intervalMin] || []).length) {
+        setErr(`Fetch failed — showing previous rows (${e?.message || e})`);
+      } else {
+        setErr(e?.message || "Failed to fetch");
+      }
       setHasFetched(true);
-    } finally {
       setLoading(false);
     }
   };
 
+  // initial and whenever interval changes
   useEffect(() => {
-    fetchBulk();
+    fetchRowsFor(intervalMin);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bulkUrl]);
+  }, [intervalMin, underlying]);
 
+  // poll current interval every 60s
   useEffect(() => {
-    const id = setInterval(fetchBulk, 60_000);
+    const id = setInterval(() => fetchRowsFor(intervalMin), 60_000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bulkUrl]);
+  }, [intervalMin, underlying]);
 
   const rows = rowsByInterval[intervalMin] || [];
 
@@ -237,16 +184,20 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
 .vi-iconbtn:disabled { opacity: .65; cursor: not-allowed; }
 @keyframes vi-spin { from{transform:rotate(0)} to{transform:rotate(360deg)} } .vi-spin { animation: vi-spin .9s linear infinite; color: var(--vi-muted); }
 .vi-header-title { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: var(--vi-fg); }
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
       `}</style>
 
       <div className="relative z-10 flex items-center justify-between mb-1">
         <div className="flex items-center gap-3">
-          <h1 className="vi-header-title">Volatility Index</h1>
-          {resolvedExpiry && (
-            <span className="px-2 py-1 text-xs vi-chip" title="Resolved automatically from server">
-              Expiry: <strong>{resolvedExpiry}</strong>
-            </span>
-          )}
+          <h1 className="vi-header-title">Upholic Score</h1>
         </div>
 
         <div className="flex items-end gap-2">
@@ -261,8 +212,8 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
           </div>
           <div className="flex flex-col">
             <label className="vi-label">&nbsp;</label>
-            <button onClick={fetchBulk} className="vi-iconbtn" aria-label="Refresh" title="Refresh">
-              <RotateCw strokeWidth={2} />
+            <button onClick={() => fetchRowsFor(intervalMin)} className="vi-iconbtn" aria-label="Refresh" title="Refresh" disabled={loading}>
+              <RotateCw strokeWidth={2} className={loading ? "vi-spin" : ""} />
             </button>
           </div>
         </div>
@@ -271,8 +222,18 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
       <div
         className="relative rounded-xl border no-scrollbar overflow-y-auto"
         style={{ borderColor: "var(--vi-brd)", maxHeight: panel === "fullscreen" ? "100%" : 350, background: "transparent", ...(panel === "fullscreen" ? { flex: "1 1 0%" } : null) }}
-        aria-busy={false}
+        aria-busy={loading}
       >
+        {/* Loading overlay for first fetch */}
+        {!hasFetched && (
+          <div className="loading-overlay" aria-hidden>
+            <div style={{ textAlign: "center", color: "var(--vi-muted)" }}>
+              <div style={{ fontSize: 12, marginBottom: 6 }}>Loading...</div>
+              <div style={{ fontSize: 11 }}>{err ? err : "Fetching data from server"}</div>
+            </div>
+          </div>
+        )}
+
         <table className="w-full table-fixed text-[13px] vi-vlines" style={{ borderCollapse: "separate", borderSpacing: 0, color: "var(--vi-fg)" }}>
           <colgroup>
             <col style={{ width: "22%" }} />
@@ -311,7 +272,7 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
             {rows.length === 0 && hasFetched && (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center" style={{ color: "var(--vi-muted)" }}>
-                  {err ? "No data (API error)" : "No data"}
+                  {err ? `No data (API): ${err}` : "No data"}
                 </td>
               </tr>
             )}
@@ -319,7 +280,11 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
         </table>
       </div>
 
-      {err && <div className="text-xs mt-1" style={{ color: "var(--vi-muted)" }}>{err}</div>}
+      {err && (
+        <div className="text-xs mt-1" style={{ color: "var(--vi-muted)" }}>
+          {err}
+        </div>
+      )}
     </div>
   );
 };

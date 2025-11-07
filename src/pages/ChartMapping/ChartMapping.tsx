@@ -21,7 +21,7 @@ function renderChartWithPanel(node: React.ReactNode, panel: PanelMode) {
 }
 
 const ChartMapping: React.FC = () => {
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("upholic_theme") as Theme) || "dark");
+  const [theme, setTheme] = useState<Theme>("dark");
   const [isEditMode, setIsEditMode] = useState(false);
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
 

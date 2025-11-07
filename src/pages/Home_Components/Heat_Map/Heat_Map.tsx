@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, Treemap, Tooltip as ReTooltip } from "recharts";
 import {
   Cpu, Building2, FlaskConical, Banknote, Stethoscope, Car, PlugZap, Radio,
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 
 /* ---------- Types ---------- */
+// (kept shape for clarity; not required at runtime)
 interface StockData {
   _id: string;
   trading_symbol: string;
@@ -23,7 +24,6 @@ interface SectorData {
   topGainers: StockData[];
   topLosers: StockData[];
 }
-type BulkResp = { stocks: StockData[]; lastISO?: string | null };
 
 type Props = { panel?: "card" | "fullscreen" };
 
@@ -31,12 +31,10 @@ type Props = { panel?: "card" | "fullscreen" };
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
-  "http://localhost:8000/api";
+  "https://api.upholictech.com/api";
 
 const REFRESH_MS = 180_000; // 3 minutes
-const BULK_URL = `${API_BASE.replace(/\/$/, "")}/heatmap/bulk?sinceMin=1440`;
-const STORAGE_KEY = "heatmap.bulk.v1";
-const STORAGE_ETAG_KEY = "heatmap.bulk.v1.etag";
+const HEATMAP_URL = `${API_BASE.replace(/\/$/, "")}/heatmap`;
 
 /* ---------- Helpers ---------- */
 function uniqueBy<T, K extends keyof T>(arr: T[], key: K): T[] {
@@ -85,7 +83,7 @@ function hexToRgb(hex: string) {
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 
-/** Sector icons */
+/** Sector icons (unchanged) */
 const sectorIcon: Record<string, React.FC<{ size?: number; color?: string }>> = {
   technology: Cpu, it: Cpu, software: Smartphone,
   communication: Radio, telecom: Radio, telecommunication: Radio,
@@ -116,7 +114,6 @@ function tinyLabel(name: string) {
 const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
   const [data, setData] = useState<SectorData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasData, setHasData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // theme tick to re-render when theme vars change
@@ -178,76 +175,44 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
     return sectors;
   };
 
-  const fetchData = useCallback(async () => {
+  useEffect(() => {
+    mountedRef.current = true;
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    try {
-      // 1) instant fast-path from sessionStorage
-      const cached = sessionStorage.getItem(STORAGE_KEY);
-      if (cached && !hasData) {
-        try {
-          const json = JSON.parse(cached) as BulkResp;
-          const sectors = buildSectors(Array.isArray(json?.stocks) ? json.stocks : []);
-          if (mountedRef.current) {
-            setData(sectors);
-            setLoading(false);
-            setHasData(true);
-          }
-        } catch {}
-      }
-
-      // 2) conditional GET with ETag
-      const etag = sessionStorage.getItem(STORAGE_ETAG_KEY) || "";
-      const resp = await fetch(BULK_URL, {
-        signal: controller.signal,
-        cache: "no-store", // we rely on our own sessionStorage + ETag
-        headers: etag ? { "If-None-Match": etag } : {},
-      });
-
-      if (resp.status === 304) {
-        if (mountedRef.current) {
-          setError(null);
-          setLoading(false);
-          setHasData(true);
-        }
-        return;
-      }
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-      const json: BulkResp = await resp.json();
-      const newTag = resp.headers.get("ETag") || "";
-
+    const doFetch = async () => {
+      setLoading(true);
       try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(json));
-        if (newTag) sessionStorage.setItem(STORAGE_ETAG_KEY, newTag);
-      } catch {}
+        const resp = await fetch(HEATMAP_URL, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const json = await resp.json(); // expected: StockData[]
+        const sectors = buildSectors(Array.isArray(json) ? json : []);
+        if (!mountedRef.current) return;
+        setData(sectors);
+        setError(null);
+        setLoading(false);
+      } catch (e: any) {
+        if (e?.name === "AbortError") return;
+        if (!mountedRef.current) return;
+        setError(e?.message || "Unknown error");
+        setLoading(false);
+      }
+    };
 
-      const sectors = buildSectors(Array.isArray(json?.stocks) ? json.stocks : []);
-      if (!mountedRef.current) return;
-      setData(sectors);
-      setError(null);
-      setLoading(false);
-      setHasData(true);
-    } catch (e: any) {
-      if (e?.name === "AbortError") return;
-      if (!mountedRef.current) return;
-      setError(e?.message || "Unknown error");
-      setLoading(false);
-    }
-  }, [hasData]);
+    doFetch();
+    const id = setInterval(doFetch, REFRESH_MS);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    fetchData();
-    const id = setInterval(fetchData, REFRESH_MS);
     return () => {
       mountedRef.current = false;
       clearInterval(id);
       controllerRef.current?.abort();
     };
-  }, [fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once; keep same polling behavior
 
   const treemapData = useMemo(() => {
     if (!data.length) return [];
@@ -265,7 +230,7 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
   }, [data]);
 
   /* ---------- skeletons / errors ---------- */
-  if (loading && !hasData) {
+  if (loading) {
     return (
       <div
         className="w-full rounded-xl grid place-items-center"
@@ -282,7 +247,7 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
       </div>
     );
   }
-  if (error && !hasData) {
+  if (error) {
     return (
       <div
         className="w-full rounded-xl grid place-items-center text-center p-6"
@@ -314,7 +279,7 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
     );
   }
 
-  /* ---------- node + tooltip renderers ---------- */
+  /* ---------- node + tooltip renderers (unchanged) ---------- */
   const Node: React.FC<any> = (props) => {
     const { x, y, width, height } = props;
     const name: string = props?.name || props?.payload?.name || "Unknown";

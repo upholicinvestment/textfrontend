@@ -1,87 +1,98 @@
 // src/hooks/useOcRowsBulk.ts
 import { useEffect, useRef, useState } from "react";
 
+export type Interval = 3 | 5 | 15 | 30;
 export type Row = { volatility: number; time: string; signal: "Bullish" | "Bearish"; spot: number };
-export type RowsByInterval = Record<3 | 5 | 15 | 30, Row[]>;
+export type RowsByInterval = Record<Interval, Row[]>;
 
-const KEY = (u: number) => `vi.bulk.v1.${u}`;
-
-function apiBase() {
-  const raw = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || "http://localhost:8000/api";
+function apiBase(): string {
+  const raw = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || "https://api.upholictech.com/api";
   const b = String(raw).replace(/\/$/, "");
   return /\/api$/i.test(b) ? b : b + "/api";
 }
-function buildUrl(underlying: number) {
-  const u = new URL("oc/rows/bulk", apiBase() + "/");
+
+function buildUrl(underlying: number, intervalMin: number) {
+  const u = new URL("oc/rows", apiBase() + "/");
   u.searchParams.set("underlying", String(underlying));
   u.searchParams.set("segment", "IDX_I");
-  u.searchParams.set("intervals", "3,5,15,30");
-  u.searchParams.set("sinceMin", "390");   // full trading day
+  u.searchParams.set("intervalMin", String(intervalMin));
+  u.searchParams.set("limit", "500");
   u.searchParams.set("mode", "level");
   u.searchParams.set("unit", "bps");
   u.searchParams.set("expiry", "auto");
   return u.toString();
 }
 
+/**
+ * useOcRowsBulk
+ * - lightweight hook that fetches rows for all supported intervals (3,5,15,30)
+ * - NO sessionStorage, NO ETag
+ */
 export function useOcRowsBulk(underlying = 13) {
   const [rowsByInterval, setRowsByInterval] = useState<RowsByInterval>({ 3: [], 5: [], 15: [], 30: [] });
   const [expiry, setExpiry] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [err, setErr] = useState<string | null>(null);
-  const etagRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // hydrate quickly from sessionStorage
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(KEY(underlying));
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.rows) {
-          setRowsByInterval(parsed.rows);
-          setExpiry(parsed.expiry || null);
-          setLoading(false);
-        }
-      }
-    } catch {}
-  }, [underlying]);
+  const intervals: Interval[] = [3, 5, 15, 30];
 
   const refresh = async () => {
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setLoading(true);
+    setErr(null);
+
     try {
-      const res = await fetch(buildUrl(underlying), {
-        headers: {
-          Accept: "application/json",
-          ...(etagRef.current ? { "If-None-Match": etagRef.current } : {}),
-        },
-        cache: "no-store",
-        keepalive: true,
+      // fetch each interval in parallel
+      const promises = intervals.map(async (iv) => {
+        const res = await fetch(buildUrl(underlying, iv), {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+          signal: ctrl.signal,
+        });
+        if (!res.ok) {
+          // try to extract error details
+          let reason = `HTTP ${res.status}`;
+          try {
+            const j = await res.json();
+            if (j?.error) reason = j.error + (j?.detail ? `: ${j.detail}` : "");
+          } catch {}
+          throw new Error(`interval ${iv} -> ${reason}`);
+        }
+        const data = await res.json();
+        // Expect either an array (rows) or object with rows key
+        const rows: Row[] = Array.isArray(data) ? data : Array.isArray(data?.rows) ? data.rows : [];
+        const resolvedExpiry = (data && data.expiry) ? String(data.expiry) : null;
+        return { iv, rows, resolvedExpiry };
       });
 
-      if (res.status === 304) return; // data unchanged
+      const results = await Promise.all(promises);
 
-      const etag = res.headers.get("ETag");
-      if (etag) etagRef.current = etag;
+      const next: RowsByInterval = { 3: [], 5: [], 15: [], 30: [] };
+      let foundExpiry: string | null = null;
+      for (const r of results) {
+        (next as any)[String(r.iv)] = r.rows;
+        if (!foundExpiry && r.resolvedExpiry) foundExpiry = r.resolvedExpiry;
+      }
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-
-      const rows: RowsByInterval = {
-        3: data?.rows?.["3"] || [],
-        5: data?.rows?.["5"] || [],
-        15: data?.rows?.["15"] || [],
-        30: data?.rows?.["30"] || [],
-      };
-      setRowsByInterval(rows);
-      setExpiry(String(data?.expiry || "") || null);
-
-      sessionStorage.setItem(KEY(underlying), JSON.stringify({ rows, expiry: data?.expiry || null, t: Date.now() }));
+      setRowsByInterval(next);
+      setExpiry(foundExpiry);
+      setErr(null);
     } catch (e: any) {
-      setErr(e?.message || "Failed to load");
+      if (e?.name === "AbortError") {
+        // aborted by caller, ignore
+        return;
+      }
+      console.error("useOcRowsBulk refresh error:", e);
+      setErr(e?.message || "Failed to load oc rows");
+      // keep previous rowsByInterval (do not clear)
     } finally {
       setLoading(false);
     }
   };
 
-  // first network load
   useEffect(() => {
     setLoading(true);
     setErr(null);
@@ -89,7 +100,6 @@ export function useOcRowsBulk(underlying = 13) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [underlying]);
 
-  // background refresh every 60s
   useEffect(() => {
     const id = setInterval(refresh, 60_000);
     return () => clearInterval(id);
