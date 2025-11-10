@@ -27,7 +27,9 @@ function buildUrl(path: string, params: Record<string, any>) {
   const cleaned = String(path).replace(/^\/+/, "");
   const u = new URL(cleaned, API_WITH_API + "/");
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== "") u.searchParams.set(k, String(v));
+    if (v !== undefined && v !== null && v !== "") {
+      u.searchParams.set(k, String(v));
+    }
   });
   return u.toString();
 }
@@ -60,12 +62,16 @@ function toStyle(css: string): React.CSSProperties {
   return s;
 }
 
-
 const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
   const [underlying] = useState<number>(13);
   const [intervalMin, setIntervalMin] = useState<IntervalKey>(3);
 
-  const [rowsByInterval, setRowsByInterval] = useState<RowsByInterval>({ 3: [], 5: [], 15: [], 30: [] });
+  const [rowsByInterval, setRowsByInterval] = useState<RowsByInterval>({
+    3: [],
+    5: [],
+    15: [],
+    30: [],
+  });
   const [loading, setLoading] = useState<boolean>(false);
   const [hasFetched, setHasFetched] = useState<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
@@ -77,10 +83,18 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
     abortRef.current = ctrl;
 
     const prevRows = rowsByInterval[min] || [];
+    const hadRows = prevRows.length > 0;
 
     try {
-      setLoading(true);
-      setErr(null);
+      if (!hadRows) {
+        // First / cold load for this interval → show loading, clear errors
+        setLoading(true);
+        setErr(null);
+        setHasFetched(false);
+      } else {
+        // We already have data → keep table visible, just clear error text
+        setErr(null);
+      }
 
       const url = buildUrl("oc/rows", {
         underlying,
@@ -102,36 +116,72 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
         let reason = `HTTP ${res.status}`;
         try {
           const j = await res.json();
-          if (j?.error) reason = j.error + (j?.detail ? `: ${j.detail}` : "");
-        } catch {}
-        // keep previously shown rows for this interval when available
-        if (prevRows?.length) {
-          setErr(`API error (${reason}) — showing previous rows`);
+          if (j?.error)
+            reason =
+              j.error + (j?.detail ? `: ${j.detail}` : "");
+        } catch {
+          // ignore parse error, keep reason as status
+        }
+
+        if (hadRows) {
+          // Soft error: keep previous rows visible
+          setErr(
+            `API error (${reason}) — showing previous rows`
+          );
           setHasFetched(true);
           setLoading(false);
           return;
         }
-        setErr(reason);
+
+        // No previous data: real error → show fail state
+        setErr(reason || "Failed to fetch");
         setHasFetched(true);
         setLoading(false);
         return;
       }
 
       const data = await res.json();
-      // multiHandler returns an array of rows (for the requested interval)
-      const rows: Row[] = Array.isArray(data) ? data : Array.isArray(data?.rows) ? data.rows : [];
+      const rows: Row[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.rows)
+        ? data.rows
+        : [];
 
-      setRowsByInterval((prev) => ({ ...prev, [min]: rows }));
+      setRowsByInterval((prev) => ({
+        ...prev,
+        [min]: rows,
+      }));
       setHasFetched(true);
       setLoading(false);
+      setErr(null);
     } catch (e: any) {
       if (e?.name === "AbortError") return;
       console.error("fetchRowsFor error", e);
-      if ((rowsByInterval[intervalMin] || []).length) {
-        setErr(`Fetch failed — showing previous rows (${e?.message || e})`);
-      } else {
-        setErr(e?.message || "Failed to fetch");
+
+      const msg = e?.message || "Failed to fetch";
+      const isFailedToFetch =
+        /Failed to fetch/i.test(msg);
+
+      if (hadRows) {
+        // We already have data → soft error, keep rows, show warning
+        setErr(
+          `Fetch failed — showing previous rows (${msg})`
+        );
+        setHasFetched(true);
+        setLoading(false);
+        return;
       }
+
+      if (isFailedToFetch) {
+        // Heavy/slow initial load → keep loading, no fail message
+        setLoading(true);
+        setErr(null);
+        setHasFetched(false);
+        return;
+      }
+
+      // Other real error on first load → show fail state
+      setErr(msg);
       setHasFetched(true);
       setLoading(false);
     }
@@ -145,7 +195,10 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
 
   // poll current interval every 60s
   useEffect(() => {
-    const id = setInterval(() => fetchRowsFor(intervalMin), 60_000);
+    const id = setInterval(
+      () => fetchRowsFor(intervalMin),
+      60_000
+    );
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intervalMin, underlying]);
@@ -153,7 +206,14 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
   const rows = rowsByInterval[intervalMin] || [];
 
   return (
-    <div className="w-full h-full flex flex-col gap-3" style={panel === "fullscreen" ? { height: "100%" } : undefined}>
+    <div
+      className="w-full h-full flex flex-col gap-3"
+      style={
+        panel === "fullscreen"
+          ? { height: "100%" }
+          : undefined
+      }
+    >
       <style>{`
 :root, .theme-scope {
   --vi-surface: var(--card-bg);
@@ -203,7 +263,17 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
         <div className="flex items-end gap-2">
           <div className="flex flex-col w-32">
             <label className="vi-label">Interval</label>
-            <select value={intervalMin} onChange={(e) => setIntervalMin(Number(e.target.value) as IntervalKey)} className="vi-select">
+            <select
+              value={intervalMin}
+              onChange={(e) =>
+                setIntervalMin(
+                  Number(
+                    e.target.value
+                  ) as IntervalKey
+                )
+              }
+              className="vi-select"
+            >
               <option value={3}>3 min</option>
               <option value={5}>5 min</option>
               <option value={15}>15 min</option>
@@ -211,9 +281,28 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="vi-label">&nbsp;</label>
-            <button onClick={() => fetchRowsFor(intervalMin)} className="vi-iconbtn" aria-label="Refresh" title="Refresh" disabled={loading}>
-              <RotateCw strokeWidth={2} className={loading ? "vi-spin" : ""} />
+            <label className="vi-label">
+              &nbsp;
+            </label>
+            <button
+              onClick={() =>
+                fetchRowsFor(
+                  intervalMin
+                )
+              }
+              className="vi-iconbtn"
+              aria-label="Refresh"
+              title="Refresh"
+              disabled={loading}
+            >
+              <RotateCw
+                strokeWidth={2}
+                className={
+                  loading
+                    ? "vi-spin"
+                    : ""
+                }
+              />
             </button>
           </div>
         </div>
@@ -221,70 +310,205 @@ const VelocityIndex: React.FC<Props> = ({ panel = "card" }) => {
 
       <div
         className="relative rounded-xl border no-scrollbar overflow-y-auto"
-        style={{ borderColor: "var(--vi-brd)", maxHeight: panel === "fullscreen" ? "100%" : 350, background: "transparent", ...(panel === "fullscreen" ? { flex: "1 1 0%" } : null) }}
+        style={{
+          borderColor:
+            "var(--vi-brd)",
+          maxHeight:
+            panel ===
+            "fullscreen"
+              ? "100%"
+              : 350,
+          background:
+            "transparent",
+          ...(panel ===
+          "fullscreen"
+            ? {
+                flex: "1 1 0%",
+              }
+            : null),
+        }}
         aria-busy={loading}
       >
-        {/* Loading overlay for first fetch */}
+        {/* Loading overlay for first fetch (no data yet) */}
         {!hasFetched && (
-          <div className="loading-overlay" aria-hidden>
-            <div style={{ textAlign: "center", color: "var(--vi-muted)" }}>
-              <div style={{ fontSize: 12, marginBottom: 6 }}>Loading...</div>
-              <div style={{ fontSize: 11 }}>{err ? err : "Fetching data from server"}</div>
+          <div
+            className="loading-overlay"
+            aria-hidden
+          >
+            <div
+              style={{
+                textAlign:
+                  "center",
+                color:
+                  "var(--vi-muted)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  marginBottom: 6,
+                }}
+              >
+                Loading...
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                }}
+              >
+                {err
+                  ? err
+                  : "Fetching data from server"}
+              </div>
             </div>
           </div>
         )}
 
-        <table className="w-full table-fixed text-[13px] vi-vlines" style={{ borderCollapse: "separate", borderSpacing: 0, color: "var(--vi-fg)" }}>
+        <table
+          className="w-full table-fixed text-[13px] vi-vlines"
+          style={{
+            borderCollapse:
+              "separate",
+            borderSpacing: 0,
+            color:
+              "var(--vi-fg)",
+          }}
+        >
           <colgroup>
-            <col style={{ width: "22%" }} />
-            <col style={{ width: "28%" }} />
-            <col style={{ width: "25%" }} />
-            <col style={{ width: "25%" }} />
+            <col
+              style={{
+                width: "22%",
+              }}
+            />
+            <col
+              style={{
+                width: "28%",
+              }}
+            />
+            <col
+              style={{
+                width: "25%",
+              }}
+            />
+            <col
+              style={{
+                width: "25%",
+              }}
+            />
           </colgroup>
           <thead className="vi-thead">
             <tr>
-              <th className="px-3 py-2 text-center">Volatility</th>
-              <th className="px-3 py-2 text-center">Time</th>
-              <th className="px-3 py-2 text-center">Signal</th>
-              <th className="px-3 py-2 text-center">Spot</th>
+              <th className="px-3 py-2 text-center">
+                Volatility
+              </th>
+              <th className="px-3 py-2 text-center">
+                Time
+              </th>
+              <th className="px-3 py-2 text-center">
+                Signal
+              </th>
+              <th className="px-3 py-2 text-center">
+                Spot
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => {
-              const volTone = r.volatility > 0 ? "color: #22c55e" : r.volatility < 0 ? "color: #ef4444" : "color: var(--vi-fg)";
+              const volTone =
+                r.volatility >
+                0
+                  ? "color: #22c55e"
+                  : r.volatility <
+                    0
+                  ? "color: #ef4444"
+                  : "color: var(--vi-fg)";
               const chipStyle =
-                r.signal === "Bullish"
+                r.signal ===
+                "Bullish"
                   ? "background: rgba(16,185,129,0.12); color:#22c55e; border:1px solid rgba(16,185,129,0.28);"
                   : "background: rgba(244,63,94,0.12); color:#ef4444; border:1px solid rgba(244,63,94,0.28);";
               return (
-                <tr key={i} className="vi-table-row">
-                  <td className="px-3 py-2 font-mono text-center" style={toStyle(volTone)}>{fmt(r.volatility)}</td>
-                  <td className="px-3 py-2 font-mono text-center">{toHHMM(r.time)}</td>
+                <tr
+                  key={
+                    i
+                  }
+                  className="vi-table-row"
+                >
+                  <td
+                    className="px-3 py-2 font-mono text-center"
+                    style={toStyle(
+                      volTone
+                    )}
+                  >
+                    {fmt(
+                      r.volatility
+                    )}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-center">
+                    {toHHMM(
+                      r.time
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-center">
-                    <span className="px-2 py-0.5 text-[12px] rounded-md inline-block" style={{ ...toStyle(chipStyle), borderWidth: 1 }}>
-                      {r.signal}
+                    <span
+                      className="px-2 py-0.5 text-[12px] rounded-md inline-block"
+                      style={{
+                        ...toStyle(
+                          chipStyle
+                        ),
+                        borderWidth: 1,
+                      }}
+                    >
+                      {
+                        r.signal
+                      }
                     </span>
                   </td>
-                  <td className="px-3 py-2 font-mono text-center">{Math.round(r.spot)}</td>
+                  <td className="px-3 py-2 font-mono text-center">
+                    {Math.round(
+                      r.spot
+                    )}
+                  </td>
                 </tr>
               );
             })}
-            {rows.length === 0 && hasFetched && (
-              <tr>
-                <td colSpan={4} className="px-3 py-6 text-center" style={{ color: "var(--vi-muted)" }}>
-                  {err ? `No data (API): ${err}` : "No data"}
-                </td>
-              </tr>
-            )}
+            {rows.length ===
+              0 &&
+              hasFetched && (
+                <tr>
+                  <td
+                    colSpan={
+                      4
+                    }
+                    className="px-3 py-6 text-center"
+                    style={{
+                      color:
+                        "var(--vi-muted)",
+                    }}
+                  >
+                    {err
+                      ? `No data (API): ${err}`
+                      : "No data"}
+                  </td>
+                </tr>
+              )}
           </tbody>
         </table>
       </div>
 
-      {err && (
-        <div className="text-xs mt-1" style={{ color: "var(--vi-muted)" }}>
-          {err}
-        </div>
-      )}
+      {err &&
+        rows.length >
+          0 && (
+          <div
+            className="text-xs mt-1"
+            style={{
+              color:
+                "var(--vi-muted)",
+            }}
+          >
+            {err}
+          </div>
+        )}
     </div>
   );
 };

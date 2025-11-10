@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect, useMemo, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import api, { extractServerError } from "../../../api";
+import api, { extractServerError, markSessionStart } from "../../../api";
 import {
   FiUser,
   FiMail,
@@ -156,8 +156,6 @@ async function getUserSnapshot(authUser: any): Promise<any> {
   return null;
 }
 
-/* ---------- Broker map ---------- */
-
 const Register = () => {
   const { login, user } = useContext(AuthContext);
   const isLoggedIn = !!user;
@@ -232,8 +230,7 @@ const Register = () => {
     [products, initialProductId]
   );
 
-
-  // ✅ Toastify listeners (show toast, then clear local state to avoid inline UI)
+  // ✅ Toastify listeners
   useEffect(() => {
     if (error) {
       toast.error(error);
@@ -385,7 +382,6 @@ const Register = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(e.target.value.replace(/\D/g, ""));
   };
@@ -428,7 +424,6 @@ const Register = () => {
     }
   };
 
-  /** ---------- Resend OTP (reuses the same API) ---------- */
   const handleResendOtp = async () => {
     if (isLoggedIn) return;
     if (phone.length !== 10) {
@@ -445,7 +440,7 @@ const Register = () => {
       const response = await api.post("/otp/send-otp", { phone });
       if (response.data.success) {
         setOtpSent(true);
-        setOtp(""); // clear previous entry
+        setOtp("");
         setSuccessMessage("OTP resent to your phone number");
         setCooldown(response.data.retryAfter || OTP_COOLDOWN_DURATION);
       } else {
@@ -456,7 +451,6 @@ const Register = () => {
       setError(message);
     }
   };
-  /** ----------------------------------------------------- */
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -493,9 +487,13 @@ const Register = () => {
 
       // Free plan → no Razorpay
       if (orderRes.status === 204) {
-        const fin = await api.post("/auth/finalize-signup", { signupIntentId });
+        const fin = await api.post("/auth/finalize-signup", {
+          signupIntentId,
+        });
         localStorage.setItem("token", fin.data.token);
         localStorage.setItem("user", JSON.stringify(fin.data.user));
+        // ✅ start session for 7-day auto-logout
+        markSessionStart();
 
         const to = getPostSignupPath();
         sessionStorage.setItem("postSignupPath", to);
@@ -538,6 +536,8 @@ const Register = () => {
 
             localStorage.setItem("token", verify.data.token);
             localStorage.setItem("user", JSON.stringify(verify.data.user));
+            // ✅ start session for 7-day auto-logout
+            markSessionStart();
 
             const to = getPostSignupPath();
             sessionStorage.setItem("postSignupPath", to);
@@ -626,7 +626,7 @@ const Register = () => {
         handler: async (rsp: any) => {
           try {
             await api.post("/payments/verify", {
-              intentId: ord.intentId, // server returns intentId
+              intentId: ord.intentId,
               razorpay_order_id: rsp.razorpay_order_id,
               razorpay_payment_id: rsp.razorpay_payment_id,
               razorpay_signature: rsp.razorpay_signature,
@@ -682,7 +682,8 @@ const Register = () => {
 
     // Logged-in checkout
     if (isLoggedIn) {
-      if (!initialProductId) return setError("Please choose a product");
+      if (!initialProductId)
+        return setError("Please choose a product");
       if (selectedProduct?.hasVariants && !initialVariantId)
         return setError("Please select a plan for the chosen product");
 
@@ -691,7 +692,9 @@ const Register = () => {
         ...(initialVariantId && { variantId: initialVariantId }),
         ...(selectedProduct &&
           YEARLY_ELIGIBLE.has(selectedProduct.key) &&
-          !selectedProduct.hasVariants && { billingInterval: billingInterval }),
+          !selectedProduct.hasVariants && {
+            billingInterval: billingInterval,
+          }),
       };
 
       if (selectedProduct?.key === "algo_simulator" && initialVariantId) {
@@ -727,7 +730,11 @@ const Register = () => {
       setError("Password must be at least 6 characters");
       return;
     }
-    if (initialProductId && selectedProduct?.hasVariants && !initialVariantId) {
+    if (
+      initialProductId &&
+      selectedProduct?.hasVariants &&
+      !initialVariantId
+    ) {
       setError("Please select a plan for the chosen product");
       return;
     }
@@ -767,9 +774,13 @@ const Register = () => {
       const signupIntentId: string = data.signupIntentId;
 
       if (!initialProductId) {
-        const fin = await api.post("/auth/finalize-signup", { signupIntentId });
+        const fin = await api.post("/auth/finalize-signup", {
+          signupIntentId,
+        });
         localStorage.setItem("token", fin.data.token);
         localStorage.setItem("user", JSON.stringify(fin.data.user));
+        // ✅ start session for 7-day auto-logout
+        markSessionStart();
 
         const to = "/dashboard";
         sessionStorage.setItem("postSignupPath", to);

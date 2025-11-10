@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../../../api';
+import api, { markSessionStart } from '../../../api';
 import { FiMail, FiLock, FiArrowRight, FiEye, FiEyeOff, FiX } from 'react-icons/fi';
 import { AuthContext } from '../../../context/AuthContext';
 
@@ -52,9 +52,10 @@ const Login = () => {
     setIsLoading(true);
     try {
       const res = await api.post('/auth/login', formData);
-      // console.log('[Login] Received token:', res.data.token);
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
+      // ✅ mark session start for 7-day auto logout
+      markSessionStart();
       login(res.data.token, res.data.user);
       setSuccessMessage('Login successful! Redirecting...');
       setTimeout(() => navigate('/dashboard'), 1000);
@@ -105,8 +106,6 @@ const Login = () => {
               <p className="text-gray-500">Sign in to continue to your account</p>
             </div>
 
-            {/* ⛔️ Removed inline error/success banners so only Toastify shows */}
-
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Email */}
               <div className="relative">
@@ -156,8 +155,8 @@ const Login = () => {
                     Remember me
                   </label>
                 </div>
-                <Link 
-                  to="/forgot-password" 
+                <Link
+                  to="/forgot-password"
                   className="text-sm text-indigo-600 hover:text-indigo-800 transition-colors font-medium"
                 >
                   Forgot password?

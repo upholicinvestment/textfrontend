@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 
 /* ---------- Types ---------- */
-// (kept shape for clarity; not required at runtime)
 interface StockData {
   _id: string;
   trading_symbol: string;
@@ -27,7 +26,7 @@ interface SectorData {
 
 type Props = { panel?: "card" | "fullscreen" };
 
-/* ---------- Config (re-use your app vars) ---------- */
+/* ---------- Config ---------- */
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
@@ -48,18 +47,20 @@ function uniqueBy<T, K extends keyof T>(arr: T[], key: K): T[] {
 }
 const cleanSymbol = (s: string) => s.replace(/-[A-Z]{3}-\d{4}-FUT$/i, "");
 
-/** Dark-first defaults (your app defaults to dark) */
+/** Dark-first defaults */
 function readThemeVars() {
-  const scope = (document.querySelector(".theme-scope") as HTMLElement) || document.documentElement;
+  const scope =
+    (document.querySelector(".theme-scope") as HTMLElement) ||
+    document.documentElement;
   const cs = getComputedStyle(scope);
-  const pick = (k: string, fb: string) => (cs.getPropertyValue(k).trim() || fb);
+  const pick = (k: string, fb: string) => cs.getPropertyValue(k).trim() || fb;
   return {
-    fg:    pick("--fg", "#e5e7eb"),
+    fg: pick("--fg", "#e5e7eb"),
     muted: pick("--muted", "#94a3b8"),
-    tip:   pick("--tip", "#0f172a"),
+    tip: pick("--tip", "#0f172a"),
     tipbr: pick("--tipbr", "rgba(148,163,184,0.25)"),
-    card:  pick("--card-bg", "#0f172a"),
-    brd:   pick("--border", "rgba(148,163,184,0.25)"),
+    card: pick("--card-bg", "#0f172a"),
+    brd: pick("--border", "rgba(148,163,184,0.25)"),
   };
 }
 
@@ -72,42 +73,95 @@ function colorForPct(pct: number) {
   return "#6b7280";
 }
 function lerpColor(a: string, b: string, t: number) {
-  const pa = hexToRgb(a), pb = hexToRgb(b);
+  const pa = hexToRgb(a),
+    pb = hexToRgb(b);
   const mix = (x: number, y: number) => Math.round(x + (y - x) * t);
   return `rgb(${mix(pa.r, pb.r)}, ${mix(pa.g, pb.g)}, ${mix(pa.b, pb.b)})`;
 }
 function hexToRgb(hex: string) {
   const m = hex.replace("#", "");
-  const full = m.length === 3 ? m.split("").map((c) => c + c).join("") : m;
+  const full =
+    m.length === 3
+      ? m
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : m;
   const n = parseInt(full, 16);
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 
-/** Sector icons (unchanged) */
-const sectorIcon: Record<string, React.FC<{ size?: number; color?: string }>> = {
-  technology: Cpu, it: Cpu, software: Smartphone,
-  communication: Radio, telecom: Radio, telecommunication: Radio,
-  finance: Banknote, financial: Banknote, financialservices: Banknote, banking: Banknote, bank: Banknote, insurance: Shield,
-  healthcare: Stethoscope, hospital: Stethoscope, pharma: Pill, pharmaceutical: Pill,
-  industrial: Factory, industrials: Factory, capitalgoods: Factory, construction: Hammer, infrastructure: Building2,
-  consumer: ShoppingBag, retail: ShoppingBag, fmcg: ShoppingCart, qsr: ShoppingCart, quickservice: ShoppingCart,
-  energy: PlugZap, utilities: PlugZap, oilgas: Flame, oil: Flame, gas: Flame,
-  materials: Boxes, metals: Boxes, cement: Package, chemicals: FlaskConical, paints: Paintbrush,
-  realestate: Home, real: Home,
-  automotive: Car, auto: Car, aviation: Plane, transport: Plane, airline: Plane, tourism: Plane,
-  conglomerate: Layers, hospitality: Home, textiles: Package,
-};
+/** Sector icons */
+const sectorIcon: Record<string, React.FC<{ size?: number; color?: string }>> =
+  {
+    technology: Cpu,
+    it: Cpu,
+    software: Smartphone,
+    communication: Radio,
+    telecom: Radio,
+    telecommunication: Radio,
+    finance: Banknote,
+    financial: Banknote,
+    financialservices: Banknote,
+    banking: Banknote,
+    bank: Banknote,
+    insurance: Shield,
+    healthcare: Stethoscope,
+    hospital: Stethoscope,
+    pharma: Pill,
+    pharmaceutical: Pill,
+    industrial: Factory,
+    industrials: Factory,
+    capitalgoods: Factory,
+    construction: Hammer,
+    infrastructure: Building2,
+    consumer: ShoppingBag,
+    retail: ShoppingBag,
+    fmcg: ShoppingCart,
+    qsr: ShoppingCart,
+    quickservice: ShoppingCart,
+    energy: PlugZap,
+    utilities: PlugZap,
+    oilgas: Flame,
+    oil: Flame,
+    gas: Flame,
+    materials: Boxes,
+    metals: Boxes,
+    cement: Package,
+    chemicals: FlaskConical,
+    paints: Paintbrush,
+    realestate: Home,
+    real: Home,
+    automotive: Car,
+    auto: Car,
+    aviation: Plane,
+    transport: Plane,
+    airline: Plane,
+    tourism: Plane,
+    conglomerate: Layers,
+    hospitality: Home,
+    textiles: Package,
+  };
+
 function pickIconFor(name?: string) {
-  const key = (name ?? "unknown").toString().toLowerCase().replace(/[^a-z]/g, "");
+  const key = (name ?? "unknown")
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
   if (sectorIcon[key]) return sectorIcon[key];
-  for (const [k, Icon] of Object.entries(sectorIcon)) if (key.includes(k)) return Icon;
+  for (const [k, Icon] of Object.entries(sectorIcon))
+    if (key.includes(k)) return Icon;
   return Box;
 }
 function tinyLabel(name: string) {
   const words = (name.match(/[A-Za-z0-9]+/g) || []).slice(0, 3);
   if (!words.length) return "";
   if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
-  return words.map((w) => w[0]).join("").toUpperCase().slice(0, 4);
+  return words
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 4);
 }
 
 /* ---------- Component ---------- */
@@ -116,13 +170,21 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // keep last successful sectors for soft-error fallback
+  const dataRef = useRef<SectorData[]>([]);
+
   // theme tick to re-render when theme vars change
   const [themeTick, setThemeTick] = useState(0);
   useEffect(() => {
     const el = document.querySelector(".theme-scope");
     if (!el) return;
-    const obs = new MutationObserver(() => setThemeTick((t) => t + 1));
-    obs.observe(el, { attributes: true, attributeFilter: ["style", "class", "data-theme"] });
+    const obs = new MutationObserver(() =>
+      setThemeTick((t) => t + 1)
+    );
+    obs.observe(el, {
+      attributes: true,
+      attributeFilter: ["style", "class", "data-theme"],
+    });
     return () => obs.disconnect();
   }, []);
   const vars = readThemeVars();
@@ -136,21 +198,37 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
       const sym = s.trading_symbol;
       const ltpVal = s.LTP ?? (s as any).ltp;
       const closeVal = s.close ?? (s as any).Close;
-      if (typeof sym !== "string" || !sym.trim() || sym.endsWith("-OI")) return false;
-      const c = parseFloat(closeVal), l = parseFloat(ltpVal);
+      if (
+        typeof sym !== "string" ||
+        !sym.trim() ||
+        sym.endsWith("-OI")
+      )
+        return false;
+      const c = parseFloat(closeVal);
+      const l = parseFloat(ltpVal);
       return Number.isFinite(c) && Number.isFinite(l) && c > 0;
     });
 
     const withChange = valid.map((s) => {
-      const c = parseFloat(s.close), l = parseFloat(s.LTP);
+      const c = parseFloat(s.close);
+      const l = parseFloat(s.LTP);
       const change = ((l - c) / c) * 100;
-      return { ...s, change, sector: s.sector, trading_symbol: s.trading_symbol };
+      return {
+        ...s,
+        change,
+        sector: s.sector,
+        trading_symbol: s.trading_symbol,
+      };
     });
 
-    const sectorMap: Record<string, { sum: number; count: number; stocks: StockData[] }> = {};
+    const sectorMap: Record<
+      string,
+      { sum: number; count: number; stocks: StockData[] }
+    > = {};
     withChange.forEach((s) => {
       const sec = s.sector || "Unknown";
-      if (!sectorMap[sec]) sectorMap[sec] = { sum: 0, count: 0, stocks: [] };
+      if (!sectorMap[sec])
+        sectorMap[sec] = { sum: 0, count: 0, stocks: [] };
       sectorMap[sec].sum += s.change ?? 0;
       sectorMap[sec].count += 1;
       sectorMap[sec].stocks.push(s);
@@ -162,13 +240,22 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
         const unique = uniqueBy(stocks, "trading_symbol");
         const topGainers = unique
           .filter((x) => (x.change ?? 0) > 0)
-          .sort((a, b) => (b.change ?? 0) - (a.change ?? 0))
+          .sort(
+            (a, b) => (b.change ?? 0) - (a.change ?? 0)
+          )
           .slice(0, 3);
         const topLosers = unique
           .filter((x) => (x.change ?? 0) < 0)
-          .sort((a, b) => (a.change ?? 0) - (b.change ?? 0))
+          .sort(
+            (a, b) => (a.change ?? 0) - (b.change ?? 0)
+          )
           .slice(0, 3);
-        return { name: name || "Unknown", size: parseFloat(avg.toFixed(2)), topGainers, topLosers };
+        return {
+          name: name || "Unknown",
+          size: parseFloat(avg.toFixed(2)),
+          topGainers,
+          topLosers,
+        };
       })
       .sort((a, b) => b.size - a.size);
 
@@ -182,23 +269,59 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
     controllerRef.current = controller;
 
     const doFetch = async () => {
-      setLoading(true);
+      const hadDataBefore = dataRef.current.length > 0;
+
+      if (!hadDataBefore) {
+        // cold load → show loader, no error
+        setLoading(true);
+        setError(null);
+      } else {
+        // refresh with existing data → don't clear UI, only clear error
+        setError(null);
+      }
+
       try {
         const resp = await fetch(HEATMAP_URL, {
           signal: controller.signal,
           cache: "no-store",
         });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!resp.ok)
+          throw new Error(`HTTP ${resp.status}`);
+
         const json = await resp.json(); // expected: StockData[]
-        const sectors = buildSectors(Array.isArray(json) ? json : []);
+        const sectors = buildSectors(
+          Array.isArray(json) ? json : []
+        );
         if (!mountedRef.current) return;
+
+        dataRef.current = sectors;
         setData(sectors);
         setError(null);
         setLoading(false);
       } catch (e: any) {
         if (e?.name === "AbortError") return;
         if (!mountedRef.current) return;
-        setError(e?.message || "Unknown error");
+
+        const msg = e?.message || "Failed to fetch";
+        const isFailedToFetch =
+          /Failed to fetch/i.test(msg);
+
+        // If it's initial load + "Failed to fetch" → treat as heavy/slow, keep spinner
+        if (!hadDataBefore && isFailedToFetch) {
+          setLoading(true);
+          setError(null);
+          return;
+        }
+
+        // If we already have data → soft error: keep last treemap, show warning (no hard fail UI)
+        if (hadDataBefore) {
+          setError(msg);
+          setLoading(false);
+          return;
+        }
+
+        // No data at all + real error → hard fail
+        setError(msg);
         setLoading(false);
       }
     };
@@ -212,14 +335,16 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
       controllerRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once; keep same polling behavior
+  }, []);
 
   const treemapData = useMemo(() => {
     if (!data.length) return [];
     const vals = data.map((d) => d.size);
-    const min = Math.min(...vals), max = Math.max(...vals);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
     const span = Math.max(0.0001, max - min);
-    const weight = (v: number) => 0.8 + ((v - min) / span) * 7.2; // 0.8..8.0
+    const weight = (v: number) =>
+      0.8 + ((v - min) / span) * 7.2; // 0.8..8.0
     return data.map((d) => ({
       name: d.name || "Unknown",
       value: weight(d.size),
@@ -229,13 +354,18 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
     }));
   }, [data]);
 
-  /* ---------- skeletons / errors ---------- */
-  if (loading) {
+  const hasData = treemapData.length > 0;
+
+  /* ---------- skeletons / errors according to rules ---------- */
+
+  // 1) Heavy/slow initial load → keep spinner (no error UI)
+  if (loading && !hasData) {
     return (
       <div
         className="w-full rounded-xl grid place-items-center"
         style={{
-          height: panel === "fullscreen" ? "100%" : 540,
+          height:
+            panel === "fullscreen" ? "100%" : 540,
           background: vars.card,
           color: vars.fg,
           border: `1px solid ${vars.brd}`,
@@ -243,32 +373,53 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
       >
         <div className="flex items-center gap-3">
           <div className="w-6 h-6 rounded-full border-2 border-current border-t-transparent animate-spin" />
+          <div
+            style={{
+              fontSize: 12,
+              color: vars.muted,
+            }}
+          >
+            Loading sector heatmap...
+          </div>
         </div>
       </div>
     );
   }
-  if (error) {
+
+  // 2) Real error + still no data → show fail to fetch
+  if (error && !hasData) {
     return (
       <div
         className="w-full rounded-xl grid place-items-center text-center p-6"
         style={{
-          height: panel === "fullscreen" ? "100%" : 540,
+          height:
+            panel === "fullscreen" ? "100%" : 540,
           background: vars.card,
           color: vars.fg,
           border: `1px solid ${vars.brd}`,
         }}
       >
-        <div style={{ color: "#ef4444" }} className="font-medium mb-2">Error loading data</div>
-        <div style={{ color: vars.muted }}>{error}</div>
+        <div
+          style={{ color: "#ef4444" }}
+          className="font-medium mb-2"
+        >
+          Failed to fetch data
+        </div>
+        <div style={{ color: vars.muted }}>
+          {error}
+        </div>
       </div>
     );
   }
-  if (!treemapData.length) {
+
+  // 3) No error, no data once loaded
+  if (!loading && !hasData) {
     return (
       <div
         className="w-full rounded-xl grid place-items-center"
         style={{
-          height: panel === "fullscreen" ? "100%" : 540,
+          height:
+            panel === "fullscreen" ? "100%" : 540,
           background: vars.card,
           color: vars.fg,
           border: `1px solid ${vars.brd}`,
@@ -279,42 +430,73 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
     );
   }
 
-  /* ---------- node + tooltip renderers (unchanged) ---------- */
+  /* ---------- node + tooltip renderers ---------- */
+
   const Node: React.FC<any> = (props) => {
     const { x, y, width, height } = props;
-    const name: string = props?.name || props?.payload?.name || "Unknown";
-    const pct: number = Number.isFinite(props?.pct) ? props.pct : Number(props?.payload?.pct) || 0;
+    const name: string =
+      props?.name || props?.payload?.name || "Unknown";
+    const pct: number = Number.isFinite(props?.pct)
+      ? props.pct
+      : Number(props?.payload?.pct) || 0;
     const Icon = pickIconFor(name);
     const fill = colorForPct(pct);
 
-    const tiny  = width < 70 || height < 44;
-    const small = width < 120 || height < 64;
-    const iconSize = tiny ? 16 : small ? 20 : 24;
+    const tiny =
+      width < 70 || height < 44;
+    const small =
+      width < 120 || height < 64;
+    const iconSize = tiny
+      ? 16
+      : small
+      ? 20
+      : 24;
     const textColor = "#ffffff";
     const pad = 4;
     const border = "rgba(0,0,0,0.35)";
 
     return (
-      <g aria-label={`${name} ${pct.toFixed(1)} percent`}>
+      <g
+        aria-label={`${name} ${pct.toFixed(
+          1
+        )} percent`}
+      >
         <rect
-          x={x} y={y} width={width} height={height}
-          fill={fill} rx={0} ry={0}
-          stroke={border} strokeWidth={1}
-          strokeLinejoin="bevel" strokeLinecap="butt"
-          vectorEffect="non-scaling-stroke" shapeRendering="crispEdges"
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          fill={fill}
+          rx={0}
+          ry={0}
+          stroke={border}
+          strokeWidth={1}
+          strokeLinejoin="bevel"
+          strokeLinecap="butt"
+          vectorEffect="non-scaling-stroke"
+          shapeRendering="crispEdges"
         />
         <foreignObject
           x={x + pad}
           y={y + pad}
           width={Math.max(0, width - pad * 2)}
-          height={Math.max(0, height - pad * 2)}
+          height={Math.max(
+            0,
+            height - pad * 2
+          )}
         >
           <div
             style={{
-              width: "100%", height: "100%",
-              display: "flex", flexDirection: "column",
-              justifyContent: tiny ? "center" : "space-between",
-              alignItems: tiny ? "center" : "stretch",
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: tiny
+                ? "center"
+                : "space-between",
+              alignItems: tiny
+                ? "center"
+                : "stretch",
               color: textColor,
               fontFamily:
                 "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial",
@@ -322,13 +504,26 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
           >
             <div
               style={{
-                display: "flex", alignItems: "center", gap: 6,
-                justifyContent: tiny ? "center" : "flex-start",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                justifyContent: tiny
+                  ? "center"
+                  : "flex-start",
               }}
             >
-              <Icon size={iconSize} color={textColor} />
+              <Icon
+                size={iconSize}
+                color={textColor}
+              />
               {tiny ? (
-                <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: 0.3 }}>
+                <span
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 10,
+                    letterSpacing: 0.3,
+                  }}
+                >
                   {tinyLabel(name)}
                 </span>
               ) : (
@@ -336,7 +531,9 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
                   title={name}
                   style={{
                     fontWeight: 700,
-                    fontSize: small ? 12 : 14,
+                    fontSize: small
+                      ? 12
+                      : 14,
                     lineHeight: 1.1,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -349,7 +546,16 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
             </div>
 
             {!tiny && (
-              <div style={{ alignSelf: "flex-end", fontWeight: 700, fontSize: small ? 12 : 14 }}>
+              <div
+                style={{
+                  alignSelf:
+                    "flex-end",
+                  fontWeight: 700,
+                  fontSize: small
+                    ? 12
+                    : 14,
+                }}
+              >
                 {pct > 0 ? "+" : ""}
                 {pct.toFixed(1)}%
               </div>
@@ -360,13 +566,28 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
     );
   };
 
-  const Tip: React.FC<any> = ({ active, payload }) => {
-    if (!active || !payload?.length) return null;
+  const Tip: React.FC<any> = ({
+    active,
+    payload,
+  }) => {
+    if (!active || !payload?.length)
+      return null;
     const p = payload[0]?.payload ?? {};
-    const name: string = p?.name || "Unknown";
-    const pct: number = Number.isFinite(p?.pct) ? p.pct : 0;
-    const gainers: StockData[] = Array.isArray(p?.topGainers) ? p.topGainers : [];
-    const losers: StockData[] = Array.isArray(p?.topLosers) ? p.topLosers : [];
+    const name: string =
+      p?.name || "Unknown";
+    const pct: number = Number.isFinite(
+      p?.pct
+    )
+      ? p.pct
+      : 0;
+    const gainers: StockData[] =
+      Array.isArray(p?.topGainers)
+        ? p.topGainers
+        : [];
+    const losers: StockData[] =
+      Array.isArray(p?.topLosers)
+        ? p.topLosers
+        : [];
 
     return (
       <div
@@ -377,52 +598,184 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
           borderRadius: 12,
           padding: 10,
           minWidth: 220,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          boxShadow:
+            "0 10px 30px rgba(0,0,0,0.35)",
         }}
       >
-        <div style={{ borderBottom: `1px solid ${vars.tipbr}`, paddingBottom: 6, marginBottom: 6 }}>
-          <div style={{ fontWeight: 800, fontSize: 14 }}>{name}</div>
-          <div style={{ fontWeight: 700, fontSize: 12, color: pct >= 0 ? "#22c55e" : "#ef4444" }}>
+        <div
+          style={{
+            borderBottom: `1px solid ${vars.tipbr}`,
+            paddingBottom: 6,
+            marginBottom: 6,
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 800,
+              fontSize: 14,
+            }}
+          >
+            {name}
+          </div>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 12,
+              color:
+                pct >= 0
+                  ? "#22c55e"
+                  : "#ef4444",
+            }}
+          >
             {pct > 0 ? "+" : ""}
             {pct.toFixed(2)}%
           </div>
         </div>
 
         {gainers.length ? (
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#22c55e", fontSize: 11, fontWeight: 700 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 9999, background: "#22c55e" }} />
+          <div
+            style={{ marginBottom: 6 }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                color: "#22c55e",
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 9999,
+                  background:
+                    "#22c55e",
+                }}
+              />
               Top Gainers
             </div>
-            {gainers.map((s, i) => (
-              <div key={`g-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}>
-                <span style={{ fontSize: 12, color: vars.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {cleanSymbol(s.trading_symbol)}
-                </span>
-                <span style={{ fontSize: 12, color: "#22c55e", fontWeight: 700 }}>
-                  +{(s.change ?? 0).toFixed(1)}%
-                </span>
-              </div>
-            ))}
+            {gainers.map(
+              (s, i) => (
+                <div
+                  key={`g-${i}`}
+                  style={{
+                    display: "flex",
+                    justifyContent:
+                      "space-between",
+                    gap: 8,
+                    marginTop: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: vars.muted,
+                      whiteSpace:
+                        "nowrap",
+                      overflow:
+                        "hidden",
+                      textOverflow:
+                        "ellipsis",
+                    }}
+                  >
+                    {cleanSymbol(
+                      s.trading_symbol
+                    )}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color:
+                        "#22c55e",
+                      fontWeight: 700,
+                    }}
+                  >
+                    +
+                    {(s.change ??
+                      0
+                    ).toFixed(
+                      1
+                    )}
+                    %
+                  </span>
+                </div>
+              )
+            )}
           </div>
         ) : null}
 
         {losers.length ? (
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#ef4444", fontSize: 11, fontWeight: 700 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 9999, background: "#ef4444" }} />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                color: "#ef4444",
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 9999,
+                  background:
+                    "#ef4444",
+                }}
+              />
               Top Losers
             </div>
-            {losers.map((s, i) => (
-              <div key={`l-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}>
-                <span style={{ fontSize: 12, color: vars.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {cleanSymbol(s.trading_symbol)}
-                </span>
-                <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 800 }}>
-                  {(s.change ?? 0).toFixed(1)}%
-                </span>
-              </div>
-            ))}
+            {losers.map(
+              (s, i) => (
+                <div
+                  key={`l-${i}`}
+                  style={{
+                    display: "flex",
+                    justifyContent:
+                      "space-between",
+                    gap: 8,
+                    marginTop: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: vars.muted,
+                      whiteSpace:
+                        "nowrap",
+                      overflow:
+                        "hidden",
+                      textOverflow:
+                        "ellipsis",
+                    }}
+                  >
+                    {cleanSymbol(
+                      s.trading_symbol
+                    )}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color:
+                        "#ef4444",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {(s.change ??
+                      0
+                    ).toFixed(
+                      1
+                    )}
+                    %
+                  </span>
+                </div>
+              )
+            )}
           </div>
         ) : null}
       </div>
@@ -430,15 +783,20 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
   };
 
   /* ---------- layout: card vs fullscreen ---------- */
+
   return (
     <div
       className="w-full rounded-xl"
       style={{
-        height: panel === "fullscreen" ? "100%" : 540,
+        height:
+          panel === "fullscreen"
+            ? "100%"
+            : 540,
         background: vars.card,
         color: vars.fg,
         border: `1px solid ${vars.brd}`,
-        boxShadow: "0 8px 28px rgba(0,0,0,.25)",
+        boxShadow:
+          "0 8px 28px rgba(0,0,0,.25)",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -447,20 +805,46 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
       {/* header */}
       <div
         style={{
-          padding: "10px 12px 0 12px",
+          padding:
+            "10px 12px 0 12px",
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent:
+            "space-between",
           alignItems: "center",
           flex: "0 0 auto",
         }}
       >
-        <h2 style={{ fontWeight: 700, fontSize: 16 }}>Sector Performance Heatmap</h2>
-        <div style={{ fontSize: 12, color: vars.muted }}>Bigger tile ⇒ stronger positive sector</div>
+        <h2
+          style={{
+            fontWeight: 700,
+            fontSize: 16,
+          }}
+        >
+          Sector Performance Heatmap
+        </h2>
+        <div
+          style={{
+            fontSize: 12,
+            color: vars.muted,
+          }}
+        >
+          Bigger tile ⇒ stronger
+          positive sector
+        </div>
       </div>
 
       {/* chart area */}
-      <div style={{ width: "100%", flex: "1 1 0", minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
+      <div
+        style={{
+          width: "100%",
+          flex: "1 1 0",
+          minHeight: 0,
+        }}
+      >
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+        >
           <Treemap
             key={themeKey}
             data={treemapData}
@@ -468,14 +852,33 @@ const Heat_Map: React.FC<Props> = ({ panel = "card" }) => {
             aspectRatio={4 / 3}
             content={<Node />}
             stroke="none"
-            style={{ shapeRendering: "crispEdges" }}
+            style={{
+              shapeRendering:
+                "crispEdges",
+            }}
             animationDuration={400}
             isAnimationActive
           >
-            <ReTooltip content={<Tip />} wrapperStyle={{ outline: "none" }} />
+            <ReTooltip
+              content={<Tip />}
+              wrapperStyle={{
+                outline: "none",
+              }}
+            />
           </Treemap>
         </ResponsiveContainer>
       </div>
+
+      {/* soft warning when we have data but last fetch failed */}
+      {error && hasData && (
+        <div
+          className="px-3 pb-2 text-[10px]"
+          style={{ color: "#f59e0b" }}
+        >
+          Warning: {error}. Showing last
+          available heatmap.
+        </div>
+      )}
     </div>
   );
 };

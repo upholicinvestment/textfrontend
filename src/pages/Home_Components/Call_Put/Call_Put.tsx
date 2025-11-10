@@ -47,15 +47,22 @@ const AUTO_REFRESH_MS = 180_000;
 /* ---------- Helpers ---------- */
 function toMinutes(i: IntervalOpt): number {
   switch (i) {
-    case "3m": return 3;
-    case "15m": return 15;
-    case "30m": return 30;
-    case "1h": return 60;
+    case "3m":
+      return 3;
+    case "15m":
+      return 15;
+    case "30m":
+      return 30;
+    case "1h":
+      return 60;
   }
 }
 const toLabelIST = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-IN", {
-    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Kolkata",
   });
 
 function formatMillions(n: number) {
@@ -76,7 +83,9 @@ function niceStep(raw: number) {
   return p * 1_000_000;
 }
 function readThemeVars() {
-  const scope = (document.querySelector(".theme-scope") as HTMLElement) || document.documentElement;
+  const scope =
+    (document.querySelector(".theme-scope") as HTMLElement) ||
+    document.documentElement;
   const cs = getComputedStyle(scope);
   const pick = (k: string, fb: string) => cs.getPropertyValue(k).trim() || fb;
   return {
@@ -98,22 +107,38 @@ export default function Call_Put({ panel = "card" }: Props) {
 
   const [atmSeries, setAtmSeries] = useState<ATMPoint[]>([]);
   const [overallSeries, setOverallSeries] = useState<OverallPoint[]>([]);
-  const [meta, setMeta] = useState<{ expiry?: string | null; step?: number; atmStrike?: number | null }>({});
+  const [meta, setMeta] = useState<{
+    expiry?: string | null;
+    step?: number;
+    atmStrike?: number | null;
+  }>({});
 
   const [err, setErr] = useState<string | null>(null);
   const [hasFetched, setHasFetched] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const rafRef = useRef<number | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Keep last good data so we can show it on soft errors
+  const dataRef = useRef<{
+    atmSeries: ATMPoint[];
+    overallSeries: OverallPoint[];
+  }>({ atmSeries: [], overallSeries: [] });
 
   // THEME
   const [themeTick, setThemeTick] = useState(0);
   useEffect(() => {
     const el = document.querySelector(".theme-scope");
     if (!el) return;
-    const obs = new MutationObserver(() => setThemeTick((t) => t + 1));
-    obs.observe(el, { attributes: true, attributeFilter: ["style", "class", "data-theme"] });
+    const obs = new MutationObserver(() =>
+      setThemeTick((t) => t + 1)
+    );
+    obs.observe(el, {
+      attributes: true,
+      attributeFilter: ["style", "class", "data-theme"],
+    });
     return () => obs.disconnect();
   }, []);
   const vars = readThemeVars();
@@ -138,31 +163,93 @@ export default function Call_Put({ panel = "card" }: Props) {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
-    try {
+
+    const hadDataBefore =
+      tab === "ATM"
+        ? (dataRef.current.atmSeries?.length ?? 0) > 0
+        : (dataRef.current.overallSeries?.length ?? 0) > 0;
+
+    if (!hadDataBefore) {
+      // First / cold load: show blocking loader, no error
+      setLoading(true);
       setErr(null);
+      setHasFetched(false);
+    } else {
+      // Subsequent refresh: keep showing existing data
+      setErr(null);
+    }
+
+    try {
       const minutes = toMinutes(interval);
       const url =
         tab === "ATM"
           ? `${API_BASE}/nifty/atm?interval=${minutes}&sinceMin=1440`
-          : `${API_BASE}/nifty/overall?interval=${minutes}&sinceMin=1440`;
+          : `${API_BASE}/nifty/overall?interval=${minutes}&sinceMin=1440}`;
 
-      const res = await fetch(url, { method: "GET", signal: ctrl.signal, cache: "no-store" });
+      const res = await fetch(url, {
+        method: "GET",
+        signal: ctrl.signal,
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const raw = await res.json();
 
       if (tab === "ATM") {
         const body = raw as AtmResp;
-        setAtmSeries(Array.isArray(body.series) ? body.series : []);
-        setMeta({ expiry: body.expiry ?? null, step: body.step ?? 50, atmStrike: body.atmStrike ?? null });
+        const series = Array.isArray(body.series) ? body.series : [];
+        setAtmSeries(series);
+        dataRef.current = {
+          ...dataRef.current,
+          atmSeries: series,
+        };
+        setMeta({
+          expiry: body.expiry ?? null,
+          step: body.step ?? 50,
+          atmStrike: body.atmStrike ?? null,
+        });
       } else {
         const body = raw as OverallResp;
-        setOverallSeries(Array.isArray(body.series) ? body.series : []);
-        setMeta({ expiry: body.expiry ?? null, step: body.step ?? 50, atmStrike: null });
+        const series = Array.isArray(body.series) ? body.series : [];
+        setOverallSeries(series);
+        dataRef.current = {
+          ...dataRef.current,
+          overallSeries: series,
+        };
+        setMeta({
+          expiry: body.expiry ?? null,
+          step: body.step ?? 50,
+          atmStrike: null,
+        });
       }
 
       setHasFetched(true);
+      setLoading(false);
+      setErr(null);
     } catch (e: any) {
-      if (e?.name !== "AbortError") setErr(e?.message || "Failed to load data");
+      if (e?.name === "AbortError") return;
+      const msg = e?.message || "Failed to load data";
+
+      // If first load & it's a generic "Failed to fetch", treat as slow/heavy load → keep loading
+      const isFailedToFetch = /Failed to fetch/i.test(msg);
+      if (!hadDataBefore && isFailedToFetch) {
+        setLoading(true);
+        setErr(null);
+        return;
+      }
+
+      // If we already have data: soft error, keep chart & show warning
+      if (hadDataBefore) {
+        setErr(msg);
+        setLoading(false);
+        setHasFetched(true);
+        return;
+      }
+
+      // Hard error with no data at all
+      setErr(msg || "Failed to fetch");
+      setLoading(false);
+      setHasFetched(true);
     }
   };
 
@@ -170,11 +257,13 @@ export default function Call_Put({ panel = "card" }: Props) {
     fetchCurrent();
     if (tickRef.current) clearInterval(tickRef.current);
     tickRef.current = setInterval(fetchCurrent, AUTO_REFRESH_MS);
+
     return () => {
       abortRef.current?.abort();
       if (tickRef.current) clearInterval(tickRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, interval]);
 
   /* ----------------------------- Transform ------------------------------- */
@@ -193,7 +282,7 @@ export default function Call_Put({ panel = "card" }: Props) {
     const labels = series.map((p) => toLabelIST(p.timestamp));
     const ce = series.map((p: any) => Number(p.callOI ?? 0));
     const pe = series.map((p: any) => Number(p.putOI ?? 0));
-    const latestAtmStrike = tab === "ATM" ? (meta.atmStrike ?? null) : null;
+    const latestAtmStrike = tab === "ATM" ? meta.atmStrike ?? null : null;
 
     return { labels, ce, pe, latestAtmStrike };
   }, [atmSeries, overallSeries, tab, meta]);
@@ -236,7 +325,10 @@ export default function Call_Put({ panel = "card" }: Props) {
     const range = Math.max(1, max - min);
     const step = niceStep(range / 6);
     const center = (min + max) / 2;
-    const minAxis = Math.max(0, Math.floor((center - 3 * step) / step) * step);
+    const minAxis = Math.max(
+      0,
+      Math.floor((center - 3 * step) / step) * step
+    );
     const maxAxis = Math.ceil((center + 3 * step) / step) * step;
     return { min: minAxis, max: maxAxis } as any;
   }, [tab, labels, ce, pe]);
@@ -263,12 +355,20 @@ export default function Call_Put({ panel = "card" }: Props) {
       },
       plugins: {
         legend: {
-          labels: { color: vars.fg, usePointStyle: true, padding: 14, font: { size: isMobile ? 10 : 12 } as any },
+          labels: {
+            color: vars.fg,
+            usePointStyle: true,
+            padding: 14,
+            font: { size: isMobile ? 10 : 12 } as any,
+          },
           position: (isMobile ? "bottom" : "top") as any,
         },
         title: {
           display: true,
-          text: tab === "ATM" ? "ATM Strike OI (CE/PE)" : "Overall OI (CE/PE)",
+          text:
+            tab === "ATM"
+              ? "ATM Strike OI (CE/PE)"
+              : "Overall OI (CE/PE)",
           color: vars.fg,
           font: { size: 14, weight: 600 },
           padding: { top: 4, bottom: 8 },
@@ -281,15 +381,27 @@ export default function Call_Put({ panel = "card" }: Props) {
           borderWidth: 1,
           callbacks:
             tab === "ATM" && latestAtmStrike != null
-              ? { afterLabel: () => `ATM: ${latestAtmStrike}` }
+              ? {
+                  afterLabel: () =>
+                    `ATM: ${latestAtmStrike}`,
+                }
               : {},
         },
       },
       scales: {
         x: {
           grid: { color: vars.grid },
-          ticks: { color: vars.axis, maxRotation: 45, minRotation: 45, font: { size: isMobile ? 9 : 12 } as any },
-          title: { display: true, text: "Time (IST)", color: vars.axis },
+          ticks: {
+            color: vars.axis,
+            maxRotation: 45,
+            minRotation: 45,
+            font: { size: isMobile ? 9 : 12 } as any,
+          },
+          title: {
+            display: true,
+            text: "Time (IST)",
+            color: vars.axis,
+          },
         },
         y: {
           beginAtZero: tab !== "OVERALL",
@@ -304,17 +416,32 @@ export default function Call_Put({ panel = "card" }: Props) {
                   ? formatMillionsOnly(val)
                   : formatMillions(val)
                 : String(val),
-            ...(overallStepSize ? { stepSize: overallStepSize } : {}),
+            ...(overallStepSize
+              ? { stepSize: overallStepSize }
+              : {}),
             font: { size: isMobile ? 9 : 12 } as any,
           },
-          title: { display: true, text: "Open Interest", color: vars.axis },
+          title: {
+            display: true,
+            text: "Open Interest",
+            color: vars.axis,
+          },
         },
       },
     }),
-    [tab, latestAtmStrike, yScaleExtras, overallStepSize, vars, themeKey, isMobile]
+    [
+      tab,
+      latestAtmStrike,
+      yScaleExtras,
+      overallStepSize,
+      vars,
+      themeKey,
+      isMobile,
+    ]
   );
 
   /* ----------------------------- UI ---------------------------- */
+
   const containerStyle: React.CSSProperties = {
     maxWidth: panel === "fullscreen" ? "none" : "80rem",
     height: panel === "fullscreen" ? "100%" : undefined,
@@ -329,17 +456,49 @@ export default function Call_Put({ panel = "card" }: Props) {
       ? "relative w-full h-full rounded-xl overflow-hidden"
       : "relative w-full h-[410px] md:h-[430px] lg:h-[440px] rounded-xl overflow-hidden";
 
-  const showEmpty = !labels.length && (panel === "fullscreen" ? hasFetched : true);
+  const hasDataCurrent =
+    tab === "ATM"
+      ? atmSeries.length > 0
+      : overallSeries.length > 0;
+
+  const showInitialLoader = loading && !hasDataCurrent;
   const chartAreaTopOffset = isMobile ? 64 : 0;
 
+  // Initial loading state: no data yet, keep it as "Loading..." (no fail-to-fetch)
+  if (showInitialLoader) {
+    return (
+      <div
+        className="mx-auto w-full rounded-xl shadow-xl"
+        style={containerStyle}
+      >
+        <div className={chartBoxClass}>
+          <div className="w-full h-full grid place-items-center">
+            <div
+              className="text-sm"
+              style={{ color: vars.muted }}
+            >
+              Loading OI data...
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto w-full rounded-xl shadow-xl" style={containerStyle}>
+    <div
+      className="mx-auto w-full rounded-xl shadow-xl"
+      style={containerStyle}
+    >
       <div className={chartBoxClass}>
         {/* Tabs LEFT */}
         <div className="absolute top-2 left-2 z-10 flex flex-wrap gap-2">
           <div
             className="flex items-center gap-1 rounded-lg px-1.5 py-1"
-            style={{ background: vars.card, border: `1px solid ${vars.brd}` }}
+            style={{
+              background: vars.card,
+              border: `1px solid ${vars.brd}`,
+            }}
           >
             {(["ATM", "OVERALL"] as const).map((t) => (
               <button
@@ -347,8 +506,14 @@ export default function Call_Put({ panel = "card" }: Props) {
                 onClick={() => setTab(t)}
                 className="px-2.5 py-1 text-xs rounded"
                 style={{
-                  background: tab === t ? "rgba(99,102,241,0.25)" : "transparent",
-                  border: tab === t ? `1px solid ${vars.brd}` : "1px solid transparent",
+                  background:
+                    tab === t
+                      ? "rgba(99,102,241,0.25)"
+                      : "transparent",
+                  border:
+                    tab === t
+                      ? `1px solid ${vars.brd}`
+                      : "1px solid transparent",
                   color: vars.fg,
                 }}
               >
@@ -362,23 +527,34 @@ export default function Call_Put({ panel = "card" }: Props) {
         <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
           <div
             className="flex items-center gap-1 rounded-lg px-1.5 py-1"
-            style={{ background: vars.card, border: `1px solid ${vars.brd}` }}
+            style={{
+              background: vars.card,
+              border: `1px solid ${vars.brd}`,
+            }}
           >
-            {(["3m", "15m", "30m", "1h"] as const).map((opt) => (
-              <motion.button
-                key={opt}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => setIntervalOpt(opt)}
-                className="px-2.5 py-1 text-xs rounded"
-                style={{
-                  background: interval === opt ? "rgba(99,102,241,0.25)" : "transparent",
-                  border: interval === opt ? `1px solid ${vars.brd}` : "1px solid transparent",
-                  color: vars.fg,
-                }}
-              >
-                {opt}
-              </motion.button>
-            ))}
+            {(["3m", "15m", "30m", "1h"] as const).map(
+              (opt) => (
+                <motion.button
+                  key={opt}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => setIntervalOpt(opt)}
+                  className="px-2.5 py-1 text-xs rounded"
+                  style={{
+                    background:
+                      interval === opt
+                        ? "rgba(99,102,241,0.25)"
+                        : "transparent",
+                    border:
+                      interval === opt
+                        ? `1px solid ${vars.brd}`
+                        : "1px solid transparent",
+                    color: vars.fg,
+                  }}
+                >
+                  {opt}
+                </motion.button>
+              )
+            )}
           </div>
         </div>
 
@@ -386,38 +562,73 @@ export default function Call_Put({ panel = "card" }: Props) {
         {tab === "ATM" && meta.atmStrike != null && (
           <div
             className="absolute bottom-2 left-2 z-10 text-[11px] md:text-xs px-2 py-1 rounded"
-            style={{ background: vars.card, border: `1px solid ${vars.brd}`, color: vars.muted }}
+            style={{
+              background: vars.card,
+              border: `1px solid ${vars.brd}`,
+              color: vars.muted,
+            }}
           >
             Latest ATM:&nbsp;
-            <span style={{ color: vars.fg, fontWeight: 600 }}>{meta.atmStrike}</span>
+            <span
+              style={{
+                color: vars.fg,
+                fontWeight: 600,
+              }}
+            >
+              {meta.atmStrike}
+            </span>
             {meta.expiry ? (
               <>
-                &nbsp;| Expiry:&nbsp;<span style={{ color: vars.fg }}>{meta.expiry}</span>
+                &nbsp;| Expiry:&nbsp;
+                <span style={{ color: vars.fg }}>
+                  {meta.expiry}
+                </span>
               </>
             ) : null}
           </div>
         )}
 
         {/* Chart area */}
-        <div className="absolute left-0 right-0 bottom-0" style={{ top: chartAreaTopOffset }}>
-          {err ? (
-            <div className="w-full h-full grid place-items-center" style={{ color: "#f87171" }}>
-              {err}
+        <div
+          className="absolute left-0 right-0 bottom-0"
+          style={{ top: chartAreaTopOffset }}
+        >
+          {err && !hasDataCurrent ? (
+            // Real error with no usable data
+            <div
+              className="w-full h-full grid place-items-center"
+              style={{ color: "#f87171" }}
+            >
+              {err || "Failed to fetch data"}
             </div>
           ) : labels.length ? (
             <Chart
-              key={`${themeKey}-${panel}-${isMobile ? "m" : "d"}-${tab}-${interval}`}
+              key={`${themeKey}-${panel}-${
+                isMobile ? "m" : "d"
+              }-${tab}-${interval}`}
               type="line"
               data={chartData}
               options={options}
             />
-          ) : showEmpty ? (
-            <div className="w-full h-full grid place-items-center" style={{ color: vars.muted }}>
+          ) : hasFetched ? (
+            <div
+              className="w-full h-full grid place-items-center"
+              style={{ color: vars.muted }}
+            >
               No data
             </div>
           ) : null}
         </div>
       </div>
+
+      {err && hasDataCurrent && (
+        <div
+          className="mt-2 text-xs px-3 pb-2"
+          style={{ color: "#f59e0b" }}
+        >
+          Warning: {err}. Showing last available data.
+        </div>
+      )}
     </div>
   );
 }

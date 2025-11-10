@@ -1,4 +1,3 @@
-//api.ts
 import axios, {
   AxiosError,
   AxiosHeaders,
@@ -12,23 +11,80 @@ export const API_BASE =
 
 const TOKEN_KEYS = ["token", "accessToken", "jwt", "authToken"];
 
+/* =========================
+ * 7-day session helpers
+ * ========================= */
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_STARTED_AT_KEY = "sessionStartedAt";
+
+export const markSessionStart = () => {
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(SESSION_STARTED_AT_KEY, String(Date.now()));
+  } catch {
+    // ignore
+  }
+};
+
+export const clearSession = () => {
+  try {
+    if (typeof window === "undefined") return;
+    TOKEN_KEYS.forEach((k) => localStorage.removeItem(k));
+    localStorage.removeItem("user");
+    localStorage.removeItem("userId");
+    localStorage.removeItem(SESSION_STARTED_AT_KEY);
+  } catch {
+    // ignore
+  }
+};
+
+export const isSessionExpired = (): boolean => {
+  try {
+    if (typeof window === "undefined") return false;
+    const raw = localStorage.getItem(SESSION_STARTED_AT_KEY);
+    if (!raw) return false;
+    const startedAt = parseInt(raw, 10);
+    if (!Number.isFinite(startedAt)) return false;
+    return Date.now() - startedAt > SESSION_MAX_AGE_MS;
+  } catch {
+    return false;
+  }
+};
+
+/* One-time check on load: if expired, logout + redirect */
+if (typeof window !== "undefined") {
+  try {
+    if (isSessionExpired()) {
+      clearSession();
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login?expired=1";
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export const getAuthToken = (): string | null => {
   for (const k of TOKEN_KEYS) {
-    const v = localStorage.getItem(k);
+    const v = typeof window !== "undefined" ? localStorage.getItem(k) : null;
     if (v) {
       try {
         const maybeObj = JSON.parse(v);
         if (maybeObj && typeof maybeObj === "object" && "token" in maybeObj) {
           return String((maybeObj as any).token).replace(/^Bearer\s+/i, "");
         }
-      } catch {}
+      } catch {
+        // not JSON, treat as raw token
+      }
       return v.replace(/^Bearer\s+/i, "");
     }
   }
   return null;
 };
 
-export const getUserId = (): string | null => localStorage.getItem("userId");
+export const getUserId = (): string | null =>
+  typeof window !== "undefined" ? localStorage.getItem("userId") : null;
 
 const DEBUG_USER = import.meta.env.VITE_DEBUG_USER ?? "";
 
@@ -64,6 +120,15 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // 🔒 Enforce 7-day session expiry on every request
+  if (typeof window !== "undefined" && isSessionExpired()) {
+    clearSession();
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login?expired=1";
+    }
+    return Promise.reject(new Error("Session expired"));
+  }
+
   const token = getAuthToken();
   const hLike = config.headers as unknown;
 

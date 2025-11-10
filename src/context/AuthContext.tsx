@@ -1,5 +1,6 @@
 // src/context/AuthContext.tsx
 import { createContext, useState, useEffect, ReactNode } from 'react';
+import { clearSession, markSessionStart } from '../api'; // ⬅️ make sure these are exported from api.ts
 
 interface User {
   id: string;
@@ -23,6 +24,9 @@ export const AuthContext = createContext<AuthContextType>({
   isLoading: true,
 });
 
+// keep in sync with api.ts
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -32,12 +36,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const savedToken = localStorage.getItem('token');
       const savedUser = localStorage.getItem('user');
+      const startedAtRaw = localStorage.getItem('sessionStartedAt');
+
       if (savedToken && savedUser) {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        let expired = false;
+
+        if (startedAtRaw) {
+          const startedAt = Number(startedAtRaw);
+          if (Number.isFinite(startedAt)) {
+            if (Date.now() - startedAt > SESSION_MAX_AGE_MS) {
+              expired = true;
+            }
+          }
+        }
+
+        if (expired) {
+          // too old → nuke everything
+          clearSession();
+        } else {
+          setToken(savedToken);
+          setUser(JSON.parse(savedUser));
+        }
       }
     } catch (error) {
-      console.error("Failed to load auth data:", error);
+      console.error('Failed to load auth data:', error);
+      try {
+        clearSession();
+      } catch {
+        // ignore
+      }
     } finally {
       setIsLoading(false);
     }
@@ -46,17 +73,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = (token: string, user: User) => {
     setToken(token);
     setUser(user);
+
+    // persist as before
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
-    // 👇 mark that we just logged in (Dashboard will use this once to show popup immediately)
+
+    // start (or reset) the 7-day window
+    markSessionStart();
+
+    // used by your dashboard to show post-login stuff
     sessionStorage.setItem('__justLoggedIn', '1');
   };
 
   const logout = () => {
+    // centralised cleanup (tokens + userId + sessionStartedAt)
+    try {
+      clearSession();
+    } catch {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('sessionStartedAt');
+    }
+
     setToken(null);
     setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
   };
 
   return (

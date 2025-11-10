@@ -37,8 +37,17 @@ const API_BASE =
 const ACTIVE_BIN = 5;
 const DEFAULT_SINCE_MIN = 1440; // 24h
 
-const BUILD_URL = (bin = ACTIVE_BIN, sinceMin = DEFAULT_SINCE_MIN, expiry?: string) =>
-  `${String(API_BASE).replace(/\/$/, "")}/advdec?bin=${bin}&sinceMin=${sinceMin}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}`;
+const BUILD_URL = (
+  bin = ACTIVE_BIN,
+  sinceMin = DEFAULT_SINCE_MIN,
+  expiry?: string
+) =>
+  `${String(API_BASE).replace(
+    /\/$/,
+    ""
+  )}/advdec?bin=${bin}&sinceMin=${sinceMin}${
+    expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""
+  }`;
 
 /* ----------------------------- Component ----------------------------- */
 const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
@@ -49,6 +58,7 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
 
   const controllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  const dataRef = useRef<Resp | null>(null); // keep track of last good data
 
   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <motion.div
@@ -61,7 +71,12 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
         color: "var(--fg)",
         border: "1px solid var(--border)",
         ...(panel === "fullscreen"
-          ? { display: "flex", flexDirection: "column", height: "100%", maxWidth: "none" }
+          ? {
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              maxWidth: "none",
+            }
           : null),
       }}
     >
@@ -74,27 +89,55 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
     const controller = new AbortController();
     controllerRef.current = controller;
 
+    // Only show blocking loader if we DON'T have any previous data
+    if (!dataRef.current) {
+      setLoading(true);
+      setError(null);
+    }
+
     try {
       const url = BUILD_URL(ACTIVE_BIN, DEFAULT_SINCE_MIN);
       const resp = await fetch(url, {
         signal: controller.signal,
         cache: "no-store",
-        headers: {},
       });
 
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
 
       const json: Resp = await resp.json();
-
       if (!mountedRef.current) return;
+
       setData(json);
+      dataRef.current = json;
       setLastUpdated(new Date());
       setError(null);
       setLoading(false);
     } catch (e: any) {
       if (e?.name === "AbortError") return;
       if (!mountedRef.current) return;
-      setError(e?.message || "Failed to load data");
+
+      const msg = e?.message || "Failed to load data";
+
+      // If first load & this looks like a heavy/slow/network case,
+      // keep showing the loader instead of "fail to fetch".
+      if (!dataRef.current && /Failed to fetch/i.test(msg)) {
+        setLoading(true);
+        setError(null);
+        return;
+      }
+
+      // If we already have data, treat as soft warning:
+      // keep showing last available data.
+      if (dataRef.current) {
+        setError(msg);
+        setLoading(false);
+        return;
+      }
+
+      // True hard error on initial load (no data at all)
+      setError(msg);
       setLoading(false);
     }
   }, []);
@@ -102,6 +145,7 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
   useEffect(() => {
     mountedRef.current = true;
     fetchData();
+
     const id = setInterval(fetchData, REFRESH_MS);
     return () => {
       mountedRef.current = false;
@@ -116,19 +160,27 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
     fetchData();
   };
 
-  // Pick the active series (bin) for the chart
   const series = useMemo<SeriesPoint[]>(
     () => data?.chartData || [],
     [data]
   );
 
-  if (loading) {
+  /* -------------------------- Render States -------------------------- */
+
+  // Initial blocking loading (no data yet)
+  if (loading && !dataRef.current) {
     return (
       <Wrapper>
-        <h2 className="text-2xl font-bold text-center mb-4" style={{ color: "var(--fg)" }}>
+        <h2
+          className="text-2xl font-bold text-center mb-4"
+          style={{ color: "var(--fg)" }}
+        >
           📈 Market Breadth (Adv/Dec)
         </h2>
-        <div className="flex justify-center gap-10 mb-6 text-base sm:text-lg" style={{ color: "var(--fg)" }}>
+        <div
+          className="flex justify-center gap-10 mb-6 text-base sm:text-lg"
+          style={{ color: "var(--fg)" }}
+        >
           {["Advances", "Declines", "Total"].map((item) => (
             <div key={item}>
               <span style={{ color: "var(--muted)" }}>{item}: </span>
@@ -139,21 +191,30 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
             </div>
           ))}
         </div>
-        <div className="min-h-[220px] flex items-center justify-center" style={{ color: "var(--muted)" }}>
+        <div
+          className="min-h-[220px] flex items-center justify-center"
+          style={{ color: "var(--muted)" }}
+        >
           Loading market data...
         </div>
       </Wrapper>
     );
   }
 
-  if (error && !data) {
+  // Hard error and no data at all
+  if (error && !dataRef.current) {
     return (
       <Wrapper>
-        <h2 className="text-2xl font-bold text-center mb-4" style={{ color: "var(--fg)" }}>
+        <h2
+          className="text-2xl font-bold text-center mb-4"
+          style={{ color: "var(--fg)" }}
+        >
           📈 Market Breadth (Adv/Dec)
         </h2>
         <div className="min-h-[220px] flex flex-col items-center justify-center">
-          <div className="text-red-400 mb-4">Error: {error}</div>
+          <div className="text-red-400 mb-4">
+            Error: {error || "Failed to fetch"}
+          </div>
           <button
             onClick={handleRetry}
             className="px-4 py-2 rounded hover:opacity-90 transition"
@@ -170,35 +231,62 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
     );
   }
 
-  const current = data?.current || { advances: 0, declines: 0, total: 0 };
+  // Normal view (or soft warning with last data)
+  const current = dataRef.current?.current || {
+    advances: 0,
+    declines: 0,
+    total: 0,
+  };
 
   return (
     <Wrapper>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold" style={{ color: "var(--fg)" }}>
+        <h2
+          className="text-2xl font-bold"
+          style={{ color: "var(--fg)" }}
+        >
           📈 Market Breadth (Adv/Dec)
         </h2>
-        <div className="text-xs" style={{ color: "var(--muted)" }}>
-          {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString("en-IN", { hour12: false })}` : ""}
+        <div
+          className="text-xs"
+          style={{ color: "var(--muted)" }}
+        >
+          {lastUpdated
+            ? `Last updated: ${lastUpdated.toLocaleTimeString("en-IN", {
+                hour12: false,
+              })}`
+            : ""}
         </div>
       </div>
 
-      <div className="flex justify-center gap-10 mb-6 text-base sm:text-lg" style={{ color: "var(--fg)" }}>
+      <div
+        className="flex justify-center gap-10 mb-6 text-base sm:text-lg"
+        style={{ color: "var(--fg)" }}
+      >
         <div>
           <span style={{ color: "var(--muted)" }}>Advances: </span>
-          <span className="font-semibold" style={{ color: "#10B981" }}>
+          <span
+            className="font-semibold"
+            style={{ color: "#10B981" }}
+          >
             {current.advances ?? "--"}
           </span>
         </div>
         <div>
           <span style={{ color: "var(--muted)" }}>Declines: </span>
-          <span className="font-semibold" style={{ color: "#EF4444" }}>
+          <span
+            className="font-semibold"
+            style={{ color: "#EF4444" }}
+          >
             {current.declines ?? "--"}
           </span>
         </div>
         <div>
           <span style={{ color: "var(--muted)" }}>Total: </span>
-          <span className="font-semibold" style={{ color: "#60A5FA" }}>
+          <span
+            className="font-semibold"
+            style={{ color: "#60A5FA" }}
+          >
             {current.total ?? "--"}
           </span>
         </div>
@@ -209,49 +297,107 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
           minHeight: 220,
           width: "100%",
           position: "relative",
-          ...(panel === "fullscreen" ? { flex: "1 1 0%" } : null),
+          ...(panel === "fullscreen"
+            ? { flex: "1 1 0%" }
+            : null),
         }}
       >
-        <ResponsiveContainer width="100%" height={panel === "fullscreen" ? "100%" : 300}>
+        <ResponsiveContainer
+          width="100%"
+          height={panel === "fullscreen" ? "100%" : 300}
+        >
           {series.length ? (
-            <AreaChart data={series} margin={{ right: 20, left: -20 }}>
-              <XAxis dataKey="time" stroke="var(--axis)" tick={{ fill: "var(--axis)", fontSize: 10 }} />
+            <AreaChart
+              data={series}
+              margin={{ right: 20, left: -20 }}
+            >
+              <XAxis
+                dataKey="time"
+                stroke="var(--axis)"
+                tick={{
+                  fill: "var(--axis)",
+                  fontSize: 10,
+                }}
+              />
               <YAxis
                 allowDecimals={false}
                 stroke="var(--axis)"
-                tick={{ fill: "var(--axis)", fontSize: 10 }}
+                tick={{
+                  fill: "var(--axis)",
+                  fontSize: 10,
+                }}
                 domain={[0, "dataMax + 5"]}
               />
               <Tooltip
-                contentStyle={{
-                  background: "var(--tip)",
-                  borderColor: "var(--tipbr)",
-                  borderRadius: "0.5rem",
-                } as React.CSSProperties}
-                itemStyle={{ color: "var(--fg)" } as React.CSSProperties}
+                contentStyle={
+                  {
+                    background: "var(--tip)",
+                    borderColor: "var(--tipbr)",
+                    borderRadius: "0.5rem",
+                  } as React.CSSProperties
+                }
+                itemStyle={
+                  { color: "var(--fg)" } as React.CSSProperties
+                }
                 labelStyle={{ color: "var(--fg)" }}
                 formatter={(value: number, name: string) => [
                   value,
-                  name === "advances" ? "Advances" : name === "declines" ? "Declines" : name,
+                  name === "advances"
+                    ? "Advances"
+                    : name === "declines"
+                    ? "Declines"
+                    : name,
                 ]}
-                labelFormatter={(label) => `Time: ${label}`}
+                labelFormatter={(label) =>
+                  `Time: ${label}`
+                }
               />
               <Legend
                 wrapperStyle={{ color: "var(--fg)" }}
                 formatter={(value) => {
-                  if (value === "advances") return "📈 Advances";
-                  if (value === "declines") return "📉 Declines";
+                  if (value === "advances")
+                    return "📈 Advances";
+                  if (value === "declines")
+                    return "📉 Declines";
                   return value;
                 }}
               />
               <defs>
-                <linearGradient id="advFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                <linearGradient
+                  id="advFill"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="5%"
+                    stopColor="#10B981"
+                    stopOpacity={0.3}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="#10B981"
+                    stopOpacity={0}
+                  />
                 </linearGradient>
-                <linearGradient id="decFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                <linearGradient
+                  id="decFill"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="5%"
+                    stopColor="#EF4444"
+                    stopOpacity={0.3}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="#EF4444"
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
               <Area
@@ -274,7 +420,10 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
               />
             </AreaChart>
           ) : (
-            <div className="flex items-center justify-center h-full" style={{ color: "var(--fg)" }}>
+            <div
+              className="flex items-center justify-center h-full"
+              style={{ color: "var(--fg)" }}
+            >
               No chart data available
             </div>
           )}
@@ -282,7 +431,10 @@ const Avd_Dec: React.FC<Props> = ({ panel = "card" }) => {
       </div>
 
       {error ? (
-        <div className="mt-3 text-xs" style={{ color: "#f59e0b" }}>
+        <div
+          className="mt-3 text-xs"
+          style={{ color: "#f59e0b" }}
+        >
           Warning: {error}. Showing last available data.
         </div>
       ) : null}
