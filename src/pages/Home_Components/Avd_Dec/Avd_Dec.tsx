@@ -31,7 +31,7 @@ const REFRESH_MS = 180_000;
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
-  "https://api.upholictech.com/api";
+  "http://localhost:8000/api";
 
 // Which bin to request from server
 const ACTIVE_BIN = 5;

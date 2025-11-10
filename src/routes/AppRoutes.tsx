@@ -44,7 +44,6 @@ const AppRoutes: React.FC = () => {
         {/* Public routes */}
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/fno" element={<Layout />} />
         <Route path="/fno-khazana" element={<Main/>} />
         <Route path="/fii-dii-activity" element={<Fii_Dii_Activity />} />
         <Route path="/fii-dii-fno" element={<Fii_Dii_Fno />} />
@@ -85,6 +84,10 @@ const AppRoutes: React.FC = () => {
           {/* FII/DII → key=fii_dii_data (part of your bundle components) */}
           <Route element={<RequireEntitlement anyOf={["fii_dii_data"]} />}>
             <Route path="/main-fii-dii" element={<Main_Page_Fii_Dii />} />
+          </Route>
+
+          <Route element={<RequireEntitlement anyOf={["fno_khazana"]} />}>
+             <Route path="/fno" element={<Layout />} />
           </Route>
 
           {/* Logged-in purchase flow still allowed */}

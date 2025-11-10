@@ -6,7 +6,7 @@ export type Row = { volatility: number; time: string; signal: "Bullish" | "Beari
 export type RowsByInterval = Record<Interval, Row[]>;
 
 function apiBase(): string {
-  const raw = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || "https://api.upholictech.com/api";
+  const raw = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || "http://localhost:8000/api";
   const b = String(raw).replace(/\/$/, "");
   return /\/api$/i.test(b) ? b : b + "/api";
 }
