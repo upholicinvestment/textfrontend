@@ -6,7 +6,7 @@ import Home from '../pages/Home/Home';
 import AdminDashboard from '../pages/Admin/AdminDashboard';
 
 import Layout from '../pages/FNO_Home/Layout/Layout';
-// import Main from '../pages/FNO_Home/Fno_Homepage/Main';
+import Main from '../pages/FNO_Home/Fno_Homepage/Main';
 // import ScannerDashboard from '../pages/Fundamental_Scanner/Scanner_Dashboard/ScannerDashboard';
 import Fii_Dii_Activity from '../pages/Fii_Dii/Fii_Dii/Fii_Dii_Activity';
 import Fii_Dii_Fno from '../pages/Fii_Dii/Fii_Dii/Fii_Dii_Fno';
@@ -44,7 +44,7 @@ const AppRoutes: React.FC = () => {
         {/* Public routes */}
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<AdminDashboard />} />
-        {/* <Route path="/fno-khazana" element={<Main/>} /> */}
+        <Route path="/fno-khazana" element={<Main/>} />
         <Route path="/fii-dii-activity" element={<Fii_Dii_Activity />} />
         <Route path="/fii-dii-fno" element={<Fii_Dii_Fno />} />
         <Route path="/dii-index-opt" element={<Dii_Index_Opt />} />
