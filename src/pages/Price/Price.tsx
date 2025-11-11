@@ -21,6 +21,7 @@ type Variant = {
   key: string;
   priceMonthly?: number;
 };
+
 type Product = {
   _id: string;
   key: string;
@@ -280,11 +281,11 @@ const Price = () => {
   // ---------- Pricing helpers ----------
   const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
-  // fallback price numbers
-  const BUNDLE_MONTHLY = 499;     //499
-  const BUNDLE_ANNUAL = 4999;     //4999
-  const JOURNAL_MONTHLY = 299;    //299
-  const JOURNAL_ANNUAL = 2499;    //2499
+  // fallback price numbers (kept to avoid breaking UI if backend missing values)
+  const BUNDLE_MONTHLY = 499; //499
+  const BUNDLE_ANNUAL = 4999; //4999
+  const JOURNAL_MONTHLY = 299; //299
+  const JOURNAL_ANNUAL = 2499; //2499
 
   const bundleMonthlyNum =
     typeof bundle?.priceMonthly === "number"
@@ -342,7 +343,22 @@ const Price = () => {
         "Correlation tools",
       ],
     },
+    {
+      id: 3,
+      name: "F&O Analytics Suite",
+      description:
+        "Derivatives intelligence: Calls, Puts, Heatmap, Breadth, Volatility & GEX levels",
+      icon: "📊",
+      features: [
+        "Call & Put analytics dashboard",
+        "Options heatmap & strike distribution",
+        "Advance/Decline (Adv-Dec) micro-breadth",
+        "Volatility Index monitoring",
+        "GEX Levels & key liquidity zones",
+      ],
+    },
   ];
+
   const selectedBundleTool =
     bundleTools.find((t) => t.id === selectedBundle) || bundleTools[0];
 
@@ -358,18 +374,19 @@ const Price = () => {
     ],
   };
 
-
   const startOfDay = (d: Date) => {
     const x = new Date(d);
     x.setHours(0, 0, 0, 0);
     return x;
   };
+
   const daysUntil = (iso?: string) => {
     if (!iso) return Infinity;
     const t = startOfDay(new Date());
     const e = startOfDay(new Date(iso));
     return Math.ceil((e.getTime() - t.getTime()) / 86400000);
   };
+
   const isActiveRow = (x: any) =>
     String(x?.status || "inactive").toLowerCase() === "active" &&
     (!x?.endsAt || new Date(x.endsAt).getTime() > Date.now());
@@ -679,7 +696,12 @@ const Price = () => {
         .toLowerCase()
         .includes("bundle");
       return (
-        ACTIVE(it) && fromBundle && (k === "journaling" || k === "fii_dii_data")
+        ACTIVE(it) &&
+        fromBundle &&
+        (k === "journaling" ||
+          k === "fii_dii_data" ||
+          k === "fno_analytics" ||
+          k === "fno_suite")
       );
     });
 
@@ -785,7 +807,7 @@ const Price = () => {
     "trading_journal_pro",
   ]);
 
-  // Renew window for Journaling (solo), prefer raw user_products (productId === journaling_solo)
+  // Renew window for Journaling (solo)
   const expiringJournalingSolo = useMemo(() => {
     const isFromBundle = (x: any) =>
       String(x?.meta?.source || "")
@@ -1144,7 +1166,7 @@ const Price = () => {
                             Trader&apos;s Essential Bundle
                           </h2>
                           <p className="text-blue-100 mt-1">
-                            All 2 premium tools for the price of one
+                            All 3 premium tools for the price of one
                           </p>
                         </div>
 
@@ -1196,7 +1218,7 @@ const Price = () => {
                       {/* Highlights */}
                       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {[
-                          "2 tools included",
+                          "3 tools included",
                           "Save up to 60%",
                           "Priority support",
                         ].map((h) => (
@@ -1214,10 +1236,10 @@ const Price = () => {
 
                   {/* Body */}
                   <div className="relative p-6 md:p-8">
-                    {/* What's inside */}
+                    {/* WHAT'S INSIDE */}
                     <div className="mb-5">
                       <div className="text-xs tracking-wider text-blue-300/80 mb-2">
-                        WHAT'S INSIDE
+                        WHAT&apos;S INSIDE
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {bundleTools.map((t) => (
@@ -1235,7 +1257,7 @@ const Price = () => {
                     </div>
 
                     {/* Tool cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                       {bundleTools.map((tool) => {
                         const selected = selectedBundle === tool.id;
                         return (
@@ -1292,7 +1314,9 @@ const Price = () => {
                             Included with the bundle along with{" "}
                             <span className="text-white">
                               {bundleTools
-                                .filter((t) => t.id !== selectedBundleTool.id)
+                                .filter(
+                                  (t) => t.id !== selectedBundleTool.id
+                                )
                                 .map((t) => t.name)
                                 .join(", ")}
                             </span>
@@ -1308,7 +1332,8 @@ const Price = () => {
                     {/* CTA row */}
                     <div className="flex flex-col sm:flex-row justify-between items-center pt-5 border-t border-gray-700">
                       <div className="mb-4 sm:mb-0 text-gray-300 text-sm">
-                        Unlock all tools + future updates
+                        Unlock Journaling, FII/DII, and F&O Analytics Suite in
+                        one plan.
                       </div>
 
                       <div className="flex items-center">
@@ -1408,7 +1433,7 @@ const Price = () => {
                       </div>
                     </div>
 
-                    {/* Content: two feature cards + grid + CTAs */}
+                    {/* Content */}
                     <div className="p-8">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                         {/* Performance Analytics card */}
@@ -1660,12 +1685,13 @@ const Price = () => {
                             </button>
                           )}
 
-                          {/* ✅ Renew now (Journaling SOLO) */}
+                          {/* Renew now (Journaling SOLO) */}
                           {journaling && expiringJournalingSolo && (
                             <button
                               onClick={async (e) => {
                                 e.preventDefault();
-                                const token = localStorage.getItem("token");
+                                const token =
+                                  localStorage.getItem("token");
                                 if (!token) {
                                   navigate(
                                     toRegister(
