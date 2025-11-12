@@ -56,7 +56,7 @@ const Dii_Index_Opt: React.FC = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get<FIIData[]>("https://cpu.upholictech.com/api/DII_Index_Opt/data");
+        const response = await axios.get<FIIData[]>("https://api.upholictech.com/api/DII_Index_Opt/data");
         
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
