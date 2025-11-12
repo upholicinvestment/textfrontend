@@ -50,7 +50,7 @@ const Client_Index_Opt: React.FC = () => {
 
   useEffect(() => {
     axios
-      .get<FIIData[]>("https://cpu.upholictech.com/api/Client_Index_Opt/data")
+      .get<FIIData[]>("https://api.upholictech.com/api/Client_Index_Opt/data")
       .then((response) => {
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
