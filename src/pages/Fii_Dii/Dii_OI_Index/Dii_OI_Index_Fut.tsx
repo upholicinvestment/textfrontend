@@ -49,7 +49,7 @@ const Dii_OI_Index_Fut: React.FC = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get<FIIData[]>("https://cpu.upholictech.com/api/OIDII_Index_Fut/data");
+        const response = await axios.get<FIIData[]>("https://api.upholictech.com/api/OIDII_Index_Fut/data");
         
         const formattedData = response.data.map((item) => {
           const dateObj = new Date(item.Date);
