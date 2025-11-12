@@ -54,7 +54,7 @@ export default function NetOIChart() {
   const [showControls, setShowControls] = useState(false);
 
   useEffect(() => {
-    fetch('https://cpu.upholictech.com/api/net-oi')
+    fetch('https://api.upholictech.com/api/net-oi')
       .then(res => res.json())
       .then(json => {
         setData(json);
