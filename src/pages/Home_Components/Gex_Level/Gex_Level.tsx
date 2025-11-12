@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 /* ========= Config ========= */
 const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "https://cpu.upholictech.com/api";
+  import.meta.env.VITE_API_BASE_URL || "https://api.upholictech.com/api";
 const REFRESH_MS = 60_000; // 1 minute
 const CHART_H = 370;
 
