@@ -40,7 +40,7 @@ type Props = { panel?: "card" | "fullscreen" };
 const RAW_BASE =
   (import.meta as any).env?.VITE_API_BASE ||
   (import.meta as any).env?.VITE_API_URL ||
-  "https://cpu.upholictech.com";
+  "https://api.upholictech.com";
 const API_BASE = String(RAW_BASE).replace(/\/$/, "") + "/api";
 const AUTO_REFRESH_MS = 180_000;
 
