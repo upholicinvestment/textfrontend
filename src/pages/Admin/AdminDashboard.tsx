@@ -6,7 +6,7 @@ import {
 } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.upholictech.com/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://cpu.upholictech.com/api";
 const ROWS = 5;
 
 // Expired/scan tunables
